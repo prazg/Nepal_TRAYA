@@ -77,16 +77,6 @@ parameter is tuned to improve agreement.
 8. **Exposure stops at the Nepalese border**, though several routed rivers cross
    into India within the routing distance.
 
-### A correction applied to an input
-
-The province field in the source lake inventory is unreliable: in it every
-province spans nearly the full longitude range of Nepal. The per-province
-totals are almost right while individual lakes are not, which is the signature
-of a join that attached the right column in the wrong order. Province and
-district are recomputed here by point-in-polygon against OpenStreetMap
-administrative relations; 946 of 1,429 lakes changed province as a result.
-This is worth fixing upstream in the Nepal Cryosphere Inventory.
-
 ## Running the pipeline
 
 ```bash
