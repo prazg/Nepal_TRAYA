@@ -75,18 +75,58 @@ def self_destructive_hazard(sla_steep: bool, ice_cored: bool | None) -> str:
 
 def overall_hazard(avalanche: bool, rockfall: bool, upstream_glof: bool,
                    sla_steep: bool, ice_cored: bool | None) -> str:
-    """Rounce et al. (2016) Figure 4."""
+    """Rounce et al. (2016) Figure 4, general reading (the default here).
+
+    AMBIGUITY IN THE SOURCE. Section 4.2 of Rounce et al. (2016) states a general
+    rule and then enumerates specific paths, and for two combinations the two
+    disagree. The general rule is:
+
+        "The most dangerous situation is a glacial lake that is susceptible to
+         both dynamic and self-destructive failures, which would classify the
+         lake as a very high hazard. Susceptibility is defined as a hazard
+         greater than low; i.e., a lake that is considered a moderate hazard for
+         dynamic failure and a moderate hazard for self-destructive failure is
+         still classified as very high hazard."
+
+    The enumeration then says that "any lake with a buried ice core that is
+    susceptible to a rockfall or upstream GLOF, or has a steep SLA, is
+    classified as a high hazard", and that a lake without an ice core in the
+    same situation is moderate. Those two combinations - rockfall with an ice
+    core, and rockfall with a steep lakefront - satisfy the general rule for very
+    high while the enumeration calls them high and moderate respectively.
+
+    We cannot resolve this from the published text (Figure 4 itself is the
+    authority and we only have the prose), so we implement the general rule,
+    which is stated with an explicit definition and a worked example and is the
+    more conservative of the two. `overall_hazard_enumerated` implements the
+    other reading, and validate.py reports how many lakes are affected.
+    """
     dyn = dynamic_hazard(avalanche, rockfall, upstream_glof)
     sdf = self_destructive_hazard(sla_steep, ice_cored)
     if ORDER[dyn] > 0 and ORDER[sdf] > 0:
         return "very high"
+    if ORDER[dyn] > 0:
+        return "high" if avalanche else "moderate"
+    if ORDER[sdf] > 0:
+        return "moderate"
+    return "low"
+
+
+def overall_hazard_enumerated(avalanche: bool, rockfall: bool, upstream_glof: bool,
+                              sla_steep: bool, ice_cored: bool | None) -> str:
+    """The alternative reading: the specific paths enumerated in Sect. 4.2,
+    taken literally and in the order given. Used only for sensitivity analysis.
+    """
+    other = rockfall or upstream_glof or sla_steep
     if ice_cored and avalanche:
         return "very high"
     if avalanche:
         return "high"
-    if ice_cored and (rockfall or upstream_glof or sla_steep):
+    if ice_cored and other:
         return "high"
-    if rockfall or upstream_glof or sla_steep:
+    if other:
+        return "moderate"
+    if ice_cored:
         return "moderate"
     return "low"
 

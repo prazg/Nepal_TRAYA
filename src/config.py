@@ -45,12 +45,19 @@ REACH_ANGLE_AVALANCHE = 17.0  # deg, large ice avalanches
 REACH_ANGLE_ROCKFALL = 20.0   # deg
 
 # Volume-dependent reach angle for avalanches below 6.67e6 m3:
-#   tan(alpha) = 1.111 - 0.118 * log10(V)      Huggel et al. (2004b), via Rounce et al. (2016) Eq. 1
+#   tan(alpha) = 1.111 - 0.118 * log10(V)
+#   Huggel, C., Haeberli, W., Kaeaeb, A., Bieri, D., Richardson, S. (2004)
+#   'An assessment procedure for glacial hazards in the Swiss Alps',
+#   Can. Geotech. J. 41(6), 1068-1083, doi:10.1139/T04-053
+#   (this is Rounce et al.'s 'Huggel et al. 2004b', their Eq. 1 -- note it is NOT
+#    the Kolka/Karmadon NHESS paper, which is Huggel et al. 2005)
 HUGGEL_A = 1.111
 HUGGEL_B = 0.118
 HUGGEL_V_LIMIT = 6.67e6       # m3; above this the fixed 17 deg threshold applies
 
-# Assumed avalanche release depths (m); Rounce et al. (2016) after Huggel et al. (2004b, 2005)
+# Assumed avalanche release depths (m); Rounce et al. (2016) after Huggel et al.
+# (2004, Can. Geotech. J.) and Huggel et al. (2005, NHESS 5, 173-187,
+# doi:10.5194/nhess-5-173-2005, the Kolka/Karmadon rock/ice avalanche)
 AVALANCHE_DEPTHS_M = (10.0, 30.0, 50.0)
 
 # ---------------------------------------------------------------------------
@@ -59,8 +66,14 @@ AVALANCHE_DEPTHS_M = (10.0, 30.0, 50.0)
 #   1000 m of the moraine. Lakes with SLA < 10 deg were not observed to fail.
 #   Fujita, K. et al. (2013), via Rounce et al. (2016) Sect. 4.1.3
 # ---------------------------------------------------------------------------
-SLA_BUFFER_INNER_M = 100.0    # exclude the first 100 m to avoid DEM edge artefacts
+# Fujita et al. (2013) examine all terrain within 1000 m of the lake, with no
+# inner exclusion; Rounce et al. (2016) additionally buffered the first 100 m to
+# suppress ASTER GDEM artefacts between adjacent cells. We follow Fujita and
+# instead require a contiguous patch of at least 4 cells, which serves the same
+# purpose on the Copernicus DEM. sensitivity.py quantifies the difference.
+SLA_BUFFER_INNER_M = 0.0
 SLA_BUFFER_OUTER_M = 1000.0
+SLA_MIN_PATCH_CELLS = 4
 SLA_THRESHOLD_DEG = 10.0
 HP_SEARCH_MAX_M = 300.0       # upper bound of the Hp bisection; PFV uses min[Hp, Dm]
                               # so a capped Hp does not distort PFV, but is flagged
@@ -117,11 +130,10 @@ EXPOSURE_CORRIDOR_M = 1000.0             # search radius around the routed chann
 
 # ---------------------------------------------------------------------------
 # Seismic
-#   Keefer, D.K. (1984) "Landslides caused by earthquakes", GSA Bulletin 95,
-#   406-421: the smallest earthquakes reported to have triggered landslides are
-#   about M 4.0, and maximum epicentral distance grows with magnitude.
+#   No triggering model is fitted here. The live layer consumes the USGS
+#   ShakeMap and ground-failure products directly; the catalogue below supplies
+#   descriptive statistics of observed seismicity near each lake.
 # ---------------------------------------------------------------------------
-EQ_MIN_MAGNITUDE_LANDSLIDE = 4.0
 EQ_CATALOGUE_START = "1900-01-01"
 EQ_CATALOGUE_MIN_MAG = 4.0
 USGS_QUERY = "https://earthquake.usgs.gov/fdsnws/event/1/query"
@@ -151,6 +163,12 @@ SOURCES = [
          url="https://www.openstreetmap.org/copyright", licence="ODbL 1.0"),
     dict(name="USGS earthquake catalogue and real-time feeds", detail="FDSN event service and GeoJSON summary feeds",
          url="https://earthquake.usgs.gov/", licence="public domain"),
+    dict(name="Esri ArcGIS Online basemaps",
+         detail="World Dark Gray Base, World Hillshade and World Imagery tiles, used keyless with attribution",
+         url="https://www.esri.com/en-us/legal/terms/full-master-agreement",
+         licence="Esri terms of use; free with attribution, confirm before commercial or high-traffic deployment"),
+    dict(name="OpenTopoMap", detail="alternative topographic basemap",
+         url="https://opentopomap.org/", licence="map style CC-BY-SA 3.0; data ODbL 1.0"),
     dict(name="Open-Meteo", detail="past and forecast precipitation",
          url="https://open-meteo.com/", licence="CC-BY-4.0"),
     dict(name="Veh, Korup & Walz (2020) supplementary data", detail="lake depth-area bathymetry sample and natural dam-break compilation",

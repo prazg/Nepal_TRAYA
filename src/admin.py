@@ -16,7 +16,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from shapely.geometry import shape, Point, LineString, MultiPolygon
+from shapely.geometry import Point, LineString
 from shapely.ops import polygonize, unary_union
 from shapely.strtree import STRtree
 

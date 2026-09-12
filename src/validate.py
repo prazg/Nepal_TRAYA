@@ -22,7 +22,6 @@ import math
 import os
 import sys
 
-import numpy as np
 from shapely.geometry import shape, Point
 
 import config as C
@@ -158,12 +157,12 @@ def main():
         t = terr.get(lid, {})
         ava = bool((t.get("avalanche") or {}).get("can_reach"))
         rock = bool((t.get("rockfall") or {}).get("can_reach"))
-        sla = t.get("sla_max_angle_deg")
+        sla_val = t.get("sla_max_angle_deg")  # noqa
         rows.append(dict(lake=name, lake_id=lid, match_km=round(d * 111.0, 2),
                          ava=ava, ava_pub=ava_pub, ava_agree=(ava == ava_pub),
                          rock=rock, rock_pub=rock_pub, rock_agree=(rock == rock_pub),
-                         sla=sla, sla_pub=sla_pub,
-                         sla_agree=((sla or 0) >= C.SLA_THRESHOLD_DEG)
+                         sla=sla_val, sla_pub=sla_pub,
+                         sla_agree=((sla_val or 0) >= C.SLA_THRESHOLD_DEG)
                          == (sla_pub >= C.SLA_THRESHOLD_DEG)))
     ava_ok = sum(r["ava_agree"] for r in rows)
     rock_ok = sum(r["rock_agree"] for r in rows)
@@ -188,7 +187,8 @@ def main():
             p50, lo, hi, unit = q["p50"], q["p2_5"], q["p97_5"], "m3/s"
         val = ob["value"] / (1e6 if ob["kind"] == "volume" else 1.0)
         events.append(dict(
-            event=f"{name} — {ob['kind']} ({unit}); inventory area {area_km2:.3f} km2",
+            lake=name, kind=ob["kind"], unit=unit, area_km2=round(area_km2, 3),
+            event=f"{name} - {ob['kind']} ({unit}); inventory area {area_km2:.3f} km2",
             observed=ob["observed"], p50=round(p50, 1), lo=round(lo, 1), hi=round(hi, 1),
             ratio=round(p50 / val, 2) if val else None,
             within=bool(lo <= val <= hi), source=ob["source"]))
@@ -216,7 +216,7 @@ def main():
 
     # ---- 2b. reproduce Fujita et al. (2013) arithmetic ---------------------
     fuj1 = []
-    for name, a, sla, hp, dm, pfv, fv in FUJITA_TABLE1:
+    for name, a, _sla, hp, dm, pfv, fv in FUJITA_TABLE1:
         dm_ours = TR.mean_depth_fujita(a)
         pfv_ours = TR.pfv_fujita(a, hp) / 1e6
         fuj1.append(dict(lake=name, area=a, hp=hp,

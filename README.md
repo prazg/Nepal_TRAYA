@@ -8,7 +8,7 @@ methods and open data, with live feeds read by the browser.
 operational warning service.** Read the "Methods and limits" tab before using
 any number from it.
 
-Live page: `https://prazg.github.io/Nepal_TRAYA/`
+Live page: `https://<user>.github.io/Nepal_Multihazard_EWS/`
 
 ---
 
@@ -30,6 +30,28 @@ earthquake feeds, USGS ShakeMap MMI contours, the USGS ground-failure product
 (its operational run of the Nowicki Jessee et al. 2018 coseismic landslide
 model), and Open-Meteo precipitation on request.
 
+### Basemaps
+
+No API key is needed for any of them, and the tool works with none at all.
+CARTO's basemaps, used in an earlier version, began requiring a key and now
+return a watermarked tile, so they were removed. The switcher offers:
+
+| basemap | source | licence |
+|---|---|---|
+| Dark grey (default) | Esri World Dark Gray Base | Esri terms of use, free with attribution |
+| Terrain (hillshade) | Esri World Hillshade | Esri terms of use, free with attribution |
+| Satellite imagery | Esri World Imagery | Esri terms of use, free with attribution |
+| OpenTopoMap | opentopomap.org | map style CC-BY-SA 3.0, data ODbL |
+| OpenStreetMap | tile.openstreetmap.org | ODbL, subject to the OSMF tile usage policy |
+| No basemap | — | — |
+
+The Esri layers are the closest visual replacement for the old CARTO dark style
+and are widely used in research, but their terms should be confirmed before any
+high-traffic or commercial deployment; OpenTopoMap and OpenStreetMap are the
+unambiguously licensed alternatives. The choice is remembered in the viewer's own
+browser, and if a provider starts failing the header says so instead of leaving a
+blank map.
+
 ## Headline results
 
 - 16 lakes exceed the 10 million m³ potential flood volume that Fujita et al.
@@ -38,6 +60,21 @@ model), and Open-Meteo precipitation on request.
 - 697 lakes have a routed flood path with mapped exposure on it.
 - 24 of 24 validation and consistency checks pass, including 8/8 agreement with
   the published avalanche classification of Rounce et al. (2016).
+
+## Preprint
+
+`paper/` holds an arXiv-ready manuscript describing the implementation, the
+validation and the sensitivity analysis. Every number, table and figure in it is
+generated from the pipeline by `src/make_tables.py` and `src/make_figures.py`, so
+the paper cannot drift from the data. `make -C paper` builds it;
+`make -C paper arxiv` produces the submission tarball. **The author list,
+affiliations and funding statement are placeholders and must be confirmed before
+submission.**
+
+Every bibliography entry is checked against the DOI registries by
+`src/verify_refs.py`, which compares author surnames, year, journal, volume and
+pages with the registered record. That check found and corrected a wrong author
+list and a misattributed equation during preparation.
 
 ## Validation
 
@@ -55,6 +92,14 @@ parameter is tuned to improve agreement.
   peak discharge of the 1985 Dig Tsho flood both fall inside our intervals.
 - **Dig Tsho after 1985**: the steep lakefront that Fujita et al. report
   disappearing after an outburst is indeed absent from the modern DEM.
+- **Unit tests** (`src/test_pipeline.py`): the 4x4 risk matrix, both readings of
+  the hazard decision tree, the ellipsoid-cap volume algebra at both limits, the
+  dimensionless scaling of the discharge model, slope on synthetic surfaces, D8
+  routing and depression filling, and the tag parsers.
+- **Sensitivity** (`src/sensitivity.py`): the results are insensitive to the DEM
+  window (6-10 km) and the noise-suppression rule, moderately sensitive to the
+  steep-lakefront threshold angle, and highly sensitive to which reading of the
+  published decision tree is implemented (68% of lakes change class).
 
 ## Known limitations, in order of importance
 
@@ -73,9 +118,29 @@ parameter is tuned to improve agreement.
    binary framework was designed for eight large suspect lakes and Himalayan
    terrain trips both of its branches nearly everywhere. Prioritise on potential
    flood volume and downstream population instead.
-7. **OpenStreetMap coverage is uneven**; exposure counts are lower bounds.
-8. **Exposure stops at the Nepalese border**, though several routed rivers cross
-   into India within the routing distance.
+7. **The published decision tree is ambiguous.** Section 4.2 of Rounce et al.
+   (2016) states a general rule and then enumerates specific paths that conflict
+   with it for two combinations. We implement the general rule, which is the more
+   conservative; the literal enumeration would class 977 of 1,429 lakes
+   differently. Anyone applying this framework should state which reading they
+   used.
+8. **Potential flood volume is close to an area scaling.** For 84% of lakes with
+   a steep lakefront the area-depth cap binds, so PFV reduces to 55A^1.25 and the
+   discriminating power sits in the binary steep-lakefront test rather than in
+   the volume calculation.
+9. **OpenStreetMap coverage is uneven**; exposure counts are lower bounds.
+10. **Exposure stops at the Nepalese border**, though several routed rivers cross
+    into India within the routing distance.
+
+### A correction applied to an input
+
+The province field in the source lake inventory is unreliable: in it every
+province spans nearly the full longitude range of Nepal. The per-province
+totals are almost right while individual lakes are not, which is the signature
+of a join that attached the right column in the wrong order. Province and
+district are recomputed here by point-in-polygon against OpenStreetMap
+administrative relations; 946 of 1,429 lakes changed province as a result.
+This is worth fixing upstream in the Nepal Cryosphere Inventory.
 
 ## Running the pipeline
 
@@ -87,8 +152,12 @@ python3 fetch_inputs.py --dem      # Copernicus DEM tiles (~1.4 GB), only needed
 python3 build_terrain.py --workers 4   # per-lake DEM analysis, resumable
 python3 exposure.py                    # OpenStreetMap, cached
 python3 seismic.py                     # USGS catalogue, cached
+python3 test_pipeline.py               # unit tests
 python3 build.py                       # assemble data/ and index.html
 python3 validate.py                    # 24 checks; non-zero exit on failure
+python3 sensitivity.py                 # ~30 min; needs the DEM
+python3 verify_refs.py                 # check the bibliography against the DOIs
+cd ../paper && make                    # build the manuscript
 ```
 
 `cache/terrain.json` is committed, so a routine refresh does not need the DEM.

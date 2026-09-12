@@ -31,7 +31,7 @@ import numpy as np
 import rasterio
 from rasterio import features as rfeatures
 from rasterio.windows import from_bounds
-from shapely.geometry import shape, LineString, mapping
+from shapely.geometry import shape, LineString
 
 import config as C
 import admin as AD
@@ -293,7 +293,7 @@ def main():
     expo_out = [dict(o, i=i) for i, o in enumerate(expo)
                 if i in interesting or o["kind"] == "hydropower"]
     keep = {o["i"] for o in expo_out}
-    for lid, r in routes.items():
+    for r in routes.values():
         hits = [[i, round(d, 1), round(off)] for i, d, off in r.pop("hits_raw")
                 if i in keep]
         # nearest first, capped so the payload stays small
@@ -321,7 +321,8 @@ def main():
                    depth_sigma=float(post[:, 2].mean()),
                    qp_piecewise=fit,
                    breach_rate_lognormal=dict(zip(
-                       ("meanlog", "sdlog", "kmax"), MG.breach_rate_lognormal()))),
+                       ("meanlog", "sdlog", "kmax"), MG.breach_rate_lognormal(),
+                       strict=True))),
         thresholds=dict(
             avalanche_slope=[C.AVALANCHE_SLOPE_MIN, C.AVALANCHE_SLOPE_MAX],
             rockfall_slope=C.ROCKFALL_SLOPE_MIN,
@@ -369,8 +370,8 @@ def _route(lid, geom, net, pop, expo, expo_xy, props):
         path=[[round(x, 4), round(y, 4)] for x, y in path.coords],
         n=dict(places=n["places"], hydropower=n["hydropower"], bridges=n["bridges"],
                health=n["health"], borders=n["borders"]),
-        pop_low=_r(min(v for v in popc.values() if v is not None), 0) if popc else None,
-        pop_high=_r(max(v for v in popc.values() if v is not None), 0) if popc else None,
+        pop_low=_r(min(_popvals), 0) if (_popvals := [v for v in popc.values() if v is not None]) else None,
+        pop_high=_r(max(_popvals), 0) if _popvals else None,
         impact=impact,
         travel_min_per_km={f"v{v:g}": round(1000.0 / v / 60.0, 3) for v in C.FRONT_VELOCITY_MS},
         qp_over_mean_flow=_r(qp / mean_q, 0) if (qp and mean_q and mean_q > 0) else None,

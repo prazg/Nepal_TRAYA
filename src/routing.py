@@ -21,7 +21,6 @@ import os
 from collections import defaultdict
 
 import geopandas as gpd
-import numpy as np
 from shapely.geometry import LineString, Point
 from shapely.ops import linemerge
 

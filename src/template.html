@@ -74,6 +74,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel2);color:var(--ink);border:1px solid var(--line);box-shadow:0 6px 22px rgba(0,0,0,.5)}
 .leaflet-popup-content{margin:9px 11px;font-size:13px}
 .leaflet-bar a{background:var(--panel2);color:var(--ink);border-color:var(--line)}
+.leaflet-control-layers{background:var(--panel2);color:var(--ink);border:1px solid var(--line);box-shadow:0 4px 16px rgba(0,0,0,.45)}
+.leaflet-control-layers-toggle{background-color:var(--panel2)}
+.leaflet-control-layers-expanded{padding:8px 10px;font-size:13px}
+.leaflet-control-layers label{display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer}
+.leaflet-control-layers-selector{accent-color:var(--accent)}
 .leaflet-bar a:hover{background:var(--panel)}
 .leaflet-control-attribution{background:rgba(15,20,25,.82)!important;color:var(--ink3)!important;font-size:10.5px}
 .leaflet-control-attribution a{color:var(--ink2)!important}
@@ -121,6 +126,7 @@ tbody tr.sel{background:#1f2f3c}
   <span class="spacer"></span>
   <span class="pill" id="pill-build">build …</span>
   <span class="pill" id="pill-eq">earthquakes …</span>
+  <span class="pill" id="pill-base">basemap</span>
   <span class="pill" id="pill-rain">rainfall on demand</span>
   <span class="pill" id="pill-screen">screening tool — not an operational warning</span>
 </header>
@@ -213,6 +219,7 @@ tbody tr.sel{background:#1f2f3c}
 <script src="data/eq_history.js"></script>
 <script src="data/glof_history.js"></script>
 <script src="data/validation.js"></script>
+<script src="data/sensitivity.js"></script>
 <script>
 /* ------------------------------------------------------------------ state */
 const S = {
@@ -223,6 +230,7 @@ const S = {
   eqHist: window.EQ_HISTORY || [],
   glofHist: window.GLOF_HISTORY || [],
   valid: window.VALIDATION || null,
+  sens: window.SENSITIVITY || null,
   sel: null, live: [], mmi: null, tab: 'watch', sort: {k:'pfv_Mm3', dir:-1},
 };
 const expoById = {}; S.expo.forEach(o => expoById[o.i] = o);
@@ -236,9 +244,60 @@ const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':
 /* ------------------------------------------------------------------- map */
 const map = L.map('map', {preferCanvas:true, zoomControl:true, worldCopyJump:false})
   .setView([28.3, 84.2], 7);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  maxZoom:17, attribution:'&copy; OpenStreetMap contributors &copy; CARTO | lakes: Nepal Cryosphere Inventory | DEM: Copernicus GLO-30 | rivers: HydroRIVERS | population: WorldPop | earthquakes: USGS'
-}).addTo(map);
+
+/* Basemaps. None of these needs an API key: CARTO's basemaps began requiring one,
+   which is why they are not used here. Each carries its own attribution and its
+   own native maximum zoom, above which Leaflet upscales rather than requesting
+   tiles that do not exist. */
+const DATA_CREDIT = 'lakes: Nepal Cryosphere Inventory | DEM: Copernicus GLO-30 '
+  + '| rivers: HydroRIVERS | population: WorldPop | earthquakes: USGS';
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const BASEMAPS = {
+  'Dark grey': L.tileLayer(`${ESRI}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`, {
+    maxZoom:17, maxNativeZoom:16, attribution:`Esri, HERE, Garmin, &copy; OpenStreetMap contributors | ${DATA_CREDIT}`}),
+  'Terrain (hillshade)': L.tileLayer(`${ESRI}/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}`, {
+    maxZoom:17, maxNativeZoom:15, attribution:`Esri, Airbus DS, USGS, NGA, NASA, CGIAR | ${DATA_CREDIT}`}),
+  'Satellite imagery': L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
+    maxZoom:17, maxNativeZoom:17, attribution:`Esri, Maxar, Earthstar Geographics | ${DATA_CREDIT}`}),
+  'OpenTopoMap': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom:17, maxNativeZoom:16, subdomains:'abc',
+    attribution:`&copy; OpenStreetMap contributors, SRTM | map style &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) | ${DATA_CREDIT}`}),
+  'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom:17, maxNativeZoom:17,
+    attribution:`&copy; OpenStreetMap contributors | ${DATA_CREDIT}`}),
+  'No basemap': L.layerGroup([]),
+};
+const BASEMAP_DEFAULT = 'Dark grey';
+let baseName = BASEMAP_DEFAULT;
+try { const v = localStorage.getItem('ews.basemap'); if (v && BASEMAPS[v]) baseName = v; } catch (e) {}
+let baseLayer = BASEMAPS[baseName].addTo(map);
+L.control.layers(BASEMAPS, null, {position:'topright', collapsed:true}).addTo(map);
+map.attributionControl.setPrefix('');
+map.on('baselayerchange', e => {
+  baseName = e.name; baseLayer = e.layer;
+  try { localStorage.setItem('ews.basemap', e.name); } catch (err) {}
+  basemapOk = true; setBasemapPill(null);
+});
+
+/* If a tile provider fails or starts demanding a key, say so once rather than
+   leaving the user with a blank or watermarked map. */
+let basemapOk = true, tileErrors = 0;
+function setBasemapPill(msg){
+  const el = document.getElementById('pill-base');
+  if (!el) return;
+  if (!msg){ el.className = 'pill'; el.textContent = `basemap: ${baseName.toLowerCase()}`; }
+  else { el.className = 'pill err'; el.textContent = msg; }
+}
+Object.values(BASEMAPS).forEach(l => {
+  if (!l.on) return;
+  // a handful of stray failures is normal; only complain if nothing is loading
+  l.on('tileload', () => { tileErrors = 0; });
+  l.on('tileerror', () => {
+    if (!basemapOk || ++tileErrors < 8) return;
+    basemapOk = false;
+    setBasemapPill('basemap tiles unavailable — pick another under the layers control');
+  });
+});
 
 const gLakes = L.layerGroup().addTo(map);
 const gRoute = L.layerGroup().addTo(map);
@@ -751,6 +810,22 @@ function tabValid(){
     </div>
     <p class="muted">An RMSE of ${fmt(v.fit.qp_piecewise.rmse_log10,2)} in log₁₀ means a typical factor-of-${fmt(Math.pow(10,v.fit.qp_piecewise.rmse_log10),1)} error in peak discharge. That is the honest precision of this class of model, and it is why every discharge on this page carries an interval.</p>
 
+    <h4>Sensitivity to the choices this implementation had to make</h4>
+    ${S.sens ? `
+    <p>Every threshold is as published, but two things still had to be decided: how to suppress DEM noise in the steep-lakefront test, and how far upslope to look for avalanche sources. The table re-runs the terrain analysis under each alternative over the ${fmt(S.sens.sample_size)} lakes of at least ${S.sens.sample_min_area_km2} km².</p>
+    <table><thead><tr><th>variant</th><th>lakes with SLA</th><th>priority set</th><th>total PFV Mm³</th><th>median ratio to reference</th><th>avalanche</th><th>rockfall</th><th>priority flips</th></tr></thead><tbody>
+    ${S.sens.variants.map(r=>`<tr${r.variant===S.sens.reference?' class="sel"':''}><td>${esc(r.variant)}</td><td class="num">${fmt(r.n_with_sla)}</td>
+      <td class="num">${fmt(r.n_priority)}</td><td class="num">${fmt(r.total_pfv_Mm3)}</td>
+      <td class="num">${r.median_ratio_to_reference==null?'—':fmt(r.median_ratio_to_reference,3)}</td>
+      <td class="num">${fmt(r.n_avalanche)}</td><td class="num">${fmt(r.n_rockfall)}</td>
+      <td class="num">${fmt(r.priority_set_changed)}</td></tr>`).join('')}
+    </tbody></table>
+    <p class="muted">The median ratio is 1.000 in every variant: changing the threshold never changes the potential flood volume of a lake that stays above it, only which lakes are in the set. Everything except the threshold angle itself is immaterial — the DEM window and the noise-suppression rule move at most one lake.</p>
+
+    <div class="callout"><b>The published decision tree is ambiguous, and it matters more than any of the above.</b>
+    Section 4.2 of Rounce et al. (2016) states a general rule — susceptible to both a dynamic and a self-destructive failure means very high hazard, with moderate plus moderate explicitly qualifying — and then enumerates specific paths under which the same combinations come out lower. We implement the general rule, which carries an explicit definition and worked example and is the more conservative. Under the literal enumeration only ${fmt(S.sens.hazard_reading.enumerated['very high']||0)} lakes would be very high hazard instead of ${fmt(S.sens.hazard_reading.general['very high']||0)}, and ${fmt(S.sens.hazard_reading.n_lakes_differing)} lakes (${fmt(100*S.sens.hazard_reading.n_lakes_differing/S.sens.hazard_reading.n_lakes,0)}% of the inventory) change class. Anyone applying this framework should say which reading they used.</div>
+    ` : `<p class="muted">Sensitivity results not built. Run <code>src/sensitivity.py</code>.</p>`}
+
     <h4>Internal consistency checks</h4>
     <table><thead><tr><th>check</th><th>result</th></tr></thead><tbody>
     ${v.checks.map(c=>`<tr><td>${esc(c.name)}</td><td>${c.pass?'<span style="color:var(--ok)">pass</span>':'<b style="color:var(--bad)">FAIL</b>'} <span class="band">${esc(c.detail)}</span></td></tr>`).join('')}
@@ -809,9 +884,15 @@ function tabSources(){
     ['Veh, G., Korup, O., Walz, A. (2020)','Hazard from Himalayan glacier lake outburst floods. PNAS 117(2), 907–912.','https://doi.org/10.1073/pnas.1914898117','depth–area posterior; dimensionless peak-discharge formulation; breach-rate distribution'],
     ['Walder, J.S., O\'Connor, J.E. (1997)','Methods for predicting peak discharge of floods caused by failure of natural and constructed earth dams. Water Resour. Res. 33(10), 2337–2348.','https://doi.org/10.1029/97WR01616','the dimensionless peak-discharge relation'],
     ['O\'Connor, J.E., Beebee, R.A. (2009)','Floods from natural rock-material dams. In: Megaflooding on Earth and Mars, Cambridge University Press, 128–171.','https://doi.org/10.1017/CBO9780511635632.008','the 63 dam-break observations and 19 breach rates'],
-    ['Huggel, C., Zgraggen-Oswald, S., Haeberli, W., Kääb, A., Polkvoj, A., Galushkin, I., Evans, S.G. (2004)','The 2002 rock/ice avalanche at Kolka/Karmadon, Russian Caucasus. Nat. Hazards Earth Syst. Sci. 5, 173–187.','https://doi.org/10.5194/nhess-5-173-2005','volume-dependent avalanche reach angle'],
+    ['Huggel, C., Haeberli, W., Kääb, A., Bieri, D., Richardson, S. (2004)','An assessment procedure for glacial hazards in the Swiss Alps. Can. Geotech. J. 41(6), 1068–1083.','https://doi.org/10.1139/T04-053','the volume-dependent avalanche reach angle, tan α = 1.111 − 0.118 log₁₀V'],
+    ['Huggel, C., Zgraggen-Oswald, S., Haeberli, W., Kääb, A., Polkvoj, A., Galushkin, I., Evans, S.G. (2005)','The 2002 rock/ice avalanche at Kolka/Karmadon, Russian Caucasus. Nat. Hazards Earth Syst. Sci. 5(2), 173–187.','https://doi.org/10.5194/nhess-5-173-2005','the assumed avalanche release depths'],
     ['Alean, J. (1985)','Ice avalanches: some empirical information about their formation and reach. J. Glaciol. 31(109), 324–333.','https://doi.org/10.3189/S0022143000006663','45° release-slope threshold for ice avalanches'],
-    ['Bolch, T., Peters, J., Yegorov, A., Pradhan, B., Buchroithner, M., Blagoveshchensky, V. (2011)','Identification of potentially dangerous glacial lakes in the northern Tien Shan. Nat. Hazards 59, 1691–1714.','https://doi.org/10.1007/s11069-011-9860-2','30° rockfall source threshold'],
+    ['Bolch, T., Peters, J., Yegorov, A., Pradhan, B., Buchroithner, M., Blagoveshchensky, V. (2011)','Identification of potentially dangerous glacial lakes in the northern Tien Shan. Nat. Hazards 59(3), 1691–1714.','https://doi.org/10.1007/s11069-011-9860-2','30° rockfall source threshold'],
+    ['Osti, R., Bhattarai, T.N., Miyake, K. (2011)','Causes of catastrophic failure of Tam Pokhari moraine dam in the Mt. Everest region. Nat. Hazards 58(3), 1209–1223.','https://doi.org/10.1007/s11069-011-9723-x','60° upper bound on avalanche release slopes'],
+    ['Shea, J.M., Immerzeel, W.W., Wagnon, P., Vincent, C., Bajracharya, S. (2015)','Modelling glacier change in the Everest region, Nepal Himalaya. The Cryosphere 9(3), 1105–1128.','https://doi.org/10.5194/tc-9-1105-2015','60° upper bound on avalanche release slopes'],
+    ['Lehner, B., Grill, G. (2013)','Global river hydrography and network routing. Hydrol. Process. 27(15), 2171–2186.','https://doi.org/10.1002/hyp.9740','the HydroRIVERS network used for downstream routing'],
+    ['Shrestha, F., Steiner, J.F., Shrestha, R., et al. (2023)','A comprehensive and version-controlled database of glacial lake outburst floods in High Mountain Asia. Earth Syst. Sci. Data 15(9), 3941–3961.','https://doi.org/10.5194/essd-15-3941-2023','HMAGLOFDB, the recorded-GLOF layer'],
+    ['Zhu, J., Baise, L.G., Thompson, E.M. (2017)','An updated geospatial liquefaction model for global application. Bull. Seismol. Soc. Am. 107(3), 1365–1385.','https://doi.org/10.1785/0120160198','the liquefaction half of the USGS ground-failure product shown live'],
     ['Bajracharya, S.R., Mool, P. (2009)','Glaciers, glacial lakes and glacial lake outburst floods in the Mount Everest region, Nepal. Ann. Glaciol. 50(53), 81–86.','https://doi.org/10.3189/172756410790595895','Dig Tsho 1985 surge-front velocity and downstream damage times'],
     ['Vuichard, D., Zimmermann, M. (1987)','The 1985 catastrophic drainage of a moraine-dammed lake, Khumbu Himal, Nepal: cause and consequences. Mt. Res. Dev. 7(2), 91–110.','https://doi.org/10.2307/3673305','Dig Tsho observations'],
     ['Cenderelli, D.A., Wohl, E.E. (2001)','Peak discharge estimates of glacial-lake outburst floods and "normal" climatic floods in the Mount Everest region, Nepal. Geomorphology 40, 57–90.','https://doi.org/10.1016/S0169-555X(01)00037-X','reconstructed Dig Tsho peak discharge'],
@@ -824,6 +905,15 @@ function tabSources(){
    <ul>${refs.map(r=>`<li><b>${esc(r[0])}</b> ${esc(r[1])} <a href="${r[2]}" target="_blank" rel="noopener">doi</a><br><span class="cite">used for: ${esc(r[3])}</span></li>`).join('')}</ul>
    <h4>Data sets</h4>
    <ul>${((s&&s.sources)||[]).map(d=>`<li><b>${esc(d.name)}</b> — ${esc(d.detail)}. <a href="${esc(d.url)}" target="_blank" rel="noopener">source</a><br><span class="cite">licence: ${esc(d.licence)}</span></li>`).join('')}</ul>
+   <h4>Basemaps</h4>
+   <p>None of the basemaps offered here needs an API key, and the tool works with none at all. CARTO's basemaps, used in an earlier version, began requiring a key and now return a watermarked tile, so they have been removed.</p>
+   <ul>
+     <li><b>Dark grey</b>, <b>Terrain (hillshade)</b> and <b>Satellite imagery</b> — Esri ArcGIS Online services (World Dark Gray Base, World Hillshade, World Imagery), attributed as Esri requires. These are free to use with attribution under Esri's terms of use; confirm those terms before any high-traffic or commercial deployment.</li>
+     <li><b>OpenTopoMap</b> — map style CC-BY-SA 3.0, data &copy; OpenStreetMap contributors (ODbL), elevation from SRTM. The clearest licence of the set, and the most informative for mountain terrain.</li>
+     <li><b>OpenStreetMap</b> standard tiles — &copy; OpenStreetMap contributors, ODbL, subject to the OSM Foundation tile usage policy.</li>
+   </ul>
+   <p class="muted">Your choice of basemap is remembered in your own browser only. If a provider stops serving tiles, the header says so and you can switch.</p>
+
    <h4>Live feeds read by your browser</h4>
    <ul><li>USGS real-time earthquake GeoJSON summary feeds, plus the ShakeMap and ground-failure products of individual events.</li>
        <li>Open-Meteo daily precipitation, past 7 days and 5-day forecast, requested only when you ask for a lake.</li></ul>
@@ -866,6 +956,7 @@ function toggle(id){ const on = document.getElementById(id).checked, g = LG[id];
       + 'Serve this folder over HTTP rather than opening the file directly.</div>';
     return;
   }
+  setBasemapPill(null);
   refresh(); drawStatics(); renderTab(); loadEq();
   setInterval(loadEq, 5 * 60 * 1000);
 })();

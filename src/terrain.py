@@ -9,7 +9,7 @@ Implements, per lake:
         Alean (1985); Bolch et al. (2011); Osti et al. (2011); Shea et al. (2015)
         as applied by Rounce et al. (2016)
   * reach-angle (Fahrboeschung) runout test with the volume-dependent avalanche
-    threshold of Huggel et al. (2004b)
+    threshold of Huggel et al. (2004, Can. Geotech. J. 41, 1068-1083)
   * steep lakefront area (SLA), potential lowering height (Hp) and potential
     flood volume (PFV) exactly as defined by Fujita et al. (2013)
 
@@ -21,14 +21,12 @@ routed path length rather than the straight-line distance.
 Documented departure from Rounce et al. (2016): avalanche-prone area is taken as
 the part of the contiguous source patch that drains to the lake, rather than
 their variable-kernel filter. This is a different estimator of the same quantity
-and it only affects which reach-angle threshold applies (Huggel et al. 2004b),
+and it only affects which reach-angle threshold applies (Huggel et al. 2004),
 not the routing.
 """
 from __future__ import annotations
 import math
 import os
-from functools import lru_cache
-
 import numpy as np
 import rasterio
 from rasterio import features
@@ -188,7 +186,8 @@ def _sla(dem, lake_mask, dist_px, z_lake, dxm, dym) -> dict:
     mean depth Dm = 55 A^0.25 (A in km2), PFV = min[Hp, Dm] * A.
     """
     cell_area = dxm * dym
-    near = (dist_px > 0) & (dist_px <= C.SLA_BUFFER_OUTER_M) & ~lake_mask
+    near = ((dist_px > C.SLA_BUFFER_INNER_M) & (dist_px > 0)
+            & (dist_px <= C.SLA_BUFFER_OUTER_M) & ~lake_mask)
     if not near.any():
         return dict(sla_area_m2=0.0, sla_max_angle_deg=None, sla_min_distance_m=None,
                     hp_m=0.0)
@@ -196,11 +195,11 @@ def _sla(dem, lake_mask, dist_px, z_lake, dxm, dym) -> dict:
     with np.errstate(divide="ignore", invalid="ignore"):
         ang = np.degrees(np.arctan(np.where(near, drop, np.nan) / np.where(near, dist_px, np.nan)))
     steep = np.nan_to_num(ang, nan=-90.0) > C.SLA_THRESHOLD_DEG
-    # require a contiguous patch of at least 4 cells to suppress single-cell noise
+    # require a contiguous patch of SLA_MIN_PATCH_CELLS cells to suppress noise
     lab, n = ndimage.label(steep)
     if n:
         sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
-        keep = np.isin(lab, 1 + np.flatnonzero(sizes >= 4))
+        keep = np.isin(lab, 1 + np.flatnonzero(sizes >= C.SLA_MIN_PATCH_CELLS))
     else:
         keep = np.zeros_like(steep)
     area = float(np.count_nonzero(keep) * cell_area)
@@ -221,7 +220,7 @@ def _sla(dem, lake_mask, dist_px, z_lake, dxm, dym) -> dict:
             l2, n2 = ndimage.label(s2)
             if n2:
                 sz = ndimage.sum(np.ones_like(l2), l2, range(1, n2 + 1))
-                remains = (sz >= 4).any()
+                remains = (sz >= C.SLA_MIN_PATCH_CELLS).any()
             else:
                 remains = False
             if remains:
