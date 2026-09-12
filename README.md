@@ -1,4 +1,4 @@
-## 🇳🇵 Nepal TRĀYA — National Multi-Hazard Early Warning System
+## 🇳🇵 Nepal TRĀYA — Nepal Multi-Hazard Early Warning System
 
 TRĀYA (त्राय) derives from the Sanskrit verbal root √trā, meaning to protect, save, or deliver. It represents an open, integrated platform for multi-hazard monitoring, prediction, early warning, and risk communication across Nepal.
 
