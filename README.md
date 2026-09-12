@@ -8,7 +8,7 @@ methods and open data, with live feeds read by the browser.
 operational warning service.** Read the "Methods and limits" tab before using
 any number from it.
 
-Live page: `https://<user>.github.io/Nepal_Multihazard_EWS/`
+Live page: `https://prazg.github.io/Nepal_Multihazard_EWS/`
 
 ---
 
