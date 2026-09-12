@@ -1,4 +1,16 @@
-# Nepal Multi-Hazard Early Warning System
+🇳🇵 Nepal TRĀYA — National Multi-Hazard Early Warning System
+
+TRĀYA (त्राय) derives from the Sanskrit verbal root √trā, meaning to protect, save, or deliver. It represents an open, integrated platform for multi-hazard monitoring, prediction, early warning, and risk communication across Nepal.
+
+Detect. Warn. Protect.
+
+TRĀYA aims to integrate Earth observation, seismic monitoring, hydrometeorological data, glacier and river surveillance, remote sensing, geospatial intelligence, artificial intelligence, and community-level warning systems to detect hazards early and support timely action.
+
+Hazards
+
+Earthquakes · Floods · Landslides · Glacial Lake Outburst Floods (GLOFs) · Avalanches · Extreme Weather · Lightning · Wildfires
+
+The long-term vision is a national hazard-intelligence infrastructure that connects observation → prediction → warning → response, while remaining open, interoperable, and adaptable to Nepal's diverse geographic and technological environments.# Nepal Multi-Hazard Early Warning System
 
 A screening assessment of glacial lake outburst flood, earthquake and
 earthquake-triggered landslide hazard for Nepal, built entirely from published
