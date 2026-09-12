@@ -1,0 +1,29 @@
+{
+  "model": {
+    "depth_posterior_draws": 100002,
+    "depth_beta0": -1.2094903091738494,
+    "depth_beta1": 0.530571806687148,
+    "depth_sigma": 0.224520636454472,
+    "qp_piecewise": {
+      "alpha": 0.32388169711931714,
+      "beta": 0.9420779768860982,
+      "chgpoint": -0.5569974606390038,
+      "sigma": 0.2871924797051519,
+      "nu": 10,
+      "n": 63,
+      "pseudo_r2": 0.6694528554408171,
+      "rmse_log10": 0.32570481978186594,
+      "eta_range": [
+        -2.9651082641463775,
+        1.5433398732481227
+      ],
+      "note": "refit by maximum likelihood to the 63-point dataset of O'Connor & Beebee (2009) compiled by Veh et al. (2020); functional form and Student-t(nu=10) noise as published"
+    },
+    "breach_rate_lognormal": {
+      "meanlog": -5.5528842466551245,
+      "sdlog": 1.5059772910405202,
+      "kmax": 0.22
+    }
+  },
+  "build": "2026-09-12T20:55:22Z"
+}
