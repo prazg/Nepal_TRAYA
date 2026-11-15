@@ -178,3 +178,7 @@ Code in `src/` is MIT. The data products in `data/` are derived from:
 - Open-Meteo (CC-BY-4.0)
 
 Recorded GLOFs, where present, come from ICIMOD's HMAGLOFDB under ICIMOD's terms.
+
+Built by Prajwal Ghimire
+CopyRight @Prajwal Ghimire.
+For Permission to use: prajwal.1.ghimire@kcl.ac.uk
