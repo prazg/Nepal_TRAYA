@@ -25,5 +25,6 @@
       "kmax": 0.22
     }
   },
-  "build": "2026-09-12T22:02:31Z"
+  "build": "2026-11-16T18:40:10Z",
+  "refresh_interval_days": 7
 }

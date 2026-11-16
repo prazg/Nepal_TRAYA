@@ -1,211 +1,415 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nepal Multi-Hazard Early Warning — glacial lakes, earthquakes, landslides</title>
-<meta name="description" content="Screening-level early warning system for glacial lake outburst floods, earthquakes and earthquake-triggered landslides in Nepal. Built from published methods on open data.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230f1419'/%3E%3Cpath d='M3 24 L11 9 L17 19 L21 13 L29 24 Z' fill='%234ea3d8'/%3E%3Ccircle cx='11' cy='13' r='2.6' fill='%23e0b83a'/%3E%3C/svg%3E">
+<title>Nepal TRĀYA (त्राय) — Multi-Hazard Early Warning &amp; Screening System</title>
+<meta name="description" content="TRĀYA (त्राय): Open-access screening and situational awareness platform for glacial lake outburst floods (GLOFs), fluvial floods (Copernicus GloFAS), earthquakes &amp; active faults, and rainfall/coseismic landslides across Nepal, refreshed every 7 days.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect width='36' height='36' rx='7' fill='%230b1016'/%3E%3Cpath d='M4 27 L12.5 10 L18.5 20.5 L23.5 13 L32 27 Z' fill='%2338bdf8' fill-opacity='.9'/%3E%3Cpath d='M9 27 L16 17 L21 23 L26 18 L32 27 Z' fill='%232dd4bf' fill-opacity='.55'/%3E%3Ccircle cx='12.5' cy='10' r='2.7' fill='%23f59e0b'/%3E%3Cpath d='M4 29.5 Q18 26.5 32 29.5' stroke='%2338bdf8' stroke-width='1.8' fill='none'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+Devanagari:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <style>
 :root{
-  --bg:#0f1419; --panel:#161d24; --panel2:#1d262f; --line:#2a3642;
-  --ink:#e6edf3; --ink2:#9aa9b7; --ink3:#68788a;
-  --accent:#4ea3d8; --accent2:#7fd1b9;
-  --h-vhigh:#c1352b; --h-high:#e07a2d; --h-mod:#d8bc45; --h-low:#4a7f6e; --h-na:#3c4855;
-  --warn:#e0b83a; --bad:#d4544a; --ok:#5fae8f;
+  --bg:#0b1016; --panel:#111821; --panel2:#17212d; --panel3:#1e2b3a; --line:#253343; --line2:#314357;
+  --ink:#e7eef6; --ink2:#9fb0c3; --ink3:#6a7d92;
+  --accent:#38bdf8; --accent2:#2dd4bf; --accent-soft:rgba(56,189,248,.13);
+  --h-vhigh:#dc3b30; --h-high:#e67e22; --h-mod:#d9b638; --h-low:#3d8b74; --h-na:#3b4958;
+  --warn:#eab308; --bad:#ef4444; --ok:#22c55e; --purple:#a78bfa;
+  --shadow:0 8px 28px rgba(0,0,0,.45);
+  --hud-bg:rgba(15,22,31,.88);
+}
+html[data-theme="light"]{
+  --bg:#f2f5f9; --panel:#ffffff; --panel2:#f4f7fb; --panel3:#e8eef5; --line:#d5dfe9; --line2:#b8c7d8;
+  --ink:#101a26; --ink2:#425468; --ink3:#697b8f;
+  --accent:#0284c7; --accent2:#0d9488; --accent-soft:rgba(2,132,199,.10);
+  --h-vhigh:#c8281e; --h-high:#d96b14; --h-mod:#b89214; --h-low:#2e7862; --h-na:#94a3b8;
+  --warn:#ca8a04; --bad:#dc2626; --ok:#16a34a; --purple:#7c3aed;
+  --shadow:0 8px 24px rgba(15,23,42,.12);
+  --hud-bg:rgba(255,255,255,.90);
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
-h1,h2,h3,h4{font-family:"Barlow Condensed",Impact,sans-serif;font-weight:600;letter-spacing:.01em;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.48 "IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:"Barlow Condensed",Impact,sans-serif;font-weight:600;letter-spacing:.015em;margin:0}
+.deva{font-family:"Noto Sans Devanagari","IBM Plex Sans",sans-serif;font-weight:600}
 code,.mono,td.num,.kv b{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
-a{color:var(--accent)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
 button,select,input{font:inherit;color:inherit}
 
-#app{display:grid;grid-template-rows:auto 1fr auto;height:100%;min-width:0;overflow:hidden}
-header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
-header h1{font-size:26px;line-height:1.1}
-header .sub{color:var(--ink2);font-size:13px}
+#app{display:grid;grid-template-rows:auto auto 1fr auto;height:100%;min-width:0;overflow:hidden}
+
+/* Header */
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0;z-index:20}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand svg{width:30px;height:30px;flex:0 0 auto}
+.brand-title{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+header h1{font-size:23px;line-height:1;letter-spacing:.02em}
+header .motto{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--accent2);padding:2px 6px;border-radius:4px;background:var(--accent-soft)}
+header .sub{color:var(--ink2);font-size:12.5px}
 header .spacer{flex:1}
-.pill{font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--line);border-radius:99px;color:var(--ink2);background:var(--panel2);white-space:nowrap}
-.pill.live{border-color:#2f5d4a;color:var(--ok)}
-.pill.stale{border-color:#5d4a2f;color:var(--warn)}
-.pill.err{border-color:#5d2f2f;color:var(--bad)}
+.pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--line);border-radius:99px;color:var(--ink2);background:var(--panel2);white-space:nowrap}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--ink3);flex:0 0 auto}
+.pill.live{border-color:rgba(34,197,94,.4);color:var(--ok)}
+.pill.live .dot{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.pill.stale,.pill.watch{border-color:rgba(234,179,8,.45);color:var(--warn)}
+.pill.stale .dot,.pill.watch .dot{background:var(--warn)}
+.pill.err{border-color:rgba(239,68,68,.45);color:var(--bad)}
+.pill.err .dot{background:var(--bad)}
 
-main{display:grid;grid-template-columns:290px minmax(0,1fr) 360px;min-height:0;min-width:0}
-@media (max-width:1200px){main{grid-template-columns:250px 1fr}#detail{display:none}}
-@media (max-width:820px){
-  html,body{height:auto}
-  #app{height:auto;overflow:visible;display:block}
-  main{display:block}
-  aside{border-right:0;border-bottom:1px solid var(--line);max-height:none;overflow:visible}
-  #detail{display:block;border-left:0;border-top:1px solid var(--line)}
-  #map{height:58vh;min-height:320px}
-  #bottom{max-height:none;border-top:1px solid var(--line)}
-  #tabbody{max-height:60vh}
-  header{gap:7px}
-  header h1{font-size:21px}
-  header .pill{font-size:10.5px;padding:2px 7px}
-  #controls section.blk:nth-of-type(n+4){display:none}
-}
+/* KPI Strip */
+#kpiStrip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;padding:7px 14px;background:var(--bg);border-bottom:1px solid var(--line)}
+#kpiStrip.hidden{display:none}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;display:flex;flex-direction:column;gap:1px;cursor:pointer;transition:border-color .15s,background .15s;min-width:0}
+.kpi:hover{border-color:var(--accent);background:var(--panel2)}
+.kpi .k-lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .k-val{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600;color:var(--ink);display:flex;align-items:baseline;gap:6px}
+.kpi .k-sub{font-size:11px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:12px 14px;min-width:0}
-#map{min-width:0}
-#detailBody{min-width:0;overflow-wrap:anywhere}
+/* Main Workspace */
+main{display:grid;grid-template-columns:300px minmax(0,1fr) 390px;min-height:0;min-width:0;position:relative}
+main.hide-left{grid-template-columns:0px minmax(0,1fr) 390px}
+main.hide-left #controls{padding:0;border:0;overflow:hidden}
+main.hide-right{grid-template-columns:300px minmax(0,1fr) 0px}
+main.hide-right #detail{padding:0;border:0;overflow:hidden}
+main.hide-left.hide-right{grid-template-columns:0px minmax(0,1fr) 0px}
+
+aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;overflow-x:hidden;padding:11px 13px;min-width:0}
 #detail{border-right:0;border-left:1px solid var(--line)}
+#detailBody{min-width:0;overflow-wrap:anywhere}
 #detail table{table-layout:fixed}
 #detail td:first-child{white-space:normal}
-section.blk{margin-bottom:16px}
-section.blk>h3{font-size:15px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink2);margin-bottom:7px;border-bottom:1px solid var(--line);padding-bottom:4px}
-label.row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13.5px;cursor:pointer}
-label.row input{accent-color:var(--accent)}
-select,input[type=search]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:13.5px}
-input[type=range]{width:100%;accent-color:var(--accent)}
-.legend{display:flex;flex-direction:column;gap:3px;font-size:13px}
-.legend i{width:13px;height:13px;border-radius:3px;display:inline-block;margin-right:7px;vertical-align:-2px}
-.muted{color:var(--ink3);font-size:12px;line-height:1.45}
 
-#map{background:#0b0f13}
-.leaflet-container{background:#0b0f13;font:inherit}
-.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel2);color:var(--ink);border:1px solid var(--line);box-shadow:0 6px 22px rgba(0,0,0,.5)}
-.leaflet-popup-content{margin:9px 11px;font-size:13px}
-.leaflet-bar a{background:var(--panel2);color:var(--ink);border-color:var(--line)}
-.leaflet-control-layers{background:var(--panel2);color:var(--ink);border:1px solid var(--line);box-shadow:0 4px 16px rgba(0,0,0,.45)}
-.leaflet-control-layers-toggle{background-color:var(--panel2)}
-.leaflet-control-layers-expanded{padding:8px 10px;font-size:13px}
+/* Map & Floating HUD */
+#mapWrap{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column}
+#map{flex:1;min-width:0;min-height:0;background:#090d12}
+.map-hud-top{position:absolute;top:10px;left:50px;right:52px;z-index:500;display:flex;align-items:center;gap:6px;flex-wrap:wrap;pointer-events:none}
+.hud-group{pointer-events:auto;display:inline-flex;align-items:center;gap:4px;background:var(--hud-bg);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:6px;padding:3px 5px;box-shadow:var(--shadow)}
+.hud-btn{background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 7px;font-size:11.5px;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.hud-btn:hover,.hud-btn.on{background:var(--panel3);color:var(--ink);border-color:var(--line2)}
+.map-hud-bot{position:absolute;bottom:22px;left:10px;z-index:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap;pointer-events:none}
+#satBar{pointer-events:auto;display:none;align-items:center;gap:7px;background:var(--hud-bg);backdrop-filter:blur(8px);border:1px solid var(--accent);border-radius:6px;padding:5px 9px;box-shadow:var(--shadow);font-size:12px}
+#satBar.on{display:inline-flex}
+#coordPill{pointer-events:auto;background:var(--hud-bg);border:1px solid var(--line);border-radius:4px;padding:2px 7px;font-size:11px;color:var(--ink2)}
+
+/* Controls & Sections */
+section.blk{margin-bottom:14px}
+section.blk>h3{font-size:13.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink2);margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:3px;display:flex;align-items:center;justify-content:space-between}
+label.row{display:flex;align-items:center;gap:7px;padding:2.5px 0;font-size:12.8px;cursor:pointer;color:var(--ink)}
+label.row input[type=checkbox]{accent-color:var(--accent);margin:0}
+label.row .tag{margin-left:auto;font-size:10px;color:var(--ink3);font-family:"IBM Plex Mono",monospace}
+select,input[type=search],input[type=date]{width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:5px 8px;font-size:12.8px;color:var(--ink)}
+select:focus,input:focus{outline:1px solid var(--accent);border-color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.legend{display:flex;flex-direction:column;gap:3px;font-size:12.2px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:7px;vertical-align:-2px}
+.muted{color:var(--ink3);font-size:11.8px;line-height:1.45}
+
+/* Leaflet Overrides */
+.leaflet-container{background:#090d12;font:inherit}
+html[data-theme="light"] .leaflet-container{background:#dce6f1}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel2);color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow)}
+.leaflet-popup-content{margin:9px 11px;font-size:12.5px;line-height:1.45}
+.leaflet-bar a{background:var(--panel2)!important;color:var(--ink)!important;border-color:var(--line)!important}
+.leaflet-bar a:hover{background:var(--panel3)!important}
+.leaflet-control-layers{background:var(--panel2)!important;color:var(--ink)!important;border:1px solid var(--line)!important;box-shadow:var(--shadow)!important;border-radius:6px!important}
+.leaflet-control-layers-expanded{padding:8px 10px!important;font-size:12.5px!important}
 .leaflet-control-layers label{display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer}
 .leaflet-control-layers-selector{accent-color:var(--accent)}
-.leaflet-bar a:hover{background:var(--panel)}
-.leaflet-control-attribution{background:rgba(15,20,25,.82)!important;color:var(--ink3)!important;font-size:10.5px}
+.leaflet-control-attribution{background:var(--hud-bg)!important;color:var(--ink3)!important;font-size:10px!important}
 .leaflet-control-attribution a{color:var(--ink2)!important}
 
-.hbadge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:11.5px;letter-spacing:.03em;text-transform:uppercase;color:#0f1419;font-weight:600}
-.h-vhigh{background:var(--h-vhigh);color:#fff}.h-high{background:var(--h-high)}.h-mod{background:var(--h-mod)}
-.h-low{background:var(--h-low);color:#fff}.h-na{background:var(--h-na);color:var(--ink2)}
+/* Badges & Key-Value Grids */
+.hbadge{display:inline-block;padding:1.5px 6.5px;border-radius:4px;font-size:10.8px;letter-spacing:.03em;text-transform:uppercase;font-weight:600;line-height:1.35}
+.h-vhigh{background:var(--h-vhigh);color:#fff}
+.h-high{background:var(--h-high);color:#fff}
+.h-mod{background:var(--h-mod);color:#111821}
+.h-low{background:var(--h-low);color:#fff}
+.h-na{background:var(--h-na);color:#e2e8f0}
+.h-info{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(56,189,248,.35)}
 
-.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;font-size:13px;margin:6px 0}
+.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2.5px 10px;font-size:12.6px;margin:5px 0}
 .kv span{color:var(--ink2)}
-.kv b{font-weight:500}
-.band{color:var(--ink3);font-size:11.5px}
+.kv b{font-weight:500;text-align:right}
+.band{color:var(--ink3);font-size:11.2px}
 
-#bottom{background:var(--panel);border-top:1px solid var(--line);max-height:42vh;display:flex;flex-direction:column;min-width:0}
-#tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-#tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 12px;color:var(--ink2);cursor:pointer;font-size:13.5px}
-#tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
-#tabbody{overflow:auto;padding:10px 14px;min-width:0;max-width:100%}
-table{width:100%;border-collapse:collapse;font-size:12.5px}
-th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-th{position:sticky;top:0;background:var(--panel);color:var(--ink2);font-weight:500;cursor:pointer;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;z-index:2}
+/* Bottom Analytical Workbench */
+#bottom{background:var(--panel);border-top:1px solid var(--line);height:36vh;min-height:40px;max-height:72vh;display:flex;flex-direction:column;min-width:0;transition:height .18s ease}
+#bottom.collapsed{height:39px!important}
+#bottom.expanded{height:64vh!important}
+#tabsBar{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:0 8px;gap:6px;flex:0 0 auto;background:var(--panel)}
+#tabs{display:flex;gap:1px;overflow-x:auto;scrollbar-width:none}
+#tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 11px;color:var(--ink2);cursor:pointer;font-size:12.8px;white-space:nowrap;font-weight:500}
+#tabs button:hover{color:var(--ink)}
+#tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+.dock-btns{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+#tabbody{overflow:auto;padding:10px 14px;min-width:0;max-width:100%;flex:1}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:12.2px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel);color:var(--ink2);font-weight:600;cursor:pointer;font-size:11px;letter-spacing:.04em;text-transform:uppercase;z-index:2;user-select:none}
+th:hover{color:var(--ink)}
 td.num{text-align:right}
 tbody tr:hover{background:var(--panel2);cursor:pointer}
-tbody tr.sel{background:#1f2f3c}
-.prose{max-width:82ch;font-size:13.5px;color:var(--ink)}
-.prose h4{font-size:15px;margin:14px 0 4px;color:var(--ink)}
+tbody tr.sel{background:var(--accent-soft)}
+.minibar{display:inline-block;height:6px;border-radius:3px;background:var(--accent);vertical-align:middle;margin-right:5px}
+
+/* Cards, Charts & Prose */
+.prose{max-width:88ch;font-size:13.2px;color:var(--ink)}
+.prose h4{font-size:16px;margin:16px 0 5px;color:var(--ink)}
 .prose p{margin:6px 0;color:var(--ink2)}
 .prose ul{margin:6px 0 6px 18px;padding:0;color:var(--ink2)}
-.prose li{margin:3px 0}
-.prose .cite{color:var(--ink3);font-size:12.5px}
-.callout{border-left:3px solid var(--warn);background:#1b1e14;padding:9px 12px;margin:10px 0;color:#e8dfae;font-size:13px}
-.callout.bad{border-color:var(--bad);background:#1e1514;color:#f0cbc6}
-.spark{display:block;width:100%;height:44px}
-.btn{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:4px 9px;font-size:12.5px;cursor:pointer;color:var(--ink2)}
+.prose li{margin:3.5px 0}
+.prose .cite{color:var(--ink3);font-size:12px}
+.callout{border-left:3px solid var(--warn);background:rgba(234,179,8,.09);padding:9px 12px;margin:10px 0;color:var(--ink);font-size:12.6px;border-radius:0 5px 5px 0}
+.callout.bad{border-color:var(--bad);background:rgba(239,68,68,.10)}
+.callout.info{border-color:var(--accent);background:var(--accent-soft)}
+
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--ink2);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;transition:border-color .15s,color .15s}
 .btn:hover{color:var(--ink);border-color:var(--accent)}
+.btn.pri{background:var(--accent-soft);color:var(--accent);border-color:rgba(56,189,248,.4)}
+
+.sat-card{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px;margin:6px 0}
+.sat-thumb{width:100%;max-height:175px;object-fit:cover;border-radius:4px;border:1px solid var(--line);display:block;background:#090d12;margin-bottom:6px}
+.spark{display:block;width:100%;height:52px}
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
+.chart-card{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:10px 12px}
+.chart-card h4{font-size:15px;margin-bottom:4px}
+.split-2{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:14px;align-items:start}
+
 .eqdot{border-radius:50%;border:1px solid rgba(255,255,255,.55)}
-.loading{color:var(--ink3);font-size:12.5px}
+.loading{color:var(--ink3);font-size:12px}
+
+@media (max-width:1280px){
+  #kpiStrip{grid-template-columns:repeat(3,minmax(0,1fr))}
+  main{grid-template-columns:255px minmax(0,1fr) 325px}
+}
+@media (max-width:980px){
+  main{grid-template-columns:235px minmax(0,1fr) 295px}
+}
+@media (max-width:760px){
+  html,body{height:auto}
+  #app{height:auto;overflow:visible;display:block}
+  #kpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  main{display:block}
+  aside{border-right:0;border-bottom:1px solid var(--line);max-height:none}
+  #detail{border-left:0;border-top:1px solid var(--line)}
+  #mapWrap{height:60vh;min-height:360px}
+  #bottom{height:auto!important;max-height:none}
+  #tabbody{max-height:65vh}
+  .split-2{grid-template-columns:1fr}
+  .map-hud-top{left:46px;right:10px}
+}
 </style>
 </head>
 <body>
 <div id="app">
 <header>
-  <h1>Nepal Multi-Hazard Early Warning</h1>
-  <span class="sub">glacial lake outburst floods &middot; earthquakes &middot; earthquake-triggered landslides</span>
+  <div class="brand">
+    <svg viewBox="0 0 36 36" aria-hidden="true">
+      <rect width="36" height="36" rx="7" fill="#131c27" stroke="#2a3b4e"/>
+      <path d="M4 27 L12.5 10 L18.5 20.5 L23.5 13 L32 27 Z" fill="#38bdf8" fill-opacity=".9"/>
+      <path d="M9 27 L16 17 L21 23 L26 18 L32 27 Z" fill="#2dd4bf" fill-opacity=".55"/>
+      <circle cx="12.5" cy="10" r="2.7" fill="#f59e0b"/>
+      <path d="M4 29.8 Q18 26.8 32 29.8" stroke="#38bdf8" stroke-width="1.8" fill="none"/>
+    </svg>
+    <div>
+      <div class="brand-title">
+        <h1>Nepal TRĀYA <span class="deva" style="font-size:18px;color:var(--accent)">त्राय</span></h1>
+        <span class="motto">Detect &middot; Warn &middot; Protect</span>
+      </div>
+      <div class="sub">Multi-Hazard Screening &amp; Situational Awareness &mdash; GLOFs &middot; River Floods &middot; Earthquakes &amp; Faults &middot; Landslides &middot; Satellite EO</div>
+    </div>
+  </div>
   <span class="spacer"></span>
-  <span class="pill" id="pill-build">build …</span>
-  <span class="pill" id="pill-eq">earthquakes …</span>
-  <span class="pill" id="pill-base">basemap</span>
-  <span class="pill" id="pill-rain">rainfall on demand</span>
-  <span class="pill" id="pill-screen">screening tool — not an operational warning</span>
+  <div class="pills">
+    <span class="pill" id="pill-build" title="Automated 7-day data refresh schedule"><span class="dot"></span>build …</span>
+    <span class="pill" id="pill-eq" title="USGS real-time earthquake feed"><span class="dot"></span>quakes …</span>
+    <span class="pill" id="pill-flood" title="Copernicus GloFAS 10-basin river flood watch"><span class="dot"></span>rivers …</span>
+    <span class="pill" id="pill-ls" title="Dahal & Hasegawa (2008) rainfall-landslide threshold watch"><span class="dot"></span>landslides …</span>
+    <span class="pill" id="pill-base"><span class="dot"></span>basemap</span>
+    <button class="btn pri" id="btnRefreshLive" title="Re-fetch live USGS earthquakes, GloFAS river forecasts, and Open-Meteo rainfall right now">↻ Refresh live</button>
+    <button class="btn" id="btnKpi" title="Toggle summary cards">KPIs</button>
+    <button class="btn" id="btnTheme" title="Switch dark / light theme">◐ Theme</button>
+  </div>
 </header>
 
-<main>
+<div id="kpiStrip">
+  <div class="kpi" data-goto="watch" title="View screened glacial lakes watchlist">
+    <span class="k-lbl">Glacial Lakes Screened</span>
+    <span class="k-val"><span id="k-lakes">1,429</span> <span class="hbadge h-vhigh" id="k-prio">16 priority</span></span>
+    <span class="k-sub" id="k-lakes-sub">PFV ≥ 10 Mm³ screening set (Fujita 2013)</span>
+  </div>
+  <div class="kpi" data-goto="floods" title="View Copernicus GloFAS 10-basin river discharge forecasts">
+    <span class="k-lbl">Fluvial Flood Watch (GloFAS)</span>
+    <span class="k-val" id="k-rivers">10 basins</span>
+    <span class="k-sub" id="k-rivers-sub">30d ensemble discharge &amp; Gumbel Q₂–Q₂₀</span>
+  </div>
+  <div class="kpi" data-goto="landslides" title="View Dahal & Hasegawa (2008) rainfall-landslide watch & catalogue">
+    <span class="k-lbl">Landslide Rainfall Watch</span>
+    <span class="k-val" id="k-ls">24 zones</span>
+    <span class="k-sub" id="k-ls-sub">Dahal &amp; Hasegawa (2008) I–D screening</span>
+  </div>
+  <div class="kpi" data-goto="live" title="View live USGS earthquakes, ShakeMap & GEM active faults">
+    <span class="k-lbl">Seismic &amp; Active Faults</span>
+    <span class="k-val" id="k-eq">—</span>
+    <span class="k-sub" id="k-eq-sub">USGS live feed + GEM Himalayan thrusts</span>
+  </div>
+  <div class="kpi" data-goto="sat" title="View Copernicus Sentinel-2 STAC scenes & 0 °C freezing level">
+    <span class="k-lbl">Cryosphere &amp; Sentinel-2 EO</span>
+    <span class="k-val" id="k-sat">10 m S2</span>
+    <span class="k-sub" id="k-sat-sub">0 °C isotherm &amp; cloud-free STAC scenes</span>
+  </div>
+  <div class="kpi" data-goto="valid" title="View external & internal validation checks">
+    <span class="k-lbl">Validation &amp; 7-Day Cycle</span>
+    <span class="k-val" id="k-val">28/28 pass</span>
+    <span class="k-sub" id="k-val-sub">Screening tool — not an operational warning</span>
+  </div>
+</div>
+
+<main id="mainGrid">
   <aside id="controls">
     <section class="blk">
-      <h3>Colour lakes by</h3>
+      <h3>Colour glacial lakes by</h3>
       <select id="colourBy">
-        <option value="hazard">GLOF hazard class</option>
-        <option value="risk">Risk (hazard × downstream impact)</option>
-        <option value="qp_m3s">Estimated peak discharge</option>
-        <option value="pfv_Mm3">Potential flood volume</option>
-        <option value="pop_high">People in 1 km corridor</option>
+        <option value="hazard">GLOF hazard (Rounce 2016 — general)</option>
+        <option value="hazard_enum">GLOF hazard (Rounce 2016 — enumerated)</option>
+        <option value="risk">Downstream risk (hazard × impact)</option>
+        <option value="pfv_Mm3">Potential flood volume (Mm³)</option>
+        <option value="qp_m3s">Estimated peak discharge Qp (m³/s)</option>
+        <option value="pop_high">People in 1 km flood corridor</option>
         <option value="priority">Priority set (PFV ≥ 10 Mm³)</option>
+        <option value="fault_km">Distance to active fault (km, GEM)</option>
+        <option value="area_change_pct">Observed lake area change (%)</option>
       </select>
-      <div class="legend" id="legend" style="margin-top:8px"></div>
+      <div class="legend" id="legend" style="margin-top:7px"></div>
     </section>
 
     <section class="blk">
-      <h3>Filter</h3>
-      <label class="row"><input type="checkbox" id="fPriority"> <b>priority set only</b> — potential flood volume ≥ 10 Mm³</label>
-      <label class="row"><input type="checkbox" id="fOnlyRouted"> only lakes with a routed flood path</label>
-      <label class="row"><input type="checkbox" id="fAva"> avalanche can reach the lake</label>
-      <label class="row"><input type="checkbox" id="fSla"> steep lakefront area present</label>
-      <label class="row"><input type="checkbox" id="fIce"> moraine ice core documented</label>
-      <label class="row"><input type="checkbox" id="fPast"> lake has a recorded GLOF</label>
-      <div style="margin-top:8px">
-        <div class="muted">minimum lake area: <b id="areaLbl" class="mono">0.000</b> km² <span class="band">(below 0.01 km² no discharge is estimated)</span></div>
+      <h3>Filter glacial lakes <button class="btn" id="btnResetFilters" style="padding:1px 6px;font-size:10.5px">reset</button></h3>
+      <label class="row"><input type="checkbox" id="fPriority"> <span><b>priority set only</b> (PFV ≥ 10 Mm³)</span></label>
+      <label class="row"><input type="checkbox" id="fOnlyRouted"> <span>routed flood path present</span></label>
+      <label class="row"><input type="checkbox" id="fAva"> <span>avalanche can reach lake</span></label>
+      <label class="row"><input type="checkbox" id="fSla"> <span>steep lakefront (SLA &gt; 10°)</span></label>
+      <label class="row"><input type="checkbox" id="fIce"> <span>documented moraine ice core</span></label>
+      <label class="row"><input type="checkbox" id="fContact"> <span>glacier ice contact on shore</span></label>
+      <label class="row"><input type="checkbox" id="fPast"> <span>recorded historical GLOF</span></label>
+      <div style="margin-top:6px">
+        <select id="fProv"><option value="">All 7 provinces</option></select>
+      </div>
+      <div style="margin-top:7px">
+        <div class="muted">min lake area: <b id="areaLbl" class="mono">0.000</b> km²</div>
         <input type="range" id="fArea" min="0" max="100" value="0">
       </div>
-      <div style="margin-top:6px"><input type="search" id="fSearch" placeholder="search lake id, province…"></div>
-      <div class="muted" id="filterCount" style="margin-top:6px"></div>
+      <div style="margin-top:5px"><input type="search" id="fSearch" placeholder="Search lake, district, RGI… (press /)"></div>
+      <div class="muted" id="filterCount" style="margin-top:5px"></div>
     </section>
 
     <section class="blk">
-      <h3>Layers</h3>
-      <label class="row"><input type="checkbox" id="lLakes" checked> glacial lakes</label>
-      <label class="row"><input type="checkbox" id="lRoute" checked> selected flood path</label>
-      <label class="row"><input type="checkbox" id="lExp" checked> exposure on path</label>
-      <label class="row"><input type="checkbox" id="lHydro"> hydropower (all)</label>
-      <label class="row"><input type="checkbox" id="lEq" checked> live earthquakes</label>
-      <label class="row"><input type="checkbox" id="lEqHist"> earthquakes M≥6, 1913–</label>
-      <label class="row"><input type="checkbox" id="lGlof"> recorded GLOFs</label>
-      <label class="row"><input type="checkbox" id="lMmi" checked> ShakeMap MMI contours</label>
+      <h3>Multi-hazard layers</h3>
+      <label class="row"><input type="checkbox" id="lLakes" checked> <span>Glacial lakes (1,429)</span></label>
+      <label class="row"><input type="checkbox" id="lRoute" checked> <span>Selected flood path &amp; ticks</span></label>
+      <label class="row"><input type="checkbox" id="lExp" checked> <span>Corridor exposure on path</span></label>
+      <label class="row"><input type="checkbox" id="lRivers" checked> <span>GloFAS river flood stations (10)</span></label>
+      <label class="row"><input type="checkbox" id="lFaults"> <span>Active tectonic faults (GEM)</span></label>
+      <label class="row"><input type="checkbox" id="lNodes"> <span>Rainfall–landslide watch (24)</span></label>
+      <label class="row"><input type="checkbox" id="lLandslides"> <span>Catalogued landslides (NASA/OSM)</span></label>
+      <label class="row"><input type="checkbox" id="lEq" checked> <span>Live earthquakes (USGS)</span></label>
+      <label class="row"><input type="checkbox" id="lMmi" checked> <span>ShakeMap MMI contours</span></label>
+      <label class="row"><input type="checkbox" id="lEqHist"> <span>Historical earthquakes M≥6</span></label>
+      <label class="row"><input type="checkbox" id="lGlof"> <span>Recorded GLOFs (HMAGLOFDB)</span></label>
+      <label class="row"><input type="checkbox" id="lHydro"> <span>Hydropower plants (all Nepal)</span></label>
+      <label class="row"><input type="checkbox" id="lGdacs"> <span>GDACS regional alerts</span></label>
+    </section>
+
+    <section class="blk">
+      <h3>NASA GIBS satellite overlay</h3>
+      <select id="satLayer">
+        <option value="none">No live satellite overlay</option>
+        <option value="imerg">GPM IMERG Precipitation Rate</option>
+        <option value="snow">MODIS Terra Snow Cover (NDSI)</option>
+        <option value="viirs">VIIRS SNPP True Colour (daily)</option>
+      </select>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:5px;margin-top:6px;align-items:center">
+        <input type="date" id="satDate" title="NASA GIBS observation date (UTC)">
+        <span class="band mono" id="satOpLbl">70%</span>
+      </div>
+      <input type="range" id="satOp" min="15" max="95" value="70" style="margin-top:4px" title="Satellite overlay opacity">
+      <div class="muted">Keyless NASA EOSDIS WMTS tiles. Use 2–3 days prior if today's composite is still processing.</div>
     </section>
 
     <section class="blk">
       <h3>Live earthquake window</h3>
       <select id="eqWindow">
-        <option value="day">past 24 hours (all M)</option>
-        <option value="week" selected>past 7 days (all M)</option>
-        <option value="month">past 30 days (M≥4.5)</option>
+        <option value="day">Past 24 hours (all M)</option>
+        <option value="week" selected>Past 7 days (all M)</option>
+        <option value="month">Past 30 days (M≥4.5)</option>
       </select>
-      <div class="muted" style="margin-top:6px">USGS real-time feeds, fetched by your browser. Nothing is stored.</div>
     </section>
 
     <section class="blk">
-      <h3>What this is</h3>
-      <p class="muted">A screening assessment of 1,429 Nepalese glacial lakes built entirely from published methods and open data, combined with live earthquake and precipitation feeds. Every number is reproducible from the pipeline in <code>src/</code>.</p>
-      <p class="muted">It is <b>not</b> a forecast and <b>not</b> an operational warning service. See the Methods and limits tab.</p>
+      <h3>Scientific scope</h3>
+      <p class="muted">TRĀYA screens 1,429 glacial lakes, 10 major river basins, active Himalayan faults, and 24 physiographic rainfall zones using published empirical methods and open satellite/hydromet feeds refreshed every 7 days.</p>
+      <p class="muted"><b>Not an operational warning service.</b> Always consult Nepal DHM &amp; NDRRMA bulletins for official warnings.</p>
     </section>
   </aside>
 
-  <div id="map"></div>
+  <div id="mapWrap">
+    <div class="map-hud-top">
+      <div class="hud-group">
+        <button class="hud-btn" id="btnToggleLeft" title="Toggle left controls">☰ Controls</button>
+        <button class="hud-btn" id="btnToggleRight" title="Toggle right inspector">Inspector ▤</button>
+      </div>
+      <div class="hud-group" id="regionBar">
+        <button class="hud-btn on" data-v="28.3,84.2,7">All Nepal</button>
+        <button class="hud-btn" data-v="27.86,86.82,10">Khumbu</button>
+        <button class="hud-btn" data-v="27.86,86.47,11">Rolwaling</button>
+        <button class="hud-btn" data-v="27.79,87.10,11">Barun</button>
+        <button class="hud-btn" data-v="28.58,84.35,9">Annapurna–Manaslu</button>
+        <button class="hud-btn" data-v="28.20,85.45,10">Langtang</button>
+        <button class="hud-btn" data-v="29.75,81.85,8">Karnali</button>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="map-hud-bot">
+      <div id="satBar">
+        <span>🛰️ <b id="satBarName">GIBS</b></span>
+        <button class="hud-btn" id="satPrev" title="Previous day">◀</button>
+        <span class="mono" id="satBarDate">—</span>
+        <button class="hud-btn" id="satNext" title="Next day">▶</button>
+        <button class="hud-btn" id="satOff" title="Hide overlay">✕</button>
+      </div>
+      <div id="coordPill" class="mono">28.30°N, 84.20°E</div>
+    </div>
+  </div>
 
   <aside id="detail">
-    <div id="detailBody"><p class="muted">Select a lake on the map or in the watchlist.</p></div>
+    <div id="detailBody"></div>
   </aside>
 </main>
 
 <div id="bottom">
-  <div id="tabs">
-    <button data-tab="watch" class="on">Watchlist</button>
-    <button data-tab="live">Live earthquakes</button>
-    <button data-tab="glof">Recorded GLOFs</button>
-    <button data-tab="valid">Validation</button>
-    <button data-tab="methods">Methods and limits</button>
-    <button data-tab="sources">Data and citations</button>
+  <div id="tabsBar">
+    <div id="tabs">
+      <button data-tab="watch" class="on">Glacial Lakes</button>
+      <button data-tab="floods">Flood Watch (GloFAS)</button>
+      <button data-tab="landslides">Landslide Watch</button>
+      <button data-tab="live">Earthquakes &amp; Faults</button>
+      <button data-tab="sat">Satellite &amp; Cryosphere</button>
+      <button data-tab="glof">Recorded GLOFs</button>
+      <button data-tab="charts">Analytics</button>
+      <button data-tab="valid">Validation</button>
+      <button data-tab="methods">Methods &amp; Citations</button>
+    </div>
+    <div class="dock-btns">
+      <button class="btn" id="dockMin" title="Minimize workbench">_</button>
+      <button class="btn" id="dockMid" title="Default height">▫</button>
+      <button class="btn" id="dockMax" title="Expand workbench">□</button>
+    </div>
   </div>
   <div id="tabbody"></div>
 </div>
@@ -218,6 +422,11 @@ tbody tr.sel{background:#1f2f3c}
 <script src="data/exposure.js"></script>
 <script src="data/eq_history.js"></script>
 <script src="data/glof_history.js"></script>
+<script src="data/faults.js"></script>
+<script src="data/rivers_watch.js"></script>
+<script src="data/landslides.js"></script>
+<script src="data/hydromet_weekly.js"></script>
+<script src="data/gdacs_alerts.js"></script>
 <script src="data/validation.js"></script>
 <script src="data/sensitivity.js"></script>
 <script>
@@ -229,125 +438,215 @@ const S = {
   expo: window.EXPOSURE || [],
   eqHist: window.EQ_HISTORY || [],
   glofHist: window.GLOF_HISTORY || [],
+  faults: (window.FAULTS && window.FAULTS.features) || [],
+  rivers: (window.RIVERS_WATCH && window.RIVERS_WATCH.basins) || [],
+  riversMeta: window.RIVERS_WATCH || null,
+  landslides: (window.LANDSLIDES && window.LANDSLIDES.events) || [],
+  lsMeta: window.LANDSLIDES || null,
+  hydromet: window.HYDROMET_WEEKLY || null,
+  gdacs: (window.GDACS_ALERTS && window.GDACS_ALERTS.events) || [],
   valid: window.VALIDATION || null,
   sens: window.SENSITIVITY || null,
-  sel: null, live: [], mmi: null, tab: 'watch', sort: {k:'pfv_Mm3', dir:-1},
+  sel: null, selKind: null, live: [], mmi: null, gf: null,
+  tab: 'watch', sort: {k:'pfv_Mm3', dir:-1},
+  stacCache: {},
 };
 const expoById = {}; S.expo.forEach(o => expoById[o.i] = o);
+const hmLakeById = {};
+((S.hydromet && S.hydromet.priority_lakes) || []).forEach(x => {
+  hmLakeById[x.id] = x;
+  if (x.sentinel2) S.stacCache[x.id] = x.sentinel2;
+});
+
 const HCLASS = {'very high':'h-vhigh','high':'h-high','moderate':'h-mod','low':'h-low'};
-const HCOL = {'very high':'#c1352b','high':'#e07a2d','moderate':'#d8bc45','low':'#4a7f6e'};
+const HCOL = {'very high':'#dc3b30','high':'#e67e22','moderate':'#d9b638','low':'#3d8b74'};
 const HORD = {'very high':3,'high':2,'moderate':1,'low':0};
-const fmt = (v,d=0) => (v===null||v===undefined||Number.isNaN(v)) ? '—'
+const FCOL = {severe:'#dc3b30', warning:'#e67e22', watch:'#d9b638', elevated:'#38bdf8', normal:'#3d8b74', unassessed:'#64748b'};
+const FCLASS = {severe:'h-vhigh', warning:'h-high', watch:'h-mod', elevated:'h-info', normal:'h-low', unassessed:'h-na'};
+const DHCOL = {exceeded:'#dc3b30', watch:'#e67e22', elevated:'#d9b638', low:'#3d8b74'};
+const DHCLASS = {exceeded:'h-vhigh', watch:'h-high', elevated:'h-mod', low:'h-low'};
+
+const fmt = (v,d=0) => (v===null||v===undefined||Number.isNaN(+v)) ? '—'
   : Number(v).toLocaleString('en-GB',{maximumFractionDigits:d, minimumFractionDigits:d});
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function hav(lo1,la1,lo2,la2){
+  const R=6371, r=Math.PI/180;
+  const a=Math.sin((la2-la1)*r/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin((lo2-lo1)*r/2)**2;
+  return 2*R*Math.asin(Math.sqrt(Math.min(1,a)));
+}
 
-/* ------------------------------------------------------------------- map */
+/* ------------------------------------------------------------------- theme */
+(function initTheme(){
+  try{
+    const t = localStorage.getItem('traya.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  }catch(e){}
+})();
+
+/* --------------------------------------------------------------------- map */
 const map = L.map('map', {preferCanvas:true, zoomControl:true, worldCopyJump:false})
   .setView([28.3, 84.2], 7);
+L.control.scale({imperial:false, position:'bottomright'}).addTo(map);
+map.on('mousemove', e => {
+  const el = document.getElementById('coordPill');
+  if (el) el.textContent = `${e.latlng.lat.toFixed(3)}°N, ${e.latlng.lng.toFixed(3)}°E`;
+});
 
-/* Basemaps. None of these needs an API key: CARTO's basemaps began requiring one,
-   which is why they are not used here. Each carries its own attribution and its
-   own native maximum zoom, above which Leaflet upscales rather than requesting
-   tiles that do not exist. */
-const DATA_CREDIT = 'lakes: Nepal Cryosphere Inventory | DEM: Copernicus GLO-30 '
-  + '| rivers: HydroRIVERS | population: WorldPop | earthquakes: USGS';
+const DATA_CREDIT = 'TRĀYA | lakes: Nepal Cryosphere Inventory | DEM: Copernicus GLO-30 | rivers: HydroRIVERS & GloFAS | faults: GEM | quakes: USGS';
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
 const BASEMAPS = {
   'Dark grey': L.tileLayer(`${ESRI}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`, {
-    maxZoom:17, maxNativeZoom:16, attribution:`Esri, HERE, Garmin, &copy; OpenStreetMap contributors | ${DATA_CREDIT}`}),
-  'Terrain (hillshade)': L.tileLayer(`${ESRI}/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}`, {
-    maxZoom:17, maxNativeZoom:15, attribution:`Esri, Airbus DS, USGS, NGA, NASA, CGIAR | ${DATA_CREDIT}`}),
+    maxZoom:17, maxNativeZoom:16, attribution:`Esri, HERE, Garmin, &copy; OpenStreetMap | ${DATA_CREDIT}`}),
+  'Sentinel-2 cloudless (10 m)': L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg', {
+    maxZoom:17, maxNativeZoom:14, attribution:`<a href="https://s2maps.eu">Sentinel-2 cloudless</a> by EOX (CC-BY 4.0, Copernicus Sentinel data) | ${DATA_CREDIT}`}),
   'Satellite imagery': L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
     maxZoom:17, maxNativeZoom:17, attribution:`Esri, Maxar, Earthstar Geographics | ${DATA_CREDIT}`}),
+  'Terrain (hillshade)': L.tileLayer(`${ESRI}/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}`, {
+    maxZoom:17, maxNativeZoom:15, attribution:`Esri, Airbus DS, USGS, NGA, NASA, CGIAR | ${DATA_CREDIT}`}),
   'OpenTopoMap': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
     maxZoom:17, maxNativeZoom:16, subdomains:'abc',
-    attribution:`&copy; OpenStreetMap contributors, SRTM | map style &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) | ${DATA_CREDIT}`}),
+    attribution:`&copy; OpenStreetMap, SRTM | style &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) | ${DATA_CREDIT}`}),
   'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom:17, maxNativeZoom:17,
-    attribution:`&copy; OpenStreetMap contributors | ${DATA_CREDIT}`}),
+    maxZoom:17, maxNativeZoom:17, attribution:`&copy; OpenStreetMap contributors | ${DATA_CREDIT}`}),
   'No basemap': L.layerGroup([]),
 };
-const BASEMAP_DEFAULT = 'Dark grey';
-let baseName = BASEMAP_DEFAULT;
+let baseName = 'Dark grey';
 try { const v = localStorage.getItem('ews.basemap'); if (v && BASEMAPS[v]) baseName = v; } catch (e) {}
 let baseLayer = BASEMAPS[baseName].addTo(map);
 L.control.layers(BASEMAPS, null, {position:'topright', collapsed:true}).addTo(map);
 map.attributionControl.setPrefix('');
-map.on('baselayerchange', e => {
-  baseName = e.name; baseLayer = e.layer;
-  try { localStorage.setItem('ews.basemap', e.name); } catch (err) {}
-  basemapOk = true; setBasemapPill(null);
-});
 
-/* If a tile provider fails or starts demanding a key, say so once rather than
-   leaving the user with a blank or watermarked map. */
 let basemapOk = true, tileErrors = 0;
 function setBasemapPill(msg){
   const el = document.getElementById('pill-base');
   if (!el) return;
-  if (!msg){ el.className = 'pill'; el.textContent = `basemap: ${baseName.toLowerCase()}`; }
-  else { el.className = 'pill err'; el.textContent = msg; }
+  if (!msg){ el.className = 'pill'; el.innerHTML = `<span class="dot"></span>${esc(baseName.toLowerCase())}`; }
+  else { el.className = 'pill err'; el.innerHTML = `<span class="dot"></span>${esc(msg)}`; }
 }
+map.on('baselayerchange', e => {
+  baseName = e.name; baseLayer = e.layer;
+  try { localStorage.setItem('ews.basemap', e.name); } catch (err) {}
+  basemapOk = true; tileErrors = 0; setBasemapPill(null);
+});
 Object.values(BASEMAPS).forEach(l => {
   if (!l.on) return;
-  // a handful of stray failures is normal; only complain if nothing is loading
   l.on('tileload', () => { tileErrors = 0; });
   l.on('tileerror', () => {
     if (!basemapOk || ++tileErrors < 8) return;
     basemapOk = false;
-    setBasemapPill('basemap tiles unavailable — pick another under the layers control');
+    setBasemapPill('tiles unavailable — switch basemap');
   });
 });
 
+/* Map Layer Groups */
+const gSat   = L.layerGroup().addTo(map);
+const gFaults= L.layerGroup();
 const gLakes = L.layerGroup().addTo(map);
 const gRoute = L.layerGroup().addTo(map);
 const gExp   = L.layerGroup().addTo(map);
+const gRivers= L.layerGroup().addTo(map);
+const gNodes = L.layerGroup();
+const gLs    = L.layerGroup();
 const gHydro = L.layerGroup();
-const gEq    = L.layerGroup().addTo(map);
 const gEqH   = L.layerGroup();
 const gGlof  = L.layerGroup();
 const gMmi   = L.layerGroup().addTo(map);
+const gEq    = L.layerGroup().addTo(map);
+const gGdacs = L.layerGroup();
 
-/* ---------------------------------------------------------------- colour */
-function scaleColour(v, stops, cols){
-  if (v === null || v === undefined) return '#3c4855';
-  for (let i = stops.length-1; i >= 0; i--) if (v >= stops[i]) return cols[i];
-  return cols[0];
+/* ----------------------------------------------------- NASA GIBS Satellite */
+const GIBS_PRODUCTS = {
+  imerg: {id:'IMERG_Precipitation_Rate', matrix:'GoogleMapsCompatible_Level6', ext:'png', maxNative:6, label:'GPM IMERG Precipitation'},
+  snow:  {id:'MODIS_Terra_NDSI_Snow_Cover', matrix:'GoogleMapsCompatible_Level8', ext:'png', maxNative:8, label:'MODIS NDSI Snow Cover'},
+  viirs: {id:'VIIRS_SNPP_CorrectedReflectance_TrueColor', matrix:'GoogleMapsCompatible_Level9', ext:'jpg', maxNative:9, label:'VIIRS True Colour'},
+};
+function defaultGibsDate(){
+  const d = new Date(Date.now() - 2 * 86400000);
+  return d.toISOString().slice(0,10);
 }
-const SEQ = ['#2b4a5c','#356b7d','#4ea3d8','#e0b83a','#e07a2d','#c1352b'];
+document.getElementById('satDate').value = defaultGibsDate();
+let activeGibsTile = null;
+function updateSatOverlay(){
+  gSat.clearLayers(); activeGibsTile = null;
+  const key = document.getElementById('satLayer').value;
+  const bar = document.getElementById('satBar');
+  const op = +document.getElementById('satOp').value / 100;
+  document.getElementById('satOpLbl').textContent = `${Math.round(op*100)}%`;
+  if (key === 'none' || !GIBS_PRODUCTS[key]){ bar.classList.remove('on'); return; }
+  const prod = GIBS_PRODUCTS[key];
+  const dtStr = document.getElementById('satDate').value || defaultGibsDate();
+  const base = (S.summary && S.summary.live_feeds && S.summary.live_feeds.nasa_gibs_wmts)
+    || 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best';
+  activeGibsTile = L.tileLayer(`${base}/${prod.id}/default/${dtStr}/${prod.matrix}/{z}/{y}/{x}.${prod.ext}`, {
+    maxZoom:17, maxNativeZoom:prod.maxNative, opacity:op,
+    attribution:'NASA EOSDIS GIBS'
+  }).addTo(gSat);
+  bar.classList.add('on');
+  document.getElementById('satBarName').textContent = prod.label;
+  document.getElementById('satBarDate').textContent = dtStr;
+}
+function shiftSatDate(days){
+  const inp = document.getElementById('satDate');
+  const cur = new Date((inp.value || defaultGibsDate()) + 'T00:00:00Z');
+  cur.setUTCDate(cur.getUTCDate() + days);
+  inp.value = cur.toISOString().slice(0,10);
+  updateSatOverlay();
+}
+
+/* ------------------------------------------------------------------ colour */
+function scaleColour(v, stops, cols, invert=false){
+  if (v === null || v === undefined || Number.isNaN(+v)) return '#3b4958';
+  const arr = invert ? cols.slice().reverse() : cols;
+  for (let i = stops.length-1; i >= 0; i--) if (v >= stops[i]) return arr[i];
+  return arr[0];
+}
+const SEQ = ['#274c63','#2e6f8e','#38bdf8','#eab308','#e67e22','#dc3b30'];
 const SCALES = {
-  qp_m3s:  {stops:[0,250,1000,3000,8000,20000], unit:'m³/s', label:'Peak discharge (median estimate)'},
-  pfv_Mm3: {stops:[0,1,5,10,25,50],             unit:'Mm³',  label:'Potential flood volume (Fujita et al. 2013)'},
-  pop_high:{stops:[0,1000,10000,50000,200000,500000], unit:'people', label:'People within 1 km of the routed path'},
+  qp_m3s:   {stops:[0,250,1000,3000,8000,20000], unit:'m³/s', label:'Peak discharge (pooled median)'},
+  pfv_Mm3:  {stops:[0,1,5,10,25,50],             unit:'Mm³',  label:'Potential flood volume (Fujita et al. 2013)'},
+  pop_high: {stops:[0,1000,10000,50000,200000,500000], unit:'people', label:'People within 1 km of routed channel'},
+  fault_km: {stops:[0,5,15,30,60,100],           unit:'km',   label:'Distance to nearest mapped active fault (GEM)', invert:true},
+  area_change_pct: {stops:[-20,0,10,25,50,100],  unit:'%',    label:'Observed lake area change'},
 };
 function lakeColour(p){
   const by = S.colourBy;
-  if (by === 'hazard') return HCOL[p.hazard] || '#3c4855';
-  if (by === 'risk')   return HCOL[p.risk]   || '#3c4855';
-  if (by === 'priority') return p.priority ? '#c1352b' : '#3c4855';
+  if (by === 'hazard')      return HCOL[p.hazard]      || '#3b4958';
+  if (by === 'hazard_enum') return HCOL[p.hazard_enum] || '#3b4958';
+  if (by === 'risk')        return HCOL[p.risk]        || '#3b4958';
+  if (by === 'priority')    return p.priority ? '#dc3b30' : '#3b4958';
   const sc = SCALES[by];
-  return scaleColour(p[by], sc.stops, SEQ);
+  return scaleColour(p[by], sc.stops, SEQ, !!sc.invert);
 }
 function drawLegend(){
   const by = S.colourBy, el = document.getElementById('legend');
-  if (by === 'hazard' || by === 'risk'){
+  if (by === 'hazard' || by === 'hazard_enum' || by === 'risk'){
     el.innerHTML = ['very high','high','moderate','low'].map(k =>
       `<div><i style="background:${HCOL[k]}"></i>${k}</div>`).join('')
-      + `<div><i style="background:#3c4855"></i>not assessed</div>`
-      + (by==='risk' ? `<p class="muted">Risk needs a routed flood path; lakes without one are shown unassessed.</p>` : '');
+      + `<div><i style="background:#3b4958"></i>not assessed</div>`
+      + (by==='hazard_enum' ? `<p class="muted">Alternative literal enumeration of Rounce et al. (2016) Sect. 4.2 — 68% of lakes shift from very high to moderate/high.</p>` : '')
+      + (by==='risk' ? `<p class="muted">Risk combines hazard × downstream impact on lakes with a routed flood path.</p>` : '');
   } else if (by === 'priority'){
-    el.innerHTML = `<div><i style="background:#c1352b"></i>PFV ≥ 10 Mm³ — investigate</div>`
-      + `<div><i style="background:#3c4855"></i>below the threshold</div>`
-      + `<p class="muted">Fujita et al. (2013) identified 49 Himalayan lakes above 10 Mm³, "a comparable volume to that of recorded major GLOFs", and propose this as the screening criterion for which lakes need detailed investigation. A potential flood volume of zero means the DEM finds no steep lakefront — see the Validation tab for why that is not the same as safe.</p>`;
+    el.innerHTML = `<div><i style="background:#dc3b30"></i>PFV ≥ 10 Mm³ — priority set (16)</div>`
+      + `<div><i style="background:#3b4958"></i>below 10 Mm³ threshold</div>`
+      + `<p class="muted">Fujita et al. (2013) screening threshold comparable to recorded major Himalayan GLOFs.</p>`;
   } else {
     const sc = SCALES[by];
-    el.innerHTML = `<div class="muted" style="margin-bottom:4px">${sc.label}</div>` +
-      sc.stops.map((s,i) => `<div><i style="background:${SEQ[i]}"></i>≥ ${fmt(s)} ${sc.unit}</div>`).reverse().join('')
-      + `<div><i style="background:#3c4855"></i>no estimate</div>`;
+    const cols = sc.invert ? SEQ.slice().reverse() : SEQ;
+    el.innerHTML = `<div class="muted" style="margin-bottom:3px">${esc(sc.label)}</div>` +
+      sc.stops.map((s,i) => `<div><i style="background:${cols[i]}"></i>≥ ${fmt(s)} ${sc.unit}</div>`).reverse().join('')
+      + `<div><i style="background:#3b4958"></i>not assessed</div>`;
   }
 }
 
-/* --------------------------------------------------------------- filters */
+/* ----------------------------------------------------------------- filters */
+function populateProvinceDropdown(){
+  const sel = document.getElementById('fProv');
+  const provs = Array.from(new Set(S.lakes.map(f => f.properties.prov).filter(Boolean))).sort();
+  provs.forEach(pr => {
+    const o = document.createElement('option');
+    o.value = pr; o.textContent = pr; sel.appendChild(o);
+  });
+}
 function passes(p){
   const f = S.filters;
   if (f.priority && !p.priority) return false;
@@ -355,17 +654,19 @@ function passes(p){
   if (f.ava && !p.avalanche) return false;
   if (f.sla && !(p.sla_area_km2 > 0)) return false;
   if (f.ice && !p.ice_cored) return false;
+  if (f.contact && !p.ice_contact) return false;
   if (f.past && !p.past_glof) return false;
+  if (f.prov && p.prov !== f.prov) return false;
   if (p.area_km2 < f.area) return false;
   if (f.q){
-    const hay = `${p.id} ${p.name||''} ${p.prov||''} ${p.district||''} ${p.typ||''} ${p.hazard||''}`.toLowerCase();
+    const hay = `${p.id} ${p.name||''} ${p.prov||''} ${p.district||''} ${p.typ||''} ${p.rgi||''} ${p.fault_name||''}`.toLowerCase();
     if (!hay.includes(f.q)) return false;
   }
   return true;
 }
 function readFilters(){
   const areaMax = 0.5, v = +document.getElementById('fArea').value;
-  const area = areaMax*Math.pow(v/100, 2);
+  const area = areaMax * Math.pow(v/100, 2);
   document.getElementById('areaLbl').textContent = area.toFixed(3);
   S.filters = {
     priority: document.getElementById('fPriority').checked,
@@ -373,57 +674,240 @@ function readFilters(){
     ava: document.getElementById('fAva').checked,
     sla: document.getElementById('fSla').checked,
     ice: document.getElementById('fIce').checked,
+    contact: document.getElementById('fContact').checked,
     past: document.getElementById('fPast').checked,
-    area, q: document.getElementById('fSearch').value.trim().toLowerCase(),
+    prov: document.getElementById('fProv').value,
+    area,
+    q: document.getElementById('fSearch').value.trim().toLowerCase(),
   };
 }
+function resetFilters(){
+  ['fPriority','fOnlyRouted','fAva','fSla','fIce','fContact','fPast'].forEach(id => document.getElementById(id).checked = false);
+  document.getElementById('fProv').value = '';
+  document.getElementById('fArea').value = 0;
+  document.getElementById('fSearch').value = '';
+  refresh();
+}
 
-/* ----------------------------------------------------------- lake layer */
-let lakeLayer = null;
+/* -------------------------------------------------------------- lake layer */
 function renderLakes(){
   gLakes.clearLayers();
   const shown = S.lakes.filter(f => passes(f.properties));
   S.shown = shown;
   document.getElementById('filterCount').textContent =
-    `${shown.length} of ${S.lakes.length} lakes shown`;
+    `${fmt(shown.length)} of ${fmt(S.lakes.length)} lakes shown`;
   if (!document.getElementById('lLakes').checked) { renderTab(); return; }
-  lakeLayer = L.geoJSON({type:'FeatureCollection', features:shown}, {
+  L.geoJSON({type:'FeatureCollection', features:shown}, {
     renderer: L.canvas({padding:0.4}),
-    style: f => ({color:'#0b0f13', weight:0.6, fillColor:lakeColour(f.properties),
-                  fillOpacity:0.92, opacity:0.9}),
+    style: f => ({
+      color: f.properties.id === S.sel ? '#fff' : '#090d12',
+      weight: f.properties.id === S.sel ? 2.0 : (f.properties.priority ? 1.2 : 0.6),
+      fillColor: lakeColour(f.properties),
+      fillOpacity: 0.92, opacity: 0.95
+    }),
     onEachFeature: (f, lyr) => {
-      lyr.on('click', () => select(f.properties.id));
-      lyr.bindTooltip(() => tip(f.properties), {sticky:true, direction:'top'});
+      lyr.on('click', () => selectLake(f.properties.id, false));
+      lyr.bindTooltip(() => lakeTip(f.properties), {sticky:true, direction:'top'});
     }
   }).addTo(gLakes);
+  // Also place subtle ring markers on priority lakes so they remain clickable at low zoom
+  shown.filter(f => f.properties.priority).forEach(f => {
+    const ring = f.geometry.coordinates[0];
+    const lon = ring.reduce((a,c)=>a+c[0],0)/ring.length;
+    const lat = ring.reduce((a,c)=>a+c[1],0)/ring.length;
+    L.circleMarker([lat, lon], {
+      radius: f.properties.id === S.sel ? 8 : 5.5,
+      color: f.properties.id === S.sel ? '#fff' : '#fbbf24',
+      weight: 1.5, fillColor: lakeColour(f.properties), fillOpacity: 0.85
+    }).on('click', () => selectLake(f.properties.id, false))
+      .bindTooltip(() => lakeTip(f.properties), {direction:'top'})
+      .addTo(gLakes);
+  });
   renderTab();
 }
-function tip(p){
-  return `<b>${esc(p.name || p.id)}</b><br>${fmt(p.area_km2,3)} km² · ${fmt(p.z)} m`
+function lakeTip(p){
+  return `<b>${esc(p.name || p.id)}</b>${p.priority?' <span class="hbadge h-vhigh">priority</span>':''}`
+    + `<br>${fmt(p.area_km2,3)} km² · ${fmt(p.z)} m · ${esc(p.district||'')}`
     + `<br>hazard <span class="hbadge ${HCLASS[p.hazard]}">${p.hazard}</span>`
     + (p.risk ? ` risk <span class="hbadge ${HCLASS[p.risk]}">${p.risk}</span>` : '')
-    + (p.qp_m3s ? `<br>Qp ≈ ${fmt(p.qp_m3s)} m³/s` : '');
+    + `<br>PFV <b>${fmt(p.pfv_Mm3,1)} Mm³</b>` + (p.qp_m3s ? ` · Qp ≈ <b>${fmt(p.qp_m3s)} m³/s</b>` : '');
 }
 
-/* -------------------------------------------------------- selection pane */
-function select(id, fly){
-  S.sel = id;
+/* --------------------------------------------------- multi-hazard overlays */
+function drawMultiHazardLayers(){
+  gRivers.clearLayers(); gFaults.clearLayers(); gNodes.clearLayers();
+  gLs.clearLayers(); gHydro.clearLayers(); gEqH.clearLayers();
+  gGlof.clearLayers(); gGdacs.clearLayers();
+
+  if (document.getElementById('lRivers').checked){
+    S.rivers.forEach(b => {
+      const st = (b.status_14d && FCOL[b.status_14d] && b.status_14d !== 'normal') ? b.status_14d : (b.status_now || 'normal');
+      const col = FCOL[st] || '#38bdf8';
+      L.circleMarker([b.lat, b.lon], {
+        radius: 7.5, color: '#fff', weight: 1.6, fillColor: col, fillOpacity: 0.92
+      }).on('click', () => selectRiver(b.id, false))
+        .bindTooltip(`<b>🌊 ${esc(b.name)}</b> (${esc(b.station)})<br>Now: <b>${fmt(b.current_m3s,0)} m³/s</b> · 14d med: <b>${fmt(b.peak_14d_median_m3s,0)} m³/s</b><br>Status: <span class="hbadge ${FCLASS[st]}">${st}</span>`, {direction:'top'})
+        .addTo(gRivers);
+    });
+  }
+
+  if (document.getElementById('lFaults').checked && S.faults.length){
+    L.geoJSON({type:'FeatureCollection', features:S.faults}, {
+      style: f => {
+        const sl = (f.properties.slip_type||'').toLowerCase();
+        const col = sl.includes('reverse') || sl.includes('thrust') ? '#ef4444'
+          : sl.includes('normal') ? '#a78bfa' : '#f59e0b';
+        return {color:col, weight:1.8, opacity:0.82, dashArray: sl.includes('strike') ? '5 4' : null};
+      },
+      onEachFeature: (f, l) => {
+        const p = f.properties;
+        l.bindPopup(`<b>${esc(p.name)}</b><br>Kinematics: <b>${esc(p.slip_type)}</b>`
+          + (p.dip_deg ? `<br>Dip: ${fmt(p.dip_deg,0)}° ${esc(p.dip_dir||'')}` : '')
+          + (p.slip_rate_mm_yr ? `<br>Net slip rate: ${fmt(p.slip_rate_mm_yr,1)} mm/yr` : '')
+          + `<br><span class="band">GEM Global Active Faults (Styron &amp; Pagani 2020)</span>`);
+      }
+    }).addTo(gFaults);
+  }
+
+  if (document.getElementById('lNodes').checked && S.hydromet && S.hydromet.nodes){
+    S.hydromet.nodes.forEach(nd => {
+      const lv = (nd.dh_combined && nd.dh_combined.level) || 'low';
+      L.circleMarker([nd.lat, nd.lon], {
+        radius: 6, color:'#090d12', weight:1.2, fillColor: DHCOL[lv] || '#3d8b74', fillOpacity:0.9
+      }).on('click', () => selectNode(nd.id, false))
+        .bindTooltip(`<b>🌧️ ${esc(nd.name)}</b> (${esc(nd.zone)})<br>7d rain: <b>${fmt(nd.rain_past_7d_mm,1)} mm</b> · next 5d: <b>${fmt(nd.rain_next_5d_mm,1)} mm</b><br>Dahal–Hasegawa index: <b>${fmt((nd.dh_combined&&nd.dh_combined.max_ratio)*100,0)}%</b> <span class="hbadge ${DHCLASS[lv]}">${lv}</span>`, {direction:'top'})
+        .addTo(gNodes);
+    });
+  }
+
+  if (document.getElementById('lLandslides').checked && S.landslides.length){
+    S.landslides.forEach(ev => {
+      const col = ev.source.includes('NASA') ? '#f97316' : '#eab308';
+      L.circleMarker([ev.lat, ev.lon], {
+        radius: ev.fatalities ? Math.min(9, 4 + Math.log10(ev.fatalities + 1)*2.5) : 4,
+        color:'#090d12', weight:1, fillColor:col, fillOpacity:0.85
+      }).bindPopup(`<b>⛰️ ${esc(ev.title)}</b><br>${esc(ev.date||'undated')} · ${esc(ev.source)}`
+        + `<br>Trigger: <b>${esc(ev.trigger||'unknown')}</b>`
+        + (ev.fatalities ? `<br>Reported fatalities: <b>${fmt(ev.fatalities)}</b>` : '')
+        + (ev.url ? `<br><a href="${esc(ev.url)}" target="_blank" rel="noopener">source record</a>` : ''))
+        .addTo(gLs);
+    });
+  }
+
+  if (document.getElementById('lHydro').checked){
+    S.expo.filter(o => o.kind === 'hydropower').forEach(o =>
+      L.circleMarker([o.lat, o.lon], {radius:4.5, color:'#090d12', weight:1, fillColor:'#eab308', fillOpacity:.9})
+        .bindPopup(`<b>⚡ ${esc(o.name||'Hydropower facility')}</b><br>${o.capacity_mw?fmt(o.capacity_mw,1)+' MW':'capacity not tagged in OSM'}`)
+        .addTo(gHydro));
+  }
+
+  if (document.getElementById('lEqHist').checked){
+    S.eqHist.filter(e => e.mag >= 6).forEach(e =>
+      L.circleMarker([e.lat, e.lon], {radius:magRadius(e.mag), color:'#dc3b30', weight:1.3, fillColor:'#dc3b30', fillOpacity:.22})
+        .bindPopup(`<b>M ${fmt(e.mag,1)}</b> ${esc(e.place||'')}<br>${new Date(e.time).getUTCFullYear()} · depth ${fmt(e.depth_km,0)} km`)
+        .addTo(gEqH));
+  }
+
+  if (document.getElementById('lGlof').checked){
+    S.glofHist.forEach(g =>
+      L.circleMarker([g.lat, g.lon], {radius:5.5, color:'#fff', weight:1.2, fillColor:'#2dd4bf', fillOpacity:.88})
+        .bindPopup(`<b>💧 ${esc(g.lake)}</b> ${g.year?fmt(g.year):''}`
+          + `<br>${esc(g.lake_type||'')} ${esc(g.mechanism?'· '+g.mechanism:'')}`
+          + `<br>Basin: ${esc(g.basin||'—')}`
+          + (g.lives?`<br>Lives lost: <b>${fmt(g.lives)}</b>`:'')
+          + (g.discharge?`<br>Reported peak discharge: <b>${fmt(g.discharge)} m³/s</b>`:''))
+        .addTo(gGlof));
+  }
+
+  if (document.getElementById('lGdacs').checked){
+    S.gdacs.forEach(a => {
+      const col = a.alert_level==='Red'?'#dc3b30':a.alert_level==='Orange'?'#e67e22':'#22c55e';
+      L.circleMarker([a.lat, a.lon], {radius:7, color:'#fff', weight:1.5, fillColor:col, fillOpacity:0.85})
+        .bindPopup(`<b>GDACS ${esc(a.type)}: ${esc(a.name)}</b><br>Alert: <b>${esc(a.alert_level)}</b> · ${esc(a.from_date)}`
+          + `<br>${esc(a.severity_text||'')}<br><a href="${esc(a.url)}" target="_blank" rel="noopener">GDACS report</a>`)
+        .addTo(gGdacs);
+    });
+  }
+}
+
+/* -------------------------------------------------- selection & inspectors */
+function ensureRightVisible(){
+  const m = document.getElementById('mainGrid');
+  if (m.classList.contains('hide-right')){
+    m.classList.remove('hide-right');
+    setTimeout(() => map.invalidateSize(), 200);
+  }
+}
+
+function renderDefaultInspector(){
+  const el = document.getElementById('detailBody');
+  const pri = S.lakes.filter(f => f.properties.priority).sort((a,b)=>b.properties.pfv_Mm3 - a.properties.pfv_Mm3);
+  el.innerHTML = `
+    <h2 style="font-size:20px">Multi-Hazard Inspector</h2>
+    <p class="muted" style="margin:4px 0 10px">Click any <b>glacial lake</b>, <b>GloFAS river station</b>, or <b>rainfall-landslide node</b> on the map or in the tables below to inspect its full physical chain, downstream arrival timeline, live weather, and Sentinel-2 satellite imagery.</p>
+    <section class="blk">
+      <h3>Top priority glacial lakes (PFV ≥ 10 Mm³)</h3>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${pri.slice(0,8).map((f, idx) => {
+          const p = f.properties;
+          return `<div class="kpi" style="padding:5px 8px" onclick="selectLake('${esc(p.id)}', true)">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+              <b>#${idx+1} ${esc(p.name || p.id)}</b>
+              <span class="mono" style="color:var(--accent);font-size:12px">${fmt(p.pfv_Mm3,1)} Mm³</span>
+            </div>
+            <div class="band">${esc(p.district||'—')} · ${fmt(p.z)} m · Qp ≈ ${fmt(p.qp_m3s)} m³/s · pop ≤1 km: ${fmt(p.pop_high)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </section>
+    <section class="blk">
+      <h3>7-day automated refresh status</h3>
+      <div class="kv">
+        <span>last pipeline build</span><b>${esc((S.summary&&S.summary.build)||'—')}</b>
+        <span>scheduled cadence</span><b>every ${fmt((S.summary&&S.summary.refresh_interval_days)||7)} days</b>
+        <span>next scheduled build</span><b>${esc(((S.summary&&S.summary.next_scheduled_refresh)||'').slice(0,10)||'weekly')}</b>
+      </div>
+    </section>`;
+}
+
+function travelText(km){
+  const vs = (S.summary && S.summary.thresholds.front_velocity_ms) || [2,5,10];
+  const t = v => { const m = km*1000/v/60; return m < 90 ? `${m.toFixed(0)} min` : `${(m/60).toFixed(1)} h`; };
+  return `${t(vs[vs.length-1])}–${t(vs[0])} (central ${t(vs[1])})`;
+}
+
+function selectLake(id, fly){
+  S.sel = id; S.selKind = 'lake';
+  ensureRightVisible();
   const f = S.lakes.find(x => x.properties.id === id);
   if (!f) return;
   const p = f.properties, r = S.routes[id];
+  try { history.replaceState(null, '', `#lake=${encodeURIComponent(id)}`); } catch(e){}
+
   gRoute.clearLayers(); gExp.clearLayers();
   if (r && document.getElementById('lRoute').checked){
-    L.polyline(r.path.map(c => [c[1], c[0]]), {color:'#4ea3d8', weight:3, opacity:.9})
-      .addTo(gRoute);
-    L.polyline(r.path.map(c => [c[1], c[0]]), {color:'#4ea3d8', weight:11, opacity:.14})
-      .addTo(gRoute);
+    const latlngs = r.path.map(c => [c[1], c[0]]);
+    L.polyline(latlngs, {color:'#38bdf8', weight:11, opacity:.16}).addTo(gRoute);
+    L.polyline(latlngs, {color:'#38bdf8', weight:3.2, opacity:.95}).addTo(gRoute);
+    // Distance milestone ticks along routed channel
+    let cum = 0, nextTick = 25;
+    for (let i = 1; i < r.path.length; i++){
+      const seg = hav(r.path[i-1][0], r.path[i-1][1], r.path[i][0], r.path[i][1]);
+      if (cum + seg >= nextTick && nextTick <= 100){
+        L.circleMarker([r.path[i][1], r.path[i][0]], {
+          radius:3.5, color:'#090d12', weight:1, fillColor:'#38bdf8', fillOpacity:1
+        }).bindTooltip(`${nextTick} km downstream · arrival ${travelText(nextTick)}`, {direction:'top'}).addTo(gRoute);
+        nextTick += 25;
+      }
+      cum += seg;
+    }
   }
   if (r && document.getElementById('lExp').checked){
     (r.exp||[]).forEach(([i, km, off]) => {
       const o = expoById[i]; if (!o) return;
-      const col = {hydropower:'#e0b83a', health:'#7fd1b9', places:'#e6edf3',
-                   bridges:'#9aa9b7', borders:'#c9a0dc'}[o.kind] || '#9aa9b7';
-      L.circleMarker([o.lat, o.lon], {radius:o.kind==='hydropower'?6:4, color:'#0b0f13',
+      const col = {hydropower:'#eab308', health:'#2dd4bf', places:'#e7eef6',
+                   bridges:'#94a3b8', borders:'#c084fc'}[o.kind] || '#94a3b8';
+      L.circleMarker([o.lat, o.lon], {radius:o.kind==='hydropower'?6:4, color:'#090d12',
         weight:1, fillColor:col, fillOpacity:.95, className:'eqdot'})
         .bindPopup(`<b>${esc(o.name||o.sub||o.kind)}</b><br>${esc(o.kind)}${o.sub?' · '+esc(o.sub):''}`
           + `<br>${fmt(km,1)} km downstream, ${fmt(off)} m from channel`
@@ -434,142 +918,422 @@ function select(id, fly){
   if (fly){
     const b = L.geoJSON(f).getBounds();
     map.fitBounds(r ? L.latLngBounds(b).extend(L.polyline(r.path.map(c=>[c[1],c[0]])).getBounds()) : b,
-      {padding:[40,40], maxZoom:12});
+      {padding:[42,42], maxZoom:12});
   }
-  renderDetail(p, r);
-  renderTab();
-}
-function travelText(km){
-  const vs = (S.summary && S.summary.thresholds.front_velocity_ms) || [2,5,10];
-  const t = v => { const m = km*1000/v/60; return m < 90 ? `${m.toFixed(0)} min` : `${(m/60).toFixed(1)} h`; };
-  return `${t(vs[vs.length-1])}–${t(vs[0])} (central ${t(vs[1])})`;
+  renderLakes();
+  renderLakeDetail(p, r, f);
 }
 
-function renderDetail(p, r){
+function downstreamTimelineSvg(r){
+  if (!r || !r.km) return '';
+  const W = 345, H = 58, padL = 10, padR = 14, trackW = W - padL - padR;
+  const maxKm = Math.max(10, r.km);
+  const xOf = km => padL + Math.min(1, km / maxKm) * trackW;
+  const ticks = [0, 30, 60, 90, 120].filter(k => k <= maxKm + 5);
+  const colMap = {hydropower:'#eab308', health:'#2dd4bf', places:'#e7eef6', bridges:'#64748b'};
+  const pts = (r.exp||[]).map(([i, km]) => ({o:expoById[i], km})).filter(x => x.o);
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:58px;display:block;margin:6px 0 2px">
+    <line x1="${padL}" y1="24" x2="${padL+trackW}" y2="24" stroke="#314357" stroke-width="3" stroke-linecap="round"/>
+    ${ticks.map(k => {
+      const x = xOf(k).toFixed(1);
+      const min5 = Math.round(k * 1000 / 5 / 60);
+      const lbl = k === 0 ? 'Lake' : `${k}km (${min5<90?min5+'m':(min5/60).toFixed(1)+'h'})`;
+      return `<line x1="${x}" y1="19" x2="${x}" y2="29" stroke="#6a7d92" stroke-width="1"/>
+        <text x="${x}" y="44" fill="#6a7d92" font-size="9" text-anchor="${k===0?'start':k>=100?'end':'middle'}" font-family="IBM Plex Mono,monospace">${lbl}</text>`;
+    }).join('')}
+    ${pts.map(({o, km}) => {
+      const y = o.kind==='hydropower' ? 14 : o.kind==='health' ? 18 : o.kind==='places' ? 24 : 30;
+      const rad = o.kind==='hydropower' ? 4.2 : o.kind==='health' ? 3.5 : 2.5;
+      return `<circle cx="${xOf(km).toFixed(1)}" cy="${y}" r="${rad}" fill="${colMap[o.kind]||'#94a3b8'}" opacity="0.9">
+        <title>${esc(o.name||o.kind)} — ${fmt(km,1)} km</title></circle>`;
+    }).join('')}
+  </svg>
+  <div class="band">Channel timeline (central 5 m/s surge): <span style="color:#eab308">●</span> hydropower · <span style="color:#2dd4bf">●</span> health · <span>●</span> settlement</div>`;
+}
+
+function renderLakeDetail(p, r, feat){
   const el = document.getElementById('detailBody');
+  const ring = feat.geometry.coordinates[0];
+  const lon = ring.reduce((a,c)=>a+c[0],0)/ring.length;
+  const lat = ring.reduce((a,c)=>a+c[1],0)/ring.length;
+  const copUrl = `https://browser.dataspace.copernicus.eu/?zoom=14&lat=${lat.toFixed(4)}&lng=${lon.toFixed(4)}&datasetId=S2_L2A_CDAS`;
+  const osmUrl = `https://www.openstreetmap.org/?mlat=${lat.toFixed(4)}&mlon=${lon.toFixed(4)}#map=14/${lat.toFixed(4)}/${lon.toFixed(4)}`;
+
   const trig = [];
-  if (p.avalanche) trig.push(`snow/ice avalanche can reach the lake${p.ava_volume_Mm3?` (≈${fmt(p.ava_volume_Mm3,2)} Mm³ source)`:''}`);
-  if (p.rockfall)  trig.push('rockfall/landslide can reach the lake');
-  if (p.upstream_glof) trig.push('another glacial lake lies upstream');
-  if (p.sla_area_km2 > 0) trig.push(`steep lakefront area ${fmt(p.sla_area_km2,3)} km² (max ${fmt(p.sla_max_angle,1)}°)`);
-  if (p.ice_cored) trig.push('moraine ice core documented in the literature');
+  if (p.avalanche) trig.push(`Snow/ice avalanche trajectory reaches lake (${p.ava_volume_Mm3?`≈${fmt(p.ava_volume_Mm3,2)} Mm³, `:''}min reach ${fmt(p.ava_reach_deg,1)}°)`);
+  if (p.rockfall)  trig.push(`Rockfall/landslide trajectory reaches lake (min reach ${fmt(p.rock_reach_deg,1)}°)`);
+  if (p.upstream_glof) trig.push('Another mapped glacial lake lies within 30 km upstream');
+  if (p.sla_area_km2 > 0) trig.push(`Steep lakefront area ${fmt(p.sla_area_km2,3)} km² (max depression ${fmt(p.sla_max_angle,1)}°)`);
+  if (p.ice_cored) trig.push('Moraine ice core documented in peer-reviewed literature');
+  if (p.ice_contact) trig.push('Direct glacier-ice shoreline contact on Copernicus DEM / RGI 7.0');
+
+  const hm = hmLakeById[p.id];
 
   el.innerHTML = `
-   <h2 style="font-size:20px">${esc(p.name || p.id)}</h2>
-   ${p.name?`<div class="band mono">${esc(p.id)}</div>`:''}
-   <div class="muted">${esc(p.typ||'glacial lake')} · ${esc(p.district||'—')} district, ${esc(p.prov||'—')} · ${fmt(p.z)} m a.s.l.</div>
-   <div style="margin:8px 0">
+   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+     <div>
+       <h2 style="font-size:20px">${esc(p.name || p.id)}</h2>
+       ${p.name?`<div class="band mono">${esc(p.id)}${p.rgi?' · '+esc(p.rgi):''}</div>`:`<div class="band mono">${esc(p.rgi||'unmatched glacier')}</div>`}
+     </div>
+     <div style="display:flex;gap:4px">
+       <button class="btn" id="btnCopyLink" title="Copy direct URL to this lake">🔗 Link</button>
+       <button class="btn" id="btnBriefJson" title="Download full screening brief JSON">⬇ JSON</button>
+     </div>
+   </div>
+   <div class="muted" style="margin-top:2px">${esc(p.typ||'glacial lake')} · ${esc(p.district||'—')}, ${esc(p.prov||'—')} · <b>${fmt(p.z)} m</b> a.s.l.</div>
+   <div style="margin:7px 0;display:flex;flex-wrap:wrap;gap:4px">
      <span class="hbadge ${HCLASS[p.hazard]}">hazard ${p.hazard}</span>
+     ${p.hazard_enum && p.hazard_enum !== p.hazard ? `<span class="hbadge ${HCLASS[p.hazard_enum]}" title="Enumerated reading of Rounce et al. (2016)">enum: ${p.hazard_enum}</span>` : ''}
      ${p.impact?`<span class="hbadge ${HCLASS[p.impact]}">impact ${p.impact}</span>`:''}
      ${p.risk?`<span class="hbadge ${HCLASS[p.risk]}">risk ${p.risk}</span>`:''}
-     ${p.priority?`<span class="hbadge h-vhigh">priority set</span>`:''}
+     ${p.priority?`<span class="hbadge h-vhigh">priority ≥10 Mm³</span>`:''}
+     ${p.permafrost_belt?`<span class="hbadge h-info" title="Above ~4,800 m Himalayan permafrost belt (Gruber 2012)">permafrost belt</span>`:''}
    </div>
 
-   <section class="blk"><h3>Triggers identified</h3>
-     ${trig.length ? `<ul style="margin:4px 0 0 18px;padding:0;font-size:13px;color:var(--ink2)">${trig.map(t=>`<li>${t}</li>`).join('')}</ul>`
-       : `<p class="muted">No trigger mechanism identified from terrain. Buried ice in the moraine is not assessable from a DEM, so this is a lower bound.</p>`}
+   <section class="blk">
+     <h3>Copernicus Sentinel-2 satellite EO</h3>
+     <div id="stacBox" class="sat-card"><span class="loading">Querying Sentinel-2 L2A STAC archive…</span></div>
+     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+       <a class="btn" href="${copUrl}" target="_blank" rel="noopener">🛰️ Copernicus Browser</a>
+       <a class="btn" href="${osmUrl}" target="_blank" rel="noopener">🗺️ OpenStreetMap</a>
+     </div>
    </section>
 
-   <section class="blk"><h3>If it drained</h3>
+   <section class="blk"><h3>Triggers &amp; catchment geometry</h3>
+     ${trig.length ? `<ul style="margin:3px 0 6px 17px;padding:0;font-size:12.4px;color:var(--ink2)">${trig.map(t=>`<li>${t}</li>`).join('')}</ul>`
+       : `<p class="muted">No dynamic or steep-lakefront trigger identified at 30 m resolution. Subsurface moraine ice cannot be ruled out from a DEM.</p>`}
      <div class="kv">
-       <span>lake area</span><b>${fmt(p.area_km2,3)} km²</b>
-       <span>maximum depth</span><b>${fmt(p.depth_m)} m</b>
-       <span class="band">95% interval</span><span class="band">${fmt(p.depth_lo)}–${fmt(p.depth_hi)} m</span>
-       <span>lake volume</span><b>${fmt(p.volume_Mm3,1)} Mm³</b>
-       <span>potential flood volume</span><b>${fmt(p.pfv_Mm3,1)} Mm³</b>
-       <span class="band">±26% (Fujita et al. 2013)</span><span class="band">${fmt(p.pfv_lo_Mm3,1)}–${fmt(p.pfv_hi_Mm3,1)} Mm³</span>
-       <span class="band">lowering height Hp${p.hp_capped?' (≥ search limit)':''}</span><span class="band">${fmt(p.hp_m,1)} m · Dm ${fmt(p.dm_fujita_m,1)} m</span>
-       <span>peak discharge</span><b>${fmt(p.qp_m3s)} m³/s</b>
-       <span class="band">95% interval</span><span class="band">${fmt(p.qp_lo)}–${fmt(p.qp_hi)} m³/s</span>
-       ${p.qp_over_mean_flow?`<span>versus mean river flow</span><b>×${fmt(p.qp_over_mean_flow)}</b>`:''}
+       <span>contributing catchment</span><b>${fmt(p.contrib_km2,2)} km²</b>
+       <span>upslope relief in window</span><b>${fmt(p.relief_m)} m</b>
+       <span>max slope within 1 km</span><b>${fmt(p.slope1k_deg,1)}°</b>
+       <span>lake area change</span><b>${p.area_change_pct==null?'—':(p.area_change_pct>0?'+':'')+fmt(p.area_change_pct,1)+' %'} (${esc(p.change_class||'—')})</b>
+       <span>recorded historical GLOF</span><b>${p.past_glof?'yes':'no'}</b>
      </div>
-     <p class="muted">Two independent volume estimates are shown because they disagree by design: the lake volume comes from a bathymetric depth–area regression, the potential flood volume from how far the lake surface could fall before its steep lakefront disappears.</p>
+   </section>
+
+   <section class="blk"><h3>Drainage &amp; breach scenarios</h3>
+     <div class="kv">
+       <span>lake surface area</span><b>${fmt(p.area_km2,3)} km²</b>
+       <span>max depth (Bayesian median)</span><b>${fmt(p.depth_m)} m <span class="band">[${fmt(p.depth_lo)}–${fmt(p.depth_hi)}]</span></b>
+       <span>bathymetric volume (Veh 2020)</span><b>${fmt(p.volume_Mm3,2)} Mm³</b>
+       <span>potential flood volume (Fujita 2013)</span><b>${fmt(p.pfv_Mm3,2)} Mm³ <span class="band">[${fmt(p.pfv_lo_Mm3,1)}–${fmt(p.pfv_hi_Mm3,1)}]</span></b>
+       <span class="band">lowering Hp${p.hp_capped?' (capped)':''} vs mean depth Dm</span><span class="band mono">${fmt(p.hp_m,1)} m vs ${fmt(p.dm_fujita_m,1)} m</span>
+       <span>pooled peak discharge Qp</span><b>${fmt(p.qp_m3s)} m³/s <span class="band">[${fmt(p.qp_lo)}–${fmt(p.qp_hi)}]</span></b>
+       ${p.qp_over_mean_flow?`<span>Qp ÷ mean reach discharge</span><b>×${fmt(p.qp_over_mean_flow)}</b>`:''}
+     </div>
+     ${p.qp_10 ? `<div class="sat-card" style="padding:6px 8px">
+       <div class="band" style="margin-bottom:3px">Median Qp by breach-depth fraction of lake depth:</div>
+       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;text-align:center;font-size:11.5px">
+         <div><span class="band">10%</span><br><b class="mono">${fmt(p.qp_10)}</b></div>
+         <div><span class="band">30%</span><br><b class="mono">${fmt(p.qp_30)}</b></div>
+         <div><span class="band">50%</span><br><b class="mono">${fmt(p.qp_50)}</b></div>
+         <div><span class="band">100%</span><br><b class="mono">${fmt(p.qp_100)}</b></div>
+       </div>
+     </div>` : ''}
    </section>
 
    ${r ? `
-   <section class="blk"><h3>Downstream</h3>
-     <div class="kv">
-       <span>routed path</span><b>${fmt(r.km,1)} km</b>
-       <span>people within 1 km</span><b>${fmt(p.pop_low)}–${fmt(p.pop_high)}</b>
-       <span>settlements</span><b>${fmt(p.n_settlements)}</b>
-       <span>hydropower</span><b>${fmt(p.n_hydropower)}</b>
-       <span>health facilities</span><b>${fmt(p.n_health)}</b>
-       <span>bridges</span><b>${fmt(p.n_bridges)}</b>
+   <section class="blk"><h3>Downstream corridor (${fmt(r.km,1)} km)</h3>
+     ${downstreamTimelineSvg(r)}
+     <div class="kv" style="margin-top:6px">
+       <span>people within 1 km (WorldPop)</span><b>${fmt(p.pop_low)}–${fmt(p.pop_high)}</b>
+       <span>settlements / clinics / hydro / bridges</span><b>${fmt(p.n_settlements)} / ${fmt(p.n_health)} / ${fmt(p.n_hydropower)} / ${fmt(p.n_bridges)}</b>
      </div>
-     <table style="margin-top:6px"><thead><tr><th>place</th><th>km</th><th>arrival</th></tr></thead><tbody>
+     <table style="margin-top:5px"><thead><tr><th>exposure</th><th>km</th><th>arrival</th></tr></thead><tbody>
      ${(r.exp||[]).filter(([i])=>{const o=expoById[i];return o && (o.kind==='places'||o.kind==='hydropower'||o.kind==='health') && o.name;})
-        .slice(0,14).map(([i,km]) => {const o=expoById[i];
+        .slice(0,12).map(([i,km]) => {const o=expoById[i];
           return `<tr><td>${esc(o.name)} <span class="band">${esc(o.sub||o.kind)}</span></td><td class="num">${fmt(km,1)}</td><td class="num">${travelText(km)}</td></tr>`;}).join('')
-       || `<tr><td colspan="3" class="muted">No named settlement, clinic or plant mapped within 1 km of the path.</td></tr>`}
+       || `<tr><td colspan="3" class="muted">No named settlement, clinic or plant mapped within 1 km.</td></tr>`}
      </tbody></table>
-     <p class="muted">Arrival times are path length divided by a constant surge-front velocity of 10, 5 and 2 m s⁻¹. The 4–5 m s⁻¹ central figure is the observed front velocity of the 1985 Dig Tsho flood. No attenuation or channel storage is modelled.</p>
-   </section>` : `<section class="blk"><h3>Downstream</h3><p class="muted">No flood path was routed for this lake: its hazard class and size put it below the routing threshold.</p></section>`}
+   </section>` : `<section class="blk"><h3>Downstream</h3><p class="muted">Below routing threshold — no downstream channel traced.</p></section>`}
 
-   <section class="blk"><h3>Rainfall and shaking</h3>
-     <div id="wx"><button class="btn" id="wxBtn">load 7-day rainfall for this lake</button></div>
-     <div class="kv" style="margin-top:8px">
-       <span>catalogued M≥5 within 50 km</span><b>${fmt(p.eq_n_m5_within_50km)}</b>
-       <span>catalogued M≥6 within 100 km</span><b>${fmt(p.eq_n_m6_within_100km)}</b>
-       <span>nearest catalogued M≥6</span><b>${fmt(p.eq_nearest_m6_km,1)} km</b>
-     </div>
+   <section class="blk"><h3>Hydromet, 0 °C isotherm &amp; river flow</h3>
+     <div id="wx">${hm ? renderCachedLakeWx(hm) : ''}<button class="btn pri" id="wxBtn" style="margin-top:4px">↻ Load live 12-day weather, 0 °C level &amp; GloFAS river flow</button></div>
    </section>
 
-   <section class="blk"><h3>Lake change</h3>
+   <section class="blk"><h3>Active fault &amp; seismic proximity</h3>
      <div class="kv">
-       <span>area change</span><b>${p.area_change_pct==null?'—':fmt(p.area_change_pct,1)+' %'}</b>
-       <span>class</span><b>${esc(p.change_class||'—')}</b>
-       <span>distance to glacier</span><b>${p.dist_glacier_m==null?'—':fmt(p.dist_glacier_m)+' m'}</b>
-       <span>recorded GLOF</span><b>${p.past_glof?'yes':'no'}</b>
+       <span>nearest active fault (GEM)</span><b>${p.fault_km!=null?fmt(p.fault_km,1)+' km':'—'}</b>
+       <span class="band">structure &amp; kinematics</span><span class="band">${esc(p.fault_name||'—')} (${esc(p.fault_slip||'—')})</span>
+       <span>catalogued M≥5 within 50 km</span><b>${fmt(p.eq_n_m5_within_50km)}</b>
+       <span>catalogued M≥6 within 100 km</span><b>${fmt(p.eq_n_m6_within_100km)} (nearest ${fmt(p.eq_nearest_m6_km,1)} km)</b>
      </div>
    </section>`;
 
-  const btn = document.getElementById('wxBtn');
-  if (btn) btn.onclick = () => loadRain(p);
+  document.getElementById('wxBtn').onclick = () => loadLakeLiveEnv(p, lat, lon, r);
+  document.getElementById('btnCopyLink').onclick = () => {
+    navigator.clipboard && navigator.clipboard.writeText(location.href);
+    document.getElementById('btnCopyLink').textContent = '✓ Copied';
+  };
+  document.getElementById('btnBriefJson').onclick = () => {
+    const blob = new Blob([JSON.stringify({lake:p, route:r||null, stac:S.stacCache[p.id]||null, build:S.summary&&S.summary.build}, null, 2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${p.id}_traya_brief.json`; a.click();
+  };
+  loadStacForLake(p.id, lon, lat);
 }
 
-/* ----------------------------------------------------------- rainfall */
-async function loadRain(p){
-  const f = S.lakes.find(x => x.properties.id === p.id);
-  const c = L.geoJSON(f).getBounds().getCenter();
-  const box = document.getElementById('wx');
-  box.innerHTML = '<span class="loading">fetching Open-Meteo…</span>';
-  const url = `${(S.summary&&S.summary.live_feeds.open_meteo)||'https://api.open-meteo.com/v1/forecast'}`
-    + `?latitude=${c.lat.toFixed(3)}&longitude=${c.lng.toFixed(3)}`
-    + `&daily=precipitation_sum,temperature_2m_max&past_days=7&forecast_days=5&timezone=Asia%2FKathmandu`;
+function renderCachedLakeWx(hm){
+  return `<div class="kv">
+    <span>weekly precip (past 7d / next 5d)</span><b>${fmt(hm.precip_past_7d_mm,1)} / ${fmt(hm.precip_next_5d_mm,1)} mm</b>
+    <span>12d snowfall / liquid rain</span><b>${fmt(hm.snowfall_12d_cm,1)} cm / ${fmt(hm.liquid_rain_12d_mm,1)} mm</b>
+    <span>0 °C freezing level (now / 12d max)</span><b>${fmt(hm.freezing_level_now_m)} / ${fmt(hm.freezing_level_max_m)} m</b>
+    <span>margin vs lake (${fmt(hm.z_m)} m)</span><b style="color:${hm.warm_rain_on_ice?'var(--bad)':'var(--ink)'}">${hm.freezing_margin_m>0?'+':''}${fmt(hm.freezing_margin_m)} m ${hm.warm_rain_on_ice?'(warm rain-on-ice!)':''}</b>
+  </div>`;
+}
+
+async function loadStacForLake(id, lon, lat){
+  const box = document.getElementById('stacBox');
+  if (!box) return;
+  if (S.stacCache[id]){
+    renderStacCard(box, S.stacCache[id], lon, lat);
+    return;
+  }
+  const url = (S.summary && S.summary.live_feeds && S.summary.live_feeds.stac_earth_search)
+    || 'https://earth-search.aws.element84.com/v1/search';
+  const now = new Date();
+  const past = new Date(now.getTime() - 120 * 86400000);
   try{
-    const r = await fetch(url); if (!r.ok) throw new Error('HTTP '+r.status);
-    const d = await r.json();
-    const days = d.daily.time, pr = d.daily.precipitation_sum, tx = d.daily.temperature_2m_max;
-    const sum7 = pr.slice(0,7).reduce((a,b)=>a+(b||0),0);
-    const f5 = pr.slice(7).reduce((a,b)=>a+(b||0),0);
-    box.innerHTML = `<div class="kv"><span>rain, past 7 days</span><b>${fmt(sum7,1)} mm</b>`
-      + `<span>rain, next 5 days</span><b>${fmt(f5,1)} mm</b>`
-      + `<span>max temp today</span><b>${fmt(tx[7],1)} °C</b></div>`
-      + sparkline(days, pr)
-      + `<p class="muted">Open-Meteo daily precipitation at the lake centre, ${d.elevation} m model elevation. Rainfall is context: no rainfall–failure threshold is applied here, because none is established for moraine dams in Nepal.</p>`;
-  } catch(e){
-    box.innerHTML = `<span class="loading">rainfall unavailable (${esc(e.message)})</span>`;
+    const resp = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        collections:['sentinel-2-l2a'],
+        bbox:[+(lon-0.025).toFixed(4), +(lat-0.025).toFixed(4), +(lon+0.025).toFixed(4), +(lat+0.025).toFixed(4)],
+        datetime:`${past.toISOString().slice(0,19)}Z/${now.toISOString().slice(0,19)}Z`,
+        limit:10
+      })
+    });
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const gj = await resp.json();
+    const feats = (gj.features||[]).sort((a,b)=>((b.properties&&b.properties.datetime)||'').localeCompare((a.properties&&a.properties.datetime)||''));
+    if (!feats.length){ box.innerHTML = '<span class="muted">No recent Sentinel-2 L2A scene returned for this footprint.</span>'; return; }
+    const clear = feats.filter(f => (f.properties['eo:cloud_cover'] ?? 100) <= 30);
+    const best = clear[0] || feats.reduce((a,b)=>(a.properties['eo:cloud_cover']??100)<=(b.properties['eo:cloud_cover']??100)?a:b);
+    const bp = best.properties || {}, assets = best.assets || {};
+    const rec = {
+      scene_id: best.id,
+      datetime: bp.datetime,
+      cloud_cover_pct: +(bp['eo:cloud_cover'] || 0).toFixed(1),
+      grid_code: bp['grid:code'] || '',
+      thumbnail: (assets.thumbnail && assets.thumbnail.href) || (assets.rendered_preview && assets.rendered_preview.href) || null,
+      latest_pass_datetime: feats[0].properties && feats[0].properties.datetime,
+    };
+    S.stacCache[id] = rec;
+    if (S.sel === id) renderStacCard(box, rec, lon, lat);
+  }catch(e){
+    if (S.sel === id) box.innerHTML = `<span class="muted">Live STAC preview unavailable (${esc(e.message)}). Use Copernicus Browser below to inspect 10 m imagery.</span>`;
   }
 }
+
+function renderStacCard(box, sc, lon, lat){
+  box.innerHTML = `
+    ${sc.thumbnail ? `<img class="sat-thumb" src="${esc(sc.thumbnail)}" alt="Sentinel-2 L2A quicklook" loading="lazy" onerror="this.style.display='none'">` : ''}
+    <div class="kv" style="margin:0">
+      <span>clearest S2 pass</span><b>${esc((sc.datetime||'').slice(0,10))} (${fmt(sc.cloud_cover_pct,1)}% cloud)</b>
+      <span class="band">scene / tile</span><span class="band mono">${esc(sc.scene_id||'—')}</span>
+      ${sc.latest_pass_datetime ? `<span class="band">most recent overpass</span><span class="band mono">${esc(sc.latest_pass_datetime.slice(0,10))}</span>` : ''}
+    </div>`;
+}
+
+async function loadLakeLiveEnv(p, lat, lon, r){
+  const box = document.getElementById('wx');
+  box.innerHTML = '<span class="loading">Fetching live Open-Meteo weather, 0 °C isotherm &amp; GloFAS discharge…</span>';
+  const wxUrl = `${(S.summary&&S.summary.live_feeds.open_meteo)||'https://api.open-meteo.com/v1/forecast'}`
+    + `?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}`
+    + `&daily=precipitation_sum,snowfall_sum,temperature_2m_max&hourly=precipitation,freezinglevel_height&past_days=7&forecast_days=5&timezone=Asia%2FKathmandu`;
+  const outlet = (r && r.path && r.path.length) ? r.path[Math.min(8, r.path.length-1)] : [lon, lat];
+  const flUrl = `${(S.summary&&S.summary.live_feeds.open_meteo_flood)||'https://flood-api.open-meteo.com/v1/flood'}`
+    + `?latitude=${outlet[1].toFixed(3)}&longitude=${outlet[0].toFixed(3)}&daily=river_discharge,river_discharge_median,river_discharge_max&past_days=7&forecast_days=14`;
+  try{
+    const [wxRes, flRes] = await Promise.all([fetch(wxUrl), fetch(flUrl).catch(()=>null)]);
+    if (!wxRes.ok) throw new Error('HTTP '+wxRes.status);
+    const d = await wxRes.json();
+    const days = d.daily.time, pr = d.daily.precipitation_sum, sn = d.daily.snowfall_sum || [], tx = d.daily.temperature_2m_max;
+    const flH = ((d.hourly && d.hourly.freezinglevel_height) || []).filter(v => v !== null && Number.isFinite(v));
+    const prH = ((d.hourly && d.hourly.precipitation) || []).map(v => v || 0);
+    let max24 = 0;
+    for (let i=24;i<=prH.length;i++){ const s = prH.slice(i-24,i).reduce((a,b)=>a+b,0); if (s>max24) max24=s; }
+    const ec24 = 73.90 * Math.pow(24, 0.21);
+    const sum7 = pr.slice(0,7).reduce((a,b)=>a+(b||0),0);
+    const f5 = pr.slice(7).reduce((a,b)=>a+(b||0),0);
+    const snow12 = sn.reduce((a,b)=>a+(b||0),0);
+    const flMax = flH.length ? Math.max(...flH) : null;
+
+    let riverHtml = '';
+    if (flRes && flRes.ok){
+      const fd = await flRes.json();
+      const qSim = (fd.daily && fd.daily.river_discharge) || [];
+      const qMed = (fd.daily && fd.daily.river_discharge_median) || [];
+      const qNow = qSim[7] ?? qSim[6];
+      const qPeak = Math.max(...qMed.slice(7).filter(v=>v!=null), qNow||0);
+      riverHtml = `<span>receiving river GloFAS (now / 14d)</span><b>${fmt(qNow,1)} / ${fmt(qPeak,1)} m³/s</b>`;
+    }
+
+    box.innerHTML = `<div class="kv">
+      <span>precip past 7d / next 5d</span><b>${fmt(sum7,1)} / ${fmt(f5,1)} mm</b>
+      <span>12d snowfall total</span><b>${fmt(snow12,1)} cm</b>
+      <span>max 24h rain vs Dahal–Hasegawa</span><b>${fmt(max24,1)} / ${fmt(ec24,0)} mm (${fmt(100*max24/ec24,0)}%)</b>
+      <span>peak 0 °C freezing level</span><b>${fmt(flMax,0)} m (lake ${fmt(p.z,0)} m)</b>
+      <span>max air temp today (${fmt(d.elevation,0)} m grid)</span><b>${fmt(tx[7],1)} °C</b>
+      ${riverHtml}
+    </div>` + sparkline(days, pr);
+  }catch(e){
+    box.innerHTML = `<span class="loading">Live weather unavailable (${esc(e.message)})</span>`;
+  }
+}
+
 function sparkline(days, pr){
-  const w = 320, h = 44, m = Math.max(1, ...pr.map(v=>v||0));
+  const w = 330, h = 46, m = Math.max(1, ...pr.map(v=>v||0));
   const bw = w/pr.length;
   const bars = pr.map((v,i) => {
     const bh = (v||0)/m*(h-12);
     const past = i < 7;
-    return `<rect x="${(i*bw+1).toFixed(1)}" y="${(h-2-bh).toFixed(1)}" width="${(bw-2).toFixed(1)}"
-      height="${bh.toFixed(1)}" fill="${past?'#4ea3d8':'#7fd1b9'}" opacity="${past?0.9:0.65}"></rect>`;
+    return `<rect x="${(i*bw+1).toFixed(1)}" y="${(h-2-bh).toFixed(1)}" width="${Math.max(2,bw-2).toFixed(1)}"
+      height="${bh.toFixed(1)}" fill="${past?'#38bdf8':'#2dd4bf'}" opacity="${past?0.92:0.68}">
+      <title>${days[i]}: ${fmt(v||0,1)} mm</title></rect>`;
   }).join('');
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${bars}
-    <line x1="${(7*bw).toFixed(1)}" y1="0" x2="${(7*bw).toFixed(1)}" y2="${h}" stroke="#68788a" stroke-dasharray="2 2"></line>
-    </svg><div class="band">blue = observed, green = forecast, dashed line = today; peak ${fmt(m,1)} mm/day</div>`;
+    <line x1="${(7*bw).toFixed(1)}" y1="0" x2="${(7*bw).toFixed(1)}" y2="${h}" stroke="#6a7d92" stroke-dasharray="2 2"/>
+    </svg><div class="band">blue = past 7d observed, teal = 5d forecast, dashed = today (peak ${fmt(m,1)} mm/d)</div>`;
 }
 
-/* --------------------------------------------------- live earthquakes */
+/* River Basin Inspector */
+function selectRiver(id, fly){
+  const b = S.rivers.find(x => x.id === id);
+  if (!b) return;
+  S.sel = id; S.selKind = 'river';
+  ensureRightVisible();
+  if (fly) map.setView([b.lat, b.lon], 9);
+  const c = b.climatology || {};
+  const st = (b.status_14d && b.status_14d !== 'normal') ? b.status_14d : (b.status_now || 'normal');
+  const el = document.getElementById('detailBody');
+  el.innerHTML = `
+    <h2 style="font-size:20px">🌊 ${esc(b.name)}</h2>
+    <div class="muted">${esc(b.station)} · ${esc(b.prov)} · ${b.lat.toFixed(2)}°N, ${b.lon.toFixed(2)}°E</div>
+    <div style="margin:7px 0;display:flex;gap:5px;flex-wrap:wrap">
+      <span class="hbadge ${FCLASS[b.status_now||'normal']}">now: ${esc(b.status_now||'normal')}</span>
+      <span class="hbadge ${FCLASS[b.status_14d||'normal']}">14d forecast: ${esc(b.status_14d||'normal')}</span>
+    </div>
+    <section class="blk">
+      <h3>GloFAS 60-day discharge hydrograph</h3>
+      ${riverHydrographSvg(b)}
+      <div class="kv" style="margin-top:8px">
+        <span>current simulated discharge</span><b>${fmt(b.current_m3s,1)} m³/s</b>
+        <span>vs long-term median (Q₅₀)</span><b>${b.anomaly_ratio?'×'+fmt(b.anomaly_ratio,2):'—'} (${fmt(c.q50,1)} m³/s)</b>
+        <span>14-day ensemble median peak</span><b>${fmt(b.peak_14d_median_m3s,1)} m³/s</b>
+        <span>14-day ensemble p75 / max</span><b>${fmt(b.peak_14d_p75_m3s,1)} / ${fmt(b.peak_14d_max_m3s,1)} m³/s</b>
+      </div>
+    </section>
+    <section class="blk">
+      <h3>Basin flood thresholds (1991–2025 reanalysis)</h3>
+      <div class="kv">
+        <span>90th percentile high flow (Q₉₀)</span><b>${fmt(c.q90,1)} m³/s</b>
+        <span>2-year flood return level (Q₂)</span><b>${fmt(c.q2,1)} m³/s</b>
+        <span>5-year flood return level (Q₅)</span><b>${fmt(c.q5,1)} m³/s</b>
+        <span>20-year flood return level (Q₂₀)</span><b>${fmt(c.q20,1)} m³/s</b>
+      </div>
+      <p class="muted">Return levels fitted by Gumbel EV1 method-of-moments to ${fmt(c.years||35)} annual maxima of Copernicus GloFAS-ERA5 daily discharge. Consult Nepal DHM real-time river gauges (hydrology.gov.np) for operational flood warnings.</p>
+    </section>`;
+}
+
+function riverHydrographSvg(b){
+  const s = b.series || {};
+  const times = s.time || [], sim = s.discharge || [], med = s.median || [], p25 = s.p25 || [], p75 = s.p75 || [], mx = s.max || [];
+  if (!times.length) return '<p class="muted">No time series loaded.</p>';
+  const W = 350, H = 135, pL = 38, pR = 8, pT = 10, pB = 20, cW = W - pL - pR, cH = H - pT - pB;
+  const c = b.climatology || {};
+  const allVals = [...sim, ...med, ...p75, ...mx, c.q2||0].filter(v => v!=null && Number.isFinite(v));
+  const yMax = Math.max(10, ...allVals) * 1.08;
+  const xOf = i => pL + (i / Math.max(1, times.length - 1)) * cW;
+  const yOf = v => pT + cH - Math.min(1, Math.max(0, (v||0) / yMax)) * cH;
+  const idx0 = s.today_index || 30;
+
+  let bandPts = [];
+  for (let i = idx0; i < times.length; i++) if (p75[i]!=null) bandPts.push(`${xOf(i).toFixed(1)},${yOf(p75[i]).toFixed(1)}`);
+  for (let i = times.length - 1; i >= idx0; i--) if (p25[i]!=null) bandPts.push(`${xOf(i).toFixed(1)},${yOf(p25[i]).toFixed(1)}`);
+
+  const pathOf = (arr, iStart, iEnd) => {
+    const pts = [];
+    for (let i = iStart; i <= iEnd && i < arr.length; i++){
+      if (arr[i] != null) pts.push(`${pts.length?'L':'M'}${xOf(i).toFixed(1)},${yOf(arr[i]).toFixed(1)}`);
+    }
+    return pts.join(' ');
+  };
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:135px;display:block;background:var(--panel2);border:1px solid var(--line);border-radius:5px">
+    <line x1="${pL}" y1="${pT+cH}" x2="${W-pR}" y2="${pT+cH}" stroke="#314357"/>
+    ${c.q2 && c.q2 <= yMax ? `<line x1="${pL}" y1="${yOf(c.q2).toFixed(1)}" x2="${W-pR}" y2="${yOf(c.q2).toFixed(1)}" stroke="#eab308" stroke-dasharray="3 3" stroke-width="1"/>
+      <text x="${W-pR-2}" y="${(yOf(c.q2)-3).toFixed(1)}" fill="#eab308" font-size="8.5" text-anchor="end" font-family="IBM Plex Mono">Q₂ ${fmt(c.q2,0)}</text>` : ''}
+    ${c.q5 && c.q5 <= yMax ? `<line x1="${pL}" y1="${yOf(c.q5).toFixed(1)}" x2="${W-pR}" y2="${yOf(c.q5).toFixed(1)}" stroke="#dc3b30" stroke-dasharray="3 3" stroke-width="1"/>
+      <text x="${W-pR-2}" y="${(yOf(c.q5)-3).toFixed(1)}" fill="#dc3b30" font-size="8.5" text-anchor="end" font-family="IBM Plex Mono">Q₅ ${fmt(c.q5,0)}</text>` : ''}
+    ${bandPts.length > 3 ? `<polygon points="${bandPts.join(' ')}" fill="#2dd4bf" fill-opacity="0.22"/>` : ''}
+    <path d="${pathOf(mx, idx0, times.length-1)}" fill="none" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2 2" opacity="0.75"/>
+    <path d="${pathOf(sim, 0, idx0)}" fill="none" stroke="#38bdf8" stroke-width="2"/>
+    <path d="${pathOf(med.some(x=>x!=null)?med:sim, idx0, times.length-1)}" fill="none" stroke="#2dd4bf" stroke-width="2"/>
+    <line x1="${xOf(idx0).toFixed(1)}" y1="${pT}" x2="${xOf(idx0).toFixed(1)}" y2="${pT+cH}" stroke="#94a3b8" stroke-dasharray="2 2"/>
+    <text x="${pL-4}" y="${pT+8}" fill="#6a7d92" font-size="8.5" text-anchor="end" font-family="IBM Plex Mono">${fmt(yMax,0)}</text>
+    <text x="${pL-4}" y="${pT+cH}" fill="#6a7d92" font-size="8.5" text-anchor="end" font-family="IBM Plex Mono">0</text>
+    <text x="${pL}" y="${H-5}" fill="#6a7d92" font-size="8.5" font-family="IBM Plex Mono">${esc((times[0]||'').slice(5))}</text>
+    <text x="${xOf(idx0).toFixed(1)}" y="${H-5}" fill="#9fb0c3" font-size="8.5" text-anchor="middle" font-family="IBM Plex Mono">today</text>
+    <text x="${W-pR}" y="${H-5}" fill="#6a7d92" font-size="8.5" text-anchor="end" font-family="IBM Plex Mono">${esc((times[times.length-1]||'').slice(5))}</text>
+  </svg>
+  <div class="band">Blue = past 30d GloFAS, teal = 30d median + p25–p75 band, dotted = ensemble max (m³/s)</div>`;
+}
+
+function selectNode(id, fly){
+  const nd = (S.hydromet && S.hydromet.nodes || []).find(x => x.id === id);
+  if (!nd) return;
+  S.sel = id; S.selKind = 'node';
+  ensureRightVisible();
+  if (fly) map.setView([nd.lat, nd.lon], 9);
+  const dh = nd.dh_combined || nd.dh_obs || {};
+  const el = document.getElementById('detailBody');
+  el.innerHTML = `
+    <h2 style="font-size:20px">🌧️ ${esc(nd.name)}</h2>
+    <div class="muted">${esc(nd.zone)} · ${esc(nd.prov)} · ${fmt(nd.elev_m)} m</div>
+    <div style="margin:7px 0">
+      <span class="hbadge ${DHCLASS[dh.level||'low']}">Dahal–Hasegawa: ${esc(dh.level||'low')} (${fmt((dh.max_ratio||0)*100,0)}%)</span>
+    </div>
+    <section class="blk">
+      <h3>12-day precipitation &amp; slope saturation</h3>
+      ${nd.daily_time && nd.daily_time.length ? sparkline(nd.daily_time, nd.daily_precip||[]) : ''}
+      <div class="kv" style="margin-top:8px">
+        <span>past 7-day precipitation</span><b>${fmt(nd.rain_past_7d_mm,1)} mm</b>
+        <span>next 5-day forecast</span><b>${fmt(nd.rain_next_5d_mm,1)} mm</b>
+        <span>peak 24h observed / threshold</span><b>${fmt(nd.max_24h_obs_mm,1)} / ${fmt(dh.ec_24h_mm,0)} mm</b>
+        <span>peak 72h observed / threshold</span><b>${fmt(nd.max_72h_obs_mm,1)} / ${fmt(dh.ec_72h_mm,0)} mm</b>
+        <span>0–7 cm topsoil moisture</span><b>${fmt(nd.soil_moisture_m3m3,3)} m³/m³</b>
+        <span>0 °C freezing level</span><b>${fmt(nd.freezing_level_m,0)} m a.s.l.</b>
+      </div>
+      <p class="muted">Threshold equation I = 73.90 D⁻⁰·⁷⁹ from Dahal &amp; Hasegawa (2008) for the Nepal Himalaya. Exceedance indicates regional rainfall capable of triggering shallow landslides, not site-specific failure certainty.</p>
+    </section>`;
+}
+
+/* --------------------------------------------------- live feeds & refresh */
+function updateStatusPills(){
+  // Rivers pill
+  const fp = document.getElementById('pill-flood');
+  if (S.rivers.length){
+    const nAlert = S.rivers.filter(b => ['watch','warning','severe'].includes(b.status_14d) || ['watch','warning','severe'].includes(b.status_now)).length;
+    fp.className = 'pill ' + (nAlert ? 'watch' : 'live');
+    fp.innerHTML = `<span class="dot"></span>rivers: ${nAlert ? nAlert+' watch/warn' : '10 normal'}`;
+    document.getElementById('k-rivers').textContent = nAlert ? `${nAlert} alert / 10` : '10 normal';
+  }
+  // Landslides pill
+  const lp = document.getElementById('pill-ls');
+  const nodes = (S.hydromet && S.hydromet.nodes) || [];
+  if (nodes.length){
+    const nEx = nodes.filter(n => ['watch','exceeded'].includes((n.dh_combined||{}).level)).length;
+    lp.className = 'pill ' + (nEx ? 'watch' : 'live');
+    lp.innerHTML = `<span class="dot"></span>rain-ls: ${nEx ? nEx+' watch' : '24 low'}`;
+    document.getElementById('k-ls').textContent = nEx ? `${nEx} watch / 24` : '24 low';
+  }
+}
+
 async function loadEq(){
   const win = document.getElementById('eqWindow').value;
   const pill = document.getElementById('pill-eq');
-  pill.className = 'pill'; pill.textContent = 'earthquakes: fetching…';
+  pill.className = 'pill'; pill.innerHTML = '<span class="dot"></span>quakes: fetching…';
   const url = (S.summary && S.summary.live_feeds.usgs[win])
     || `https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_${win}.geojson`;
   try{
@@ -581,27 +1345,60 @@ async function loadEq(){
       return c[0]>=bb[0]-2 && c[0]<=bb[2]+2 && c[1]>=bb[1]-2 && c[1]<=bb[3]+2;
     }).sort((a,b) => b.properties.time - a.properties.time);
     pill.className = 'pill live';
-    pill.textContent = `${S.live.length} earthquake${S.live.length===1?'':'s'} in window`;
+    const maxM = S.live.length ? Math.max(...S.live.map(f=>f.properties.mag||0)) : null;
+    pill.innerHTML = `<span class="dot"></span>${S.live.length} quake${S.live.length===1?'':'s'}${maxM?` (max M${maxM.toFixed(1)})`:''}`;
+    document.getElementById('k-eq').textContent = `${S.live.length} live (${win})`;
+    document.getElementById('k-eq-sub').textContent = `${fmt(S.faults.length)} GEM active fault traces`;
     drawEq(); renderTab();
     const big = S.live.filter(f => f.properties.mag >= 4.5)[0];
     if (big) loadEventDetail(big);
   } catch(e){
-    pill.className = 'pill err'; pill.textContent = 'earthquake feed unavailable';
+    pill.className = 'pill err'; pill.innerHTML = '<span class="dot"></span>quake feed offline';
+    document.getElementById('k-eq').textContent = `${fmt(S.faults.length)} faults`;
     S.live = []; drawEq(); renderTab();
   }
 }
-function magRadius(m){ return Math.max(3, 2.1*Math.max(0.5, m)); }
-function magColour(m){ return m>=6?'#c1352b':m>=5?'#e07a2d':m>=4?'#d8bc45':'#7fd1b9'; }
+
+async function refreshAllLiveInBrowser(){
+  const btn = document.getElementById('btnRefreshLive');
+  btn.textContent = '↻ Refreshing…'; btn.disabled = true;
+  try{
+    const pEq = loadEq();
+    // Live GloFAS refresh for the 10 basins
+    const pFl = (async () => {
+      if (!S.rivers.length) return;
+      const lats = S.rivers.map(b=>b.lat).join(','), lons = S.rivers.map(b=>b.lon).join(',');
+      const u = `${(S.summary&&S.summary.live_feeds.open_meteo_flood)||'https://flood-api.open-meteo.com/v1/flood'}?latitude=${lats}&longitude=${lons}&daily=river_discharge,river_discharge_median,river_discharge_p25,river_discharge_p75,river_discharge_max&past_days=30&forecast_days=30`;
+      const r = await fetch(u); if (!r.ok) return;
+      const arr = await r.json(); const items = Array.isArray(arr) ? arr : [arr];
+      items.forEach((it, idx) => {
+        const b = S.rivers[idx]; if (!b || !it.daily) return;
+        const d = it.daily, idx0 = 30;
+        b.current_m3s = d.river_discharge[idx0] ?? d.river_discharge[idx0-1];
+        const fc = (d.river_discharge_median || d.river_discharge).slice(idx0, idx0+14).filter(v=>v!=null);
+        b.peak_14d_median_m3s = fc.length ? Math.max(...fc) : b.current_m3s;
+        b.series = {today_index:idx0, time:d.time, discharge:d.river_discharge, median:d.river_discharge_median||[], p25:d.river_discharge_p25||[], p75:d.river_discharge_p75||[], max:d.river_discharge_max||[]};
+      });
+    })().catch(()=>{});
+    await Promise.allSettled([pEq, pFl]);
+    updateStatusPills(); drawMultiHazardLayers(); renderTab();
+  }finally{
+    btn.textContent = '↻ Refresh live'; btn.disabled = false;
+  }
+}
+
+function magRadius(m){ return Math.max(3.5, 2.2*Math.max(0.5, m)); }
+function magColour(m){ return m>=6?'#dc3b30':m>=5?'#e67e22':m>=4?'#d9b638':'#2dd4bf'; }
 function drawEq(){
   gEq.clearLayers();
   if (!document.getElementById('lEq').checked) return;
   S.live.forEach(f => {
     const c = f.geometry.coordinates, p = f.properties;
-    L.circleMarker([c[1], c[0]], {radius:magRadius(p.mag), color:'#0b0f13', weight:1,
-      fillColor:magColour(p.mag), fillOpacity:.85})
+    L.circleMarker([c[1], c[0]], {radius:magRadius(p.mag), color:'#090d12', weight:1,
+      fillColor:magColour(p.mag), fillOpacity:.88})
       .bindPopup(`<b>M ${fmt(p.mag,1)}</b> ${esc(p.place||'')}<br>${new Date(p.time).toISOString().replace('T',' ').slice(0,16)} UTC`
-        + `<br>depth ${fmt(c[2],1)} km`
-        + `<br><a href="${p.url}" target="_blank" rel="noopener">USGS event page</a>`)
+        + `<br>Depth: ${fmt(c[2],1)} km`
+        + `<br><a href="${esc(p.url)}" target="_blank" rel="noopener">USGS event page</a>`)
       .addTo(gEq);
   });
 }
@@ -625,89 +1422,79 @@ async function loadEventDetail(f){
       drawMmi();
     }
     renderTab();
-  } catch(e){ /* product not available for this event */ }
+  } catch(e){}
 }
 function drawMmi(){
   gMmi.clearLayers();
   if (!S.mmi || !document.getElementById('lMmi').checked) return;
   L.geoJSON(S.mmi.gj, {
-    style: ft => ({color: ft.properties.color || '#e0b83a', weight:1.4, opacity:.85, fill:false}),
+    style: ft => ({color: ft.properties.color || '#eab308', weight:1.5, opacity:.85, fill:false}),
     onEachFeature: (ft, l) => l.bindTooltip(`MMI ${ft.properties.value} — ${esc(S.mmi.event)}`)
   }).addTo(gMmi);
 }
 
-/* -------------------------------------------------------- static layers */
-function drawStatics(){
-  gHydro.clearLayers(); gEqH.clearLayers(); gGlof.clearLayers();
-  if (document.getElementById('lHydro').checked){
-    S.expo.filter(o => o.kind === 'hydropower').forEach(o =>
-      L.circleMarker([o.lat, o.lon], {radius:4, color:'#0b0f13', weight:1,
-        fillColor:'#e0b83a', fillOpacity:.9})
-        .bindPopup(`<b>${esc(o.name||'hydropower')}</b><br>${o.capacity_mw?fmt(o.capacity_mw,1)+' MW':'capacity not tagged'}`)
-        .addTo(gHydro));
-  }
-  if (document.getElementById('lEqHist').checked){
-    S.eqHist.filter(e => e.mag >= 6).forEach(e =>
-      L.circleMarker([e.lat, e.lon], {radius:magRadius(e.mag), color:'#c1352b', weight:1.2,
-        fillColor:'#c1352b', fillOpacity:.22})
-        .bindPopup(`<b>M ${fmt(e.mag,1)}</b> ${esc(e.place||'')}<br>${new Date(e.time).getUTCFullYear()} · depth ${fmt(e.depth_km,0)} km`)
-        .addTo(gEqH));
-  }
-  if (document.getElementById('lGlof').checked){
-    S.glofHist.forEach(g =>
-      L.circleMarker([g.lat, g.lon], {radius:5, color:'#fff', weight:1,
-        fillColor:'#7fd1b9', fillOpacity:.85})
-        .bindPopup(`<b>${esc(g.lake)}</b> ${g.year?fmt(g.year):''}`
-          + `<br>${esc(g.lake_type||'')} ${esc(g.mechanism?'· '+g.mechanism:'')}`
-          + `<br>basin ${esc(g.basin||'—')}`
-          + (g.lives?`<br>lives lost ${fmt(g.lives)}`:'')
-          + (g.discharge?`<br>reported discharge ${fmt(g.discharge)} m³/s`:''))
-        .addTo(gGlof));
-  }
-}
-
-/* ------------------------------------------------------------- tabs */
+/* --------------------------------------------------------------- 9 tabs */
 function renderTab(){
   const b = document.getElementById('tabbody');
-  if (S.tab === 'watch')       b.innerHTML = tabWatch();
-  else if (S.tab === 'live')   b.innerHTML = tabLive();
-  else if (S.tab === 'glof')   b.innerHTML = tabGlof();
-  else if (S.tab === 'valid')  b.innerHTML = tabValid();
-  else if (S.tab === 'methods')b.innerHTML = tabMethods();
-  else                         b.innerHTML = tabSources();
+  if (S.tab === 'watch')          b.innerHTML = tabWatch();
+  else if (S.tab === 'floods')    b.innerHTML = tabFloods();
+  else if (S.tab === 'landslides')b.innerHTML = tabLandslides();
+  else if (S.tab === 'live')      b.innerHTML = tabLive();
+  else if (S.tab === 'sat')       b.innerHTML = tabSat();
+  else if (S.tab === 'glof')      b.innerHTML = tabGlof();
+  else if (S.tab === 'charts')    b.innerHTML = tabCharts();
+  else if (S.tab === 'valid')     b.innerHTML = tabValid();
+  else                            b.innerHTML = tabMethods();
+
   b.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => {
     const k = th.dataset.k;
     S.sort = {k, dir: (S.sort.k === k ? -S.sort.dir : -1)};
     renderTab();
   });
-  b.querySelectorAll('tr[data-id]').forEach(tr => tr.onclick = () => select(tr.dataset.id, true));
-  const dl = b.querySelector('#dlCsv'); if (dl) dl.onclick = downloadCsv;
+  b.querySelectorAll('tr[data-lake]').forEach(tr => tr.onclick = () => selectLake(tr.dataset.lake, true));
+  b.querySelectorAll('tr[data-river]').forEach(tr => tr.onclick = () => selectRiver(tr.dataset.river, true));
+  b.querySelectorAll('tr[data-node]').forEach(tr => tr.onclick = () => selectNode(tr.dataset.node, true));
+  b.querySelectorAll('tr[data-fly]').forEach(tr => tr.onclick = () => {
+    const [la, lo, z] = tr.dataset.fly.split(',').map(Number);
+    map.setView([la, lo], z || 11);
+  });
+  const dlCsv = b.querySelector('#dlCsv'); if (dlCsv) dlCsv.onclick = downloadCsv;
+  const dlGeo = b.querySelector('#dlGeo'); if (dlGeo) dlGeo.onclick = downloadGeoJson;
 }
+
 const WCOLS = [
-  ['name','lake','t'], ['id','inventory id','t'], ['district','district','t'], ['prov','province','t'], ['area_km2','area km²','n2'], ['z','m a.s.l.','n0'],
+  ['name','lake','t'], ['id','id','t'], ['district','district','t'], ['prov','province','t'],
+  ['area_km2','area km²','n2'], ['z','m a.s.l.','n0'],
   ['hazard','hazard','h'], ['impact','impact','h'], ['risk','risk','h'],
-  ['qp_m3s','Qp m³/s','n0'], ['pfv_Mm3','PFV Mm³','n1'], ['priority','priority','b'], ['route_km','path km','n1'],
-  ['pop_high','people ≤1 km','n0'], ['n_hydropower','hydro','n0'], ['n_settlements','settl.','n0'],
+  ['pfv_Mm3','PFV Mm³','pfv'], ['qp_m3s','Qp m³/s','n0'], ['priority','prio','b'],
+  ['pop_high','people ≤1 km','n0'], ['n_hydropower','hydro','n0'], ['fault_km','fault km','n1'],
 ];
 function sortVal(p, k){
-  if (k==='hazard'||k==='impact'||k==='risk') return HORD[p[k]] ?? -1;
+  if (k==='hazard'||k==='impact'||k==='risk'||k==='hazard_enum') return HORD[p[k]] ?? -1;
   if (k==='priority') return p.priority ? 1 : 0;
-  const v = p[k]; return (typeof v === 'number') ? v : (v==null ? '' : String(v));
+  const v = p[k]; return (typeof v === 'number') ? v : (v==null ? -1e9 : String(v));
 }
 function tabWatch(){
   const rows = (S.shown||[]).map(f=>f.properties).slice();
   rows.sort((a,b)=>{ const x=sortVal(a,S.sort.k), y=sortVal(b,S.sort.k);
     return (x<y?-1:x>y?1:0)*S.sort.dir; });
   const top = rows.slice(0,400);
-  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-      <span class="muted">${rows.length} lakes after filtering — showing first ${top.length}, sorted by ${esc(S.sort.k)}</span>
-      <button class="btn" id="dlCsv">download filtered set as CSV</button></div>
-    <table><thead><tr>${WCOLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join('')}</tr></thead><tbody>
-    ${top.map(p=>`<tr data-id="${esc(p.id)}" class="${p.id===S.sel?'sel':''}">${WCOLS.map(([k,,t])=>{
+  const maxPfv = Math.max(10, ...rows.map(r=>r.pfv_Mm3||0));
+  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+      <span class="muted"><b>${fmt(rows.length)}</b> lakes after filtering — showing top ${fmt(top.length)} sorted by <code>${esc(S.sort.k)}</code></span>
+      <button class="btn" id="dlCsv">⬇ CSV</button>
+      <button class="btn" id="dlGeo">⬇ GeoJSON</button>
+    </div>
+    <table><thead><tr>${WCOLS.map(([k,l])=>`<th data-k="${k}">${l}${S.sort.k===k?(S.sort.dir<0?' ↓':' ↑'):''}</th>`).join('')}</tr></thead><tbody>
+    ${top.map(p=>`<tr data-lake="${esc(p.id)}" class="${p.id===S.sel?'sel':''}">${WCOLS.map(([k,,t])=>{
       const v=p[k];
       if (t==='h') return `<td>${v?`<span class="hbadge ${HCLASS[v]}">${v}</span>`:'—'}</td>`;
       if (t==='b') return `<td>${v?'<span class="hbadge h-vhigh">yes</span>':'<span class="band">—</span>'}</td>`;
       if (t==='t') return `<td>${esc(v||'—')}</td>`;
+      if (t==='pfv'){
+        const w = v>0 ? Math.max(2, Math.round((v/maxPfv)*44)) : 0;
+        return `<td class="num">${w?`<span class="minibar" style="width:${w}px;background:${p.priority?'#dc3b30':'#38bdf8'}"></span>`:''}${fmt(v,1)}</td>`;
+      }
       return `<td class="num">${fmt(v, +t.slice(1))}</td>`;
     }).join('')}</tr>`).join('')}</tbody></table>`;
 }
@@ -719,246 +1506,459 @@ function downloadCsv(){
   }).join(','))).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-  a.download = 'nepal_glacial_lake_screening.csv'; a.click();
+  a.download = 'nepal_traya_glacial_lakes.csv'; a.click();
 }
+function downloadGeoJson(){
+  const gj = {type:'FeatureCollection', features:S.shown||[]};
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(gj)], {type:'application/geo+json'}));
+  a.download = 'nepal_traya_glacial_lakes.geojson'; a.click();
+}
+
+function tabFloods(){
+  if (!S.rivers.length) return `<p class="muted">GloFAS river flood layer not loaded.</p>`;
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+    <span class="muted"><b>Copernicus EMS GloFAS</b> river discharge across Nepal's 10 major river outlets (updated ${esc((S.riversMeta&&S.riversMeta.updated_utc||'').slice(0,16))} UTC). Click any basin to inspect its 60-day ensemble hydrograph.</span>
+  </div>
+  <table><thead><tr>
+    <th>river basin</th><th>outlet corridor</th><th>province</th><th>now m³/s</th><th>vs Q₅₀</th>
+    <th>14d med m³/s</th><th>14d p75 m³/s</th><th>14d max m³/s</th><th>Q₂ (2-yr)</th><th>Q₅ (5-yr)</th><th>Q₂₀ (20-yr)</th><th>status</th>
+  </tr></thead><tbody>
+  ${S.rivers.map(b => {
+    const c = b.climatology || {};
+    const st = (b.status_14d && b.status_14d !== 'normal') ? b.status_14d : (b.status_now || 'normal');
+    return `<tr data-river="${esc(b.id)}" class="${b.id===S.sel?'sel':''}">
+      <td><b>${esc(b.name)}</b></td><td>${esc(b.station)}</td><td>${esc(b.prov)}</td>
+      <td class="num">${fmt(b.current_m3s,1)}</td>
+      <td class="num">${b.anomaly_ratio?'×'+fmt(b.anomaly_ratio,2):'—'}</td>
+      <td class="num"><b>${fmt(b.peak_14d_median_m3s,1)}</b></td>
+      <td class="num">${fmt(b.peak_14d_p75_m3s,1)}</td>
+      <td class="num">${fmt(b.peak_14d_max_m3s,1)}</td>
+      <td class="num">${fmt(c.q2,0)}</td><td class="num">${fmt(c.q5,0)}</td><td class="num">${fmt(c.q20,0)}</td>
+      <td><span class="hbadge ${FCLASS[st]}">${st}</span></td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function idCurveSvg(nodes){
+  const W = 380, H = 195, pL = 42, pR = 12, pT = 12, pB = 28, cW = W-pL-pR, cH = H-pT-pB;
+  const xMin = Math.log10(5), xMax = Math.log10(240), yMin = Math.log10(0.1), yMax = Math.log10(60);
+  const xOf = d => pL + (Math.log10(d)-xMin)/(xMax-xMin)*cW;
+  const yOf = i => pT + cH - (Math.log10(Math.max(0.1,i))-yMin)/(yMax-yMin)*cH;
+  const dhLine = [5,12,24,72,168,240].map((d,k)=>`${k?'L':'M'}${xOf(d).toFixed(1)},${yOf(73.9*Math.pow(d,-0.79)).toFixed(1)}`).join(' ');
+  const gzLine = [5,12,24,72,168,240].map((d,k)=>`${k?'L':'M'}${xOf(d).toFixed(1)},${yOf(2.2*Math.pow(d,-0.44)).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:195px;display:block;background:var(--panel);border:1px solid var(--line);border-radius:6px">
+    ${[6,24,72,168].map(d=>`<line x1="${xOf(d).toFixed(1)}" y1="${pT}" x2="${xOf(d).toFixed(1)}" y2="${pT+cH}" stroke="#253343" stroke-dasharray="2 2"/>
+      <text x="${xOf(d).toFixed(1)}" y="${H-8}" fill="#6a7d92" font-size="9" text-anchor="middle" font-family="IBM Plex Mono">${d}h</text>`).join('')}
+    ${[0.2,1,5,20].map(iv=>`<line x1="${pL}" y1="${yOf(iv).toFixed(1)}" x2="${W-pR}" y2="${yOf(iv).toFixed(1)}" stroke="#253343" stroke-dasharray="2 2"/>
+      <text x="${pL-5}" y="${(yOf(iv)+3).toFixed(1)}" fill="#6a7d92" font-size="9" text-anchor="end" font-family="IBM Plex Mono">${iv}</text>`).join('')}
+    <path d="${dhLine}" fill="none" stroke="#dc3b30" stroke-width="2"/>
+    <path d="${gzLine}" fill="none" stroke="#eab308" stroke-width="1.4" stroke-dasharray="4 3"/>
+    ${nodes.map(n => {
+      const i24 = (n.max_24h_obs_mm||0)/24, i72 = (n.max_72h_obs_mm||0)/72;
+      let s = '';
+      if (i24 >= 0.1) s += `<circle cx="${xOf(24).toFixed(1)}" cy="${yOf(i24).toFixed(1)}" r="3.2" fill="#38bdf8"><title>${esc(n.name)} 24h: ${fmt(i24,2)} mm/h</title></circle>`;
+      if (i72 >= 0.1) s += `<circle cx="${xOf(72).toFixed(1)}" cy="${yOf(i72).toFixed(1)}" r="3.2" fill="#2dd4bf"><title>${esc(n.name)} 72h: ${fmt(i72,2)} mm/h</title></circle>`;
+      return s;
+    }).join('')}
+    <text x="${W-pR-4}" y="${pT+14}" fill="#dc3b30" font-size="9.5" text-anchor="end" font-weight="600">Dahal &amp; Hasegawa (2008) Nepal: I = 73.9 D⁻⁰·⁷⁹</text>
+    <text x="${W-pR-4}" y="${pT+27}" fill="#eab308" font-size="9" text-anchor="end">Guzzetti et al. (2008) Global: I = 2.2 D⁻⁰·⁴⁴</text>
+    <text x="12" y="${pT+cH/2}" fill="#6a7d92" font-size="9" transform="rotate(-90 12 ${pT+cH/2})" text-anchor="middle">Mean intensity I (mm/h)</text>
+  </svg>`;
+}
+
+function tabLandslides(){
+  const nodes = (S.hydromet && S.hydromet.nodes) || [];
+  const evs = S.landslides.slice(0, 150);
+  return `<div class="split-2">
+    <div>
+      <h4 style="font-size:15px;margin-bottom:4px">Nepal Himalaya I–D Threshold Diagram</h4>
+      ${idCurveSvg(nodes)}
+      <p class="muted" style="margin-top:5px">Dots plot current 24 h (blue) and 72 h (teal) intensities across 24 sentinel zones against the empirical Nepal threshold of Dahal &amp; Hasegawa (2008). Toggle <b>Catalogued landslides</b> in the left panel to map ${fmt(S.landslides.length)} NASA COOLR &amp; OSM records.</p>
+    </div>
+    <div>
+      <h4 style="font-size:15px;margin-bottom:4px">Physiographic Rainfall–Landslide Watch (24 Sentinel Nodes)</h4>
+      <table><thead><tr><th>zone / station</th><th>belt</th><th>past 7d mm</th><th>next 5d mm</th><th>max 24h mm</th><th>soil moist.</th><th>0 °C level</th><th>D–H status</th></tr></thead><tbody>
+      ${nodes.map(n => {
+        const dh = n.dh_combined || n.dh_obs || {};
+        return `<tr data-node="${esc(n.id)}">
+          <td><b>${esc(n.name)}</b></td><td>${esc(n.zone)}</td>
+          <td class="num">${fmt(n.rain_past_7d_mm,1)}</td><td class="num">${fmt(n.rain_next_5d_mm,1)}</td>
+          <td class="num">${fmt(n.max_24h_obs_mm,1)}</td><td class="num">${fmt(n.soil_moisture_m3m3,2)}</td>
+          <td class="num">${fmt(n.freezing_level_m,0)} m</td>
+          <td><span class="hbadge ${DHCLASS[dh.level||'low']}">${esc(dh.level||'low')} (${fmt((dh.max_ratio||0)*100,0)}%)</span></td>
+        </tr>`;
+      }).join('')}</tbody></table>
+
+      <h4 style="font-size:15px;margin:14px 0 4px">Documented Landslide Occurrences (${fmt(S.landslides.length)} records — NASA COOLR &amp; OpenStreetMap)</h4>
+      <table><thead><tr><th>date</th><th>location / title</th><th>source</th><th>trigger</th><th>fatalities</th></tr></thead><tbody>
+      ${evs.map(e => `<tr data-fly="${e.lat},${e.lon},12">
+        <td class="mono">${esc(e.date||'—')}</td><td>${esc(e.title)}</td><td>${esc(e.source)}</td>
+        <td>${esc(e.trigger||'—')}</td><td class="num">${e.fatalities!=null?fmt(e.fatalities):'—'}</td>
+      </tr>`).join('')}</tbody></table>
+    </div>
+  </div>`;
+}
+
 function tabLive(){
   const gf = S.gf;
   let head = '';
   if (gf){
-    const col = {red:'bad', orange:'', yellow:'', green:''}[gf.landslide_alert] || '';
+    const col = {red:'bad', orange:'', yellow:'', green:'info'}[gf.landslide_alert] || '';
     head = `<div class="callout ${col}"><b>USGS ground-failure alert for ${esc(gf.event)}</b> —
       landslide alert <b>${esc(gf.landslide_alert||'n/a')}</b>, aggregate hazard ${esc(gf.landslide_value||'—')},
-      estimated population in landslide-hazard areas ${esc(gf.landslide_pop||'—')};
-      liquefaction alert ${esc(gf.liq_alert||'n/a')}.
+      exposed population ${esc(gf.landslide_pop||'—')}; liquefaction alert ${esc(gf.liq_alert||'n/a')}.
       <a href="${esc(gf.url)}" target="_blank" rel="noopener">USGS event page</a>.
-      <div class="band">This is the USGS operational run of the Nowicki Jessee et al. (2018) landslide model, not our calculation.</div></div>`;
+      <div class="band">Operational USGS run of the Nowicki Jessee et al. (2018) coseismic landslide model &amp; Zhu et al. (2017) liquefaction model.</div></div>`;
   }
-  if (!S.live.length) return head + `<p class="muted">No earthquakes in the selected window inside the Nepal region, or the feed could not be reached.</p>`;
-  return head + `<table><thead><tr><th>time UTC</th><th>M</th><th>depth km</th><th>place</th><th>lakes within 50 km</th></tr></thead><tbody>
-   ${S.live.slice(0,120).map(f=>{
+  const eqTbl = S.live.length ? `<table><thead><tr><th>time UTC</th><th>M</th><th>depth km</th><th>place</th><th>glacial lakes ≤50 km</th></tr></thead><tbody>
+   ${S.live.slice(0,100).map(f=>{
      const c=f.geometry.coordinates, p=f.properties;
-     const n = S.lakes.filter(l=>{const g=l.geometry.coordinates[0][0];
-       return hav(c[0],c[1],g[0],g[1])<=50;}).length;
-     return `<tr><td class="mono">${new Date(p.time).toISOString().replace('T',' ').slice(0,16)}</td>
-       <td class="num">${fmt(p.mag,1)}</td><td class="num">${fmt(c[2],1)}</td>
+     const n = S.lakes.filter(l=>{const g=l.geometry.coordinates[0][0]; return hav(c[0],c[1],g[0],g[1])<=50;}).length;
+     return `<tr data-fly="${c[1]},${c[0]},9"><td class="mono">${new Date(p.time).toISOString().replace('T',' ').slice(0,16)}</td>
+       <td class="num"><b>${fmt(p.mag,1)}</b></td><td class="num">${fmt(c[2],1)}</td>
        <td>${esc(p.place||'')}</td><td class="num">${n}</td></tr>`;}).join('')}
-   </tbody></table>
-   <p class="muted">Earthquake shaking is a documented trigger for both moraine failure and rock/ice avalanche into lakes. The count is proximity only — no triggering probability is asserted.</p>`;
+   </tbody></table>` : `<p class="muted">No earthquakes in the selected window inside the Nepal region, or the live feed could not be reached.</p>`;
+
+  return head + `<div class="split-2">
+    <div>
+      <h4 style="font-size:15px;margin-bottom:4px">Active Himalayan Fault Summary (${fmt(S.faults.length)} GEM traces)</h4>
+      <p class="muted">Enable <b>Active tectonic faults (GEM)</b> in the left layer list to display the Main Frontal Thrust (MFT), Main Boundary Thrust (MBT), Main Central Thrust (MCT), and Tibetan normal grabens on the map.</p>
+      <table><thead><tr><th>fault structure</th><th>kinematics</th><th>dip</th><th>slip mm/yr</th></tr></thead><tbody>
+      ${S.faults.filter(f=>f.properties.name && !f.properties.name.startsWith('Active ')).slice(0,25).map(f=>{
+        const p=f.properties;
+        return `<tr><td>${esc(p.name)}</td><td>${esc(p.slip_type)}</td><td class="num">${p.dip_deg?fmt(p.dip_deg,0)+'°':'—'}</td><td class="num">${p.slip_rate_mm_yr?fmt(p.slip_rate_mm_yr,1):'—'}</td></tr>`;
+      }).join('')}</tbody></table>
+    </div>
+    <div>
+      <h4 style="font-size:15px;margin-bottom:4px">Live USGS Earthquakes in Nepal Region</h4>
+      ${eqTbl}
+    </div>
+  </div>`;
 }
-function hav(lo1,la1,lo2,la2){
-  const R=6371, r=Math.PI/180;
-  const a=Math.sin((la2-la1)*r/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin((lo2-lo1)*r/2)**2;
-  return 2*R*Math.asin(Math.sqrt(a));
+
+function tabSat(){
+  const pls = (S.hydromet && S.hydromet.priority_lakes) || [];
+  return `<div style="margin-bottom:8px" class="muted">
+    Weekly <b>Copernicus Sentinel-2 L2A</b> cloud-screened scene index (via Element84 Earth Search STAC) and <b>Open-Meteo 0 °C freezing-level altitude</b> across Nepal's priority (PFV ≥ 10 Mm³) and documented ice-cored glacial lakes. Click any row to fly to the lake and view its optical quicklook.
+  </div>
+  <table><thead><tr>
+    <th>lake</th><th>district</th><th>lake elev m</th><th>PFV Mm³</th><th>0 °C max (12d)</th><th>thermal margin</th>
+    <th>12d rain / snow</th><th>clearest S2 pass</th><th>cloud %</th><th>Copernicus</th>
+  </tr></thead><tbody>
+  ${pls.map(lk => {
+    const s2 = lk.sentinel2 || {};
+    return `<tr data-lake="${esc(lk.id)}" class="${lk.id===S.sel?'sel':''}">
+      <td><b>${esc(lk.name)}</b> ${lk.ice_cored?'<span class="hbadge h-info">ice-core</span>':''}</td>
+      <td>${esc(lk.district||'—')}</td>
+      <td class="num">${fmt(lk.z_m,0)}</td>
+      <td class="num">${fmt(lk.pfv_Mm3,1)}</td>
+      <td class="num">${fmt(lk.freezing_level_max_m,0)} m</td>
+      <td class="num" style="color:${lk.warm_rain_on_ice?'var(--bad)':'inherit'}">${lk.freezing_margin_m>0?'+':''}${fmt(lk.freezing_margin_m,0)} m</td>
+      <td class="num">${fmt(lk.liquid_rain_12d_mm,1)} mm / ${fmt(lk.snowfall_12d_cm,1)} cm</td>
+      <td class="mono">${esc((s2.datetime||'—').slice(0,10))}</td>
+      <td class="num">${s2.cloud_cover_pct!=null?fmt(s2.cloud_cover_pct,1)+'%':'—'}</td>
+      <td>${s2.copernicus_browser_url?`<a href="${esc(s2.copernicus_browser_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">open ↗</a>`:'—'}</td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
 }
+
 function tabGlof(){
   const g = S.glofHist.slice().sort((a,b)=>(b.year||0)-(a.year||0));
-  return `<p class="muted">${g.length} GLOF records for Nepal in HMAGLOFDB v4.0 (ICIMOD). These are the events the record contains, not all events that occurred.</p>
-   <table><thead><tr><th>year</th><th>lake</th><th>glacier</th><th>basin</th><th>type</th><th>mechanism</th><th>lives</th><th>discharge m³/s</th></tr></thead><tbody>
-   ${g.map(e=>`<tr><td class="num">${e.year?fmt(e.year):'—'}</td><td>${esc(e.lake)}</td><td>${esc(e.glacier)}</td>
-     <td>${esc(e.basin)}</td><td>${esc(e.lake_type)}</td><td>${esc(e.mechanism)}</td>
+  return `<p class="muted" style="margin-bottom:6px">${fmt(g.length)} GLOF records for Nepal in HMAGLOFDB v4.0 (ICIMOD, Shrestha et al. 2023). Click any row to centre the map on the source lake.</p>
+   <table><thead><tr><th>year</th><th>lake</th><th>glacier</th><th>basin</th><th>type</th><th>mechanism / driver</th><th>lives</th><th>discharge m³/s</th></tr></thead><tbody>
+   ${g.map(e=>`<tr data-fly="${e.lat},${e.lon},11"><td class="num">${e.year?fmt(e.year):'—'}</td><td><b>${esc(e.lake)}</b></td><td>${esc(e.glacier)}</td>
+     <td>${esc(e.basin)}</td><td>${esc(e.lake_type)}</td><td>${esc([e.mechanism,e.driver].filter(x=>x&&x!=='Unknown').join(' · ')||'Unknown')}</td>
      <td class="num">${e.lives?fmt(e.lives):'—'}</td><td class="num">${e.discharge?fmt(e.discharge):'—'}</td></tr>`).join('')}
    </tbody></table>`;
 }
+
+function tabCharts(){
+  const P = S.lakes.map(f => f.properties);
+  // 1. Provincial summary
+  const byProv = {};
+  P.forEach(p => {
+    const pr = (p.prov || 'Unassigned').replace(' Province','');
+    if (!byProv[pr]) byProv[pr] = {n:0, pri:0, pop:0, pfv:0};
+    byProv[pr].n++;
+    if (p.priority) byProv[pr].pri++;
+    byProv[pr].pfv += (p.pfv_Mm3 || 0);
+  });
+  const provRows = Object.entries(byProv).sort((a,b)=>b[1].pfv - a[1].pfv);
+  const maxProvPfv = Math.max(1, ...provRows.map(r=>r[1].pfv));
+
+  // 2. PFV vs Area log-log SVG
+  const pos = P.filter(p => p.pfv_Mm3 > 0 && p.area_km2 > 0);
+  const W = 360, H = 190, pL = 42, pR = 12, pT = 12, pB = 26, cW = W-pL-pR, cH = H-pT-pB;
+  const xMin = -2.5, xMax = 0.7, yMin = -1.5, yMax = 2.3;
+  const xOf = a => pL + (Math.log10(a)-xMin)/(xMax-xMin)*cW;
+  const yOf = v => pT + cH - (Math.log10(v)-yMin)/(yMax-yMin)*cH;
+
+  // 3. Elevation histogram
+  const bins = [3000,3500,4000,4400,4800,5200,5600,6200];
+  const bCounts = bins.slice(0,-1).map((lo,i) => {
+    const hi = bins[i+1];
+    const sub = P.filter(p => p.z >= lo && p.z < hi);
+    return {lbl:`${(lo/1000).toFixed(1)}–${(hi/1000).toFixed(1)}k`, n:sub.length, pri:sub.filter(x=>x.priority).length, pf:lo>=4800};
+  });
+  const maxBin = Math.max(1, ...bCounts.map(b=>b.n));
+
+  return `<div class="chart-grid">
+    <div class="chart-card">
+      <h4>Potential Flood Volume vs Lake Area (${fmt(pos.length)} SLA lakes)</h4>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:190px;display:block">
+        <line x1="${pL}" y1="${yOf(10).toFixed(1)}" x2="${W-pR}" y2="${yOf(10).toFixed(1)}" stroke="#dc3b30" stroke-dasharray="3 3"/>
+        <text x="${pL+4}" y="${(yOf(10)-4).toFixed(1)}" fill="#dc3b30" font-size="9" font-family="IBM Plex Mono">10 Mm³ priority threshold</text>
+        <line x1="${xOf(0.005).toFixed(1)}" y1="${yOf(55*Math.pow(0.005,1.25)).toFixed(1)}" x2="${xOf(3).toFixed(1)}" y2="${yOf(55*Math.pow(3,1.25)).toFixed(1)}" stroke="#94a3b8" stroke-dasharray="2 2"/>
+        ${pos.map(p => `<circle cx="${xOf(p.area_km2).toFixed(1)}" cy="${yOf(p.pfv_Mm3).toFixed(1)}" r="${p.priority?3.6:1.9}" fill="${p.priority?'#dc3b30':(p.hp_m>=p.dm_fujita_m?'#38bdf8':'#eab308')}" opacity="0.82">
+          <title>${esc(p.name||p.id)}: A=${fmt(p.area_km2,3)} km², PFV=${fmt(p.pfv_Mm3,2)} Mm³</title></circle>`).join('')}
+        <text x="${W/2}" y="${H-5}" fill="#6a7d92" font-size="9" text-anchor="middle" font-family="IBM Plex Mono">Lake area A (km², log scale) · dashed = 55A¹·²⁵ cap</text>
+      </svg>
+    </div>
+
+    <div class="chart-card">
+      <h4>Provincial Cumulative PFV &amp; Priority Lakes</h4>
+      <div style="display:flex;flex-direction:column;gap:7px;margin-top:8px">
+        ${provRows.map(([pr, v]) => `<div>
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span><b>${esc(pr)}</b> <span class="band">(${fmt(v.n)} lakes, ${v.pri} priority)</span></span>
+            <span class="mono">${fmt(v.pfv,1)} Mm³</span>
+          </div>
+          <div style="height:8px;background:var(--panel);border-radius:4px;overflow:hidden;margin-top:2px">
+            <div style="height:100%;width:${(100*v.pfv/maxProvPfv).toFixed(1)}%;background:${v.pri?'linear-gradient(90deg,#38bdf8,#dc3b30)':'#38bdf8'}"></div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h4>Glacial Lake Hypsometry &amp; Permafrost Belt (≥4.8 km)</h4>
+      <div style="display:flex;align-items:flex-end;gap:6px;height:148px;padding-top:14px">
+        ${bCounts.map(b => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end">
+          <span class="mono" style="font-size:9.5px;color:var(--ink2)">${b.n}</span>
+          <div style="width:100%;height:${Math.max(3, Math.round(110*b.n/maxBin))}px;background:${b.pf?'#38bdf8':'#3d8b74'};border-radius:3px 3px 0 0" title="${b.lbl} m: ${b.n} lakes (${b.pri} priority)"></div>
+          <span class="mono" style="font-size:8.5px;color:var(--ink3);margin-top:4px">${b.lbl}</span>
+        </div>`).join('')}
+      </div>
+      <div class="band" style="margin-top:6px">Blue bars ≥ 4,800 m lie inside the Himalayan mountain permafrost belt (Gruber 2012).</div>
+    </div>
+  </div>`;
+}
+
 function tabValid(){
   const v = S.valid;
   if (!v) return `<p class="muted">Validation results not built.</p>`;
   return `<div class="prose">
-    <h4>Reproduction of published hazard assessments</h4>
-    <p>The terrain tests were run against the eight lakes assessed by Rounce et al. (2016), whose published classification is the closest available ground truth. Agreement is reported per criterion, with no parameter tuning.</p>
-    <table><thead><tr><th>lake</th><th>avalanche (ours)</th><th>avalanche (published)</th><th>rockfall (ours)</th><th>rockfall (published)</th><th>SLA° ours</th><th>SLA° published</th><th>SLA ≥10° agrees</th></tr></thead><tbody>
+    <h4>Reproduction of published hazard assessments (Rounce et al. 2016 Table 5)</h4>
+    <table><thead><tr><th>lake</th><th>avalanche (ours)</th><th>avalanche (pub.)</th><th>rockfall (ours)</th><th>rockfall (pub.)</th><th>SLA° ours</th><th>SLA° pub.</th><th>SLA ≥10° agrees</th></tr></thead><tbody>
     ${v.rounce.map(r=>`<tr><td>${esc(r.lake)}</td><td>${r.ava?'yes':'no'}</td><td>${r.ava_pub?'yes':'no'}</td>
       <td>${r.rock?'yes':'no'}</td><td>${r.rock_pub?'yes':'no'}</td>
       <td class="num">${fmt(r.sla,1)}</td><td class="num">${fmt(r.sla_pub,1)}</td>
-      <td>${r.sla_agree?'yes':'<b style="color:var(--bad)">no</b>'}</td></tr>`).join('')}
+      <td>${r.sla_agree?'<span style="color:var(--ok)">yes</span>':'<b style="color:var(--bad)">no</b>'}</td></tr>`).join('')}
     </tbody></table>
     <p class="cite">${esc(v.rounce_note||'')}</p>
 
-    <h4>Reproducing the potential-flood-volume method exactly</h4>
-    <p>Fujita et al. (2013) Table 1 gives the steep lakefront geometry of five lakes that later burst, measured on pre-flood Hexagon KH-9 imagery. Our implementation of their mean-depth and potential-flood-volume equations is checked against their published numbers, and their potential flood volume is compared with the flood volume later observed.</p>
-    <table><thead><tr><th>lake</th><th>area km²</th><th>Hp m</th><th>Dm published</th><th>Dm ours</th><th>PFV published</th><th>PFV ours</th><th>observed flood volume</th><th>PFV ÷ observed</th></tr></thead><tbody>
+    <h4>Reproduction of potential-flood-volume arithmetic (Fujita et al. 2013 Table 1)</h4>
+    <table><thead><tr><th>lake</th><th>area km²</th><th>Hp m</th><th>Dm pub.</th><th>Dm ours</th><th>PFV pub.</th><th>PFV ours</th><th>observed FV</th><th>PFV ÷ obs</th></tr></thead><tbody>
     ${v.fujita1.map(r=>`<tr><td>${esc(r.lake)}</td><td class="num">${fmt(r.area,2)}</td><td class="num">${fmt(r.hp)}</td>
-      <td class="num">${fmt(r.dm_pub)}</td><td class="num">${fmt(r.dm_ours,1)} ${r.dm_ok?'':'<b style="color:var(--bad)">!</b>'}</td>
-      <td class="num">${fmt(r.pfv_pub,1)}</td><td class="num">${fmt(r.pfv_ours,1)} ${r.pfv_ok?'':'<b style="color:var(--bad)">!</b>'}</td>
+      <td class="num">${fmt(r.dm_pub)}</td><td class="num">${fmt(r.dm_ours,1)}</td>
+      <td class="num">${fmt(r.pfv_pub,1)}</td><td class="num">${fmt(r.pfv_ours,1)}</td>
       <td class="num">${r.fv_obs==null?'—':fmt(r.fv_obs,1)}</td><td class="num">${r.pfv_over_fv==null?'—':'×'+fmt(r.pfv_over_fv,2)}</td></tr>`).join('')}
     </tbody></table>
-    <p class="cite">Volumes in million m³. Where an outburst volume was later observed, the published potential flood volume predicted it to within about 30 per cent — that is the accuracy this metric carries.</p>
 
-    <h4>Lake-by-lake comparison against published values</h4>
-    <p>Fujita et al. (2013) Table 2 gives the present-day potential flood volume of every Nepalese lake that earlier inventories had flagged as potentially dangerous, computed from 15 m ASTER DEMs. We recompute the same quantity from the 30 m Copernicus DEM. Agreement: ${esc(v.fujita_agreement.zero)} of the zero-PFV lakes, ${esc(v.fujita_agreement.large)} of those above ${fmt(v.fujita_large_threshold)} Mm³ within a factor of three, ${esc(v.fujita_agreement.small)} of those below it.</p>
-    <table><thead><tr><th>lake</th><th>PFV published</th><th>PFV ours</th><th>ratio</th><th>SLA ours km²</th><th>Hp ours m</th><th>agrees</th></tr></thead><tbody>
+    <h4>Lake-by-lake PFV comparison (Fujita et al. 2013 Table 2, Nepal)</h4>
+    <p>Agreement: ${esc(v.fujita_agreement.zero)} zero-PFV lakes, ${esc(v.fujita_agreement.large)} above ${fmt(v.fujita_large_threshold)} Mm³ within ×3, ${esc(v.fujita_agreement.small)} below ${fmt(v.fujita_large_threshold)} Mm³.</p>
+    <table><thead><tr><th>lake</th><th>PFV pub.</th><th>PFV ours</th><th>ratio</th><th>SLA ours km²</th><th>Hp ours m</th><th>agrees</th></tr></thead><tbody>
     ${v.fujita2.map(r=>`<tr><td>${esc(r.lake)}</td><td class="num">${fmt(r.pfv_pub,1)}</td><td class="num">${fmt(r.pfv_ours,2)}</td>
       <td class="num">${r.ratio==null?'—':'×'+fmt(r.ratio,2)}</td><td class="num">${fmt(r.sla_km2,3)}</td><td class="num">${fmt(r.hp,1)}</td>
       <td>${r.both_zero?'<span style="color:var(--ok)">both zero</span>':r.within3?'<span style="color:var(--ok)">within ×3</span>':'<b style="color:var(--bad)">no</b>'}</td></tr>`).join('')}
     </tbody></table>
-    <div class="callout bad">The pattern in that table is the single most important limitation of this build. Where the published potential flood volume is large, we reproduce it well. Where it is small — under about 5 Mm³ — we return zero, because a 30 m DEM does not resolve the marginal steep lakefronts that a 15 m DEM with hand-edited lake boundaries picks up. <b>A potential flood volume of zero on this page is a statement about the DEM, not a statement that a lake is safe.</b></div>
+    <div class="callout bad"><b>Resolution limit:</b> Below ~5 Mm³, 30 m Copernicus DEM cells miss marginal steep lakefronts resolved on 15 m ASTER DEMs. <b>PFV = 0 is a statement about DEM resolution, not a certificate of safety.</b></div>
 
-    <h4>Reconstruction of observed floods</h4>
-    <p>Where an outburst has been measured or reconstructed, the model's estimate for the same lake is compared against it.</p>
-    <table><thead><tr><th>event</th><th>observed</th><th>our median</th><th>our 95% interval</th><th>within interval</th><th>source of the observation</th></tr></thead><tbody>
+    <h4>Measured &amp; reconstructed outbursts</h4>
+    <table><thead><tr><th>event</th><th>observed</th><th>our median</th><th>our 95% interval</th><th>within</th><th>source</th></tr></thead><tbody>
     ${v.events.map(e=>`<tr><td>${esc(e.event)}</td><td class="num">${esc(e.observed)}</td>
       <td class="num">${fmt(e.p50)}</td><td class="num">${fmt(e.lo)}–${fmt(e.hi)}</td>
-      <td>${e.within?'yes':'<b style="color:var(--bad)">no</b>'}</td><td class="cite">${esc(e.source)}</td></tr>`).join('')}
+      <td>${e.within?'<span style="color:var(--ok)">yes</span>':'<b style="color:var(--bad)">no</b>'}</td><td class="cite">${esc(e.source)}</td></tr>`).join('')}
     </tbody></table>
 
-    <h4>Model fit</h4>
-    <div class="kv" style="max-width:460px">
-      <span>depth–area regression</span><b>log₁₀d = ${fmt(v.fit.depth_beta0,3)} + ${fmt(v.fit.depth_beta1,3)}·log₁₀A</b>
-      <span>residual σ (log₁₀ m)</span><b>${fmt(v.fit.depth_sigma,3)}</b>
-      <span>Qp piecewise pseudo-R²</span><b>${fmt(v.fit.qp_piecewise.pseudo_r2,3)}</b>
-      <span>Qp residual RMSE (log₁₀)</span><b>${fmt(v.fit.qp_piecewise.rmse_log10,3)}</b>
-      <span>change point log₁₀η</span><b>${fmt(v.fit.qp_piecewise.chgpoint,3)}</b>
-    </div>
-    <p class="muted">An RMSE of ${fmt(v.fit.qp_piecewise.rmse_log10,2)} in log₁₀ means a typical factor-of-${fmt(Math.pow(10,v.fit.qp_piecewise.rmse_log10),1)} error in peak discharge. That is the honest precision of this class of model, and it is why every discharge on this page carries an interval.</p>
-
-    <h4>Sensitivity to the choices this implementation had to make</h4>
-    ${S.sens ? `
-    <p>Every threshold is as published, but two things still had to be decided: how to suppress DEM noise in the steep-lakefront test, and how far upslope to look for avalanche sources. The table re-runs the terrain analysis under each alternative over the ${fmt(S.sens.sample_size)} lakes of at least ${S.sens.sample_min_area_km2} km².</p>
-    <table><thead><tr><th>variant</th><th>lakes with SLA</th><th>priority set</th><th>total PFV Mm³</th><th>median ratio to reference</th><th>avalanche</th><th>rockfall</th><th>priority flips</th></tr></thead><tbody>
-    ${S.sens.variants.map(r=>`<tr${r.variant===S.sens.reference?' class="sel"':''}><td>${esc(r.variant)}</td><td class="num">${fmt(r.n_with_sla)}</td>
-      <td class="num">${fmt(r.n_priority)}</td><td class="num">${fmt(r.total_pfv_Mm3)}</td>
-      <td class="num">${r.median_ratio_to_reference==null?'—':fmt(r.median_ratio_to_reference,3)}</td>
-      <td class="num">${fmt(r.n_avalanche)}</td><td class="num">${fmt(r.n_rockfall)}</td>
-      <td class="num">${fmt(r.priority_set_changed)}</td></tr>`).join('')}
-    </tbody></table>
-    <p class="muted">The median ratio is 1.000 in every variant: changing the threshold never changes the potential flood volume of a lake that stays above it, only which lakes are in the set. Everything except the threshold angle itself is immaterial — the DEM window and the noise-suppression rule move at most one lake.</p>
-
-    <div class="callout"><b>The published decision tree is ambiguous, and it matters more than any of the above.</b>
-    Section 4.2 of Rounce et al. (2016) states a general rule — susceptible to both a dynamic and a self-destructive failure means very high hazard, with moderate plus moderate explicitly qualifying — and then enumerates specific paths under which the same combinations come out lower. We implement the general rule, which carries an explicit definition and worked example and is the more conservative. Under the literal enumeration only ${fmt(S.sens.hazard_reading.enumerated['very high']||0)} lakes would be very high hazard instead of ${fmt(S.sens.hazard_reading.general['very high']||0)}, and ${fmt(S.sens.hazard_reading.n_lakes_differing)} lakes (${fmt(100*S.sens.hazard_reading.n_lakes_differing/S.sens.hazard_reading.n_lakes,0)}% of the inventory) change class. Anyone applying this framework should say which reading they used.</div>
-    ` : `<p class="muted">Sensitivity results not built. Run <code>src/sensitivity.py</code>.</p>`}
-
-    <h4>Internal consistency checks</h4>
+    <h4>Internal &amp; multi-hazard consistency checks (${v.checks.filter(c=>c.pass).length}/${v.checks.length})</h4>
     <table><thead><tr><th>check</th><th>result</th></tr></thead><tbody>
     ${v.checks.map(c=>`<tr><td>${esc(c.name)}</td><td>${c.pass?'<span style="color:var(--ok)">pass</span>':'<b style="color:var(--bad)">FAIL</b>'} <span class="band">${esc(c.detail)}</span></td></tr>`).join('')}
     </tbody></table>
   </div>`;
 }
+
 function tabMethods(){
-  const t = (S.summary&&S.summary.thresholds)||{};
-  return `<div class="prose">
-   <h4>What this system does</h4>
-   <p>It screens every mapped glacial lake in Nepal for the two failure routes that cause most Himalayan outburst floods, estimates how big a flood each lake could produce, routes that flood down the real river network, and counts who and what is in the way. It then overlays live earthquake and precipitation feeds, because both are recognised triggers.</p>
-
-   <h4>The GLOF chain, step by step</h4>
-   <ul>
-     <li><b>Can something fall in?</b> Snow and ice avalanche source areas are glacierised slopes between ${fmt(t.avalanche_slope&&t.avalanche_slope[0])}° and ${fmt(t.avalanche_slope&&t.avalanche_slope[1])}°; rockfall source areas are non-glacierised slopes steeper than ${fmt(t.rockfall_slope)}°. A single-flow-direction route is traced from every source cell on a depression-filled Copernicus DEM, and only cells whose route ends in the lake count. The reach angle over the routed path must exceed ${fmt(t.reach_angle&&t.reach_angle[0])}° for avalanches or ${fmt(t.reach_angle&&t.reach_angle[1])}° for rockfall, with the volume-dependent avalanche threshold tan α = 1.111 − 0.118 log₁₀V for volumes below 6.67 × 10⁶ m³.</li>
-     <li><b>Can the dam give way on its own?</b> The steep lakefront area is computed as the depression angle from the lake surface to every point within 1 km, using the distance to the nearest shoreline; area where that angle exceeds ${fmt(t.sla_threshold)}° is the SLA. Lakes with no SLA have not been observed to fail this way.</li>
-     <li><b>How much water?</b> Maximum depth from a Bayesian depth–area regression on 24 Himalayan bathymetric surveys; volume from a half-ellipsoid basin; released volume from the ellipsoid cap remaining after a breach of 10, 30, 50 or 100 per cent of lake depth. Independently, the potential flood volume is the lake-surface drop that would remove the SLA, capped by an area–depth mean.</li>
-     <li><b>How big a peak?</b> The dimensionless peak-discharge relation of Walder and O'Connor, fitted piecewise to 63 documented natural dam breaks, with breach rates drawn from a lognormal fit to 19 published natural-dam breach rates. Every breach fraction and breach rate is pooled, so the reported interval spans the plausible range rather than one scenario.</li>
-     <li><b>Where does it go?</b> Downstream along HydroRIVERS to ${fmt(t.routing_max_km)} km, with exposure counted within ${fmt(t.corridor_m)} m of the channel and population read from WorldPop 2020 (both the constrained and unconstrained variants, reported as a range).</li>
-     <li><b>Who is at risk?</b> Hazard, downstream impact and risk classes follow the published framework: an avalanche route ranks above rockfall or an upstream lake, because avalanches are the most frequent Himalayan trigger; a lake susceptible to both a dynamic and a self-destructive failure is very high hazard.</li>
-   </ul>
-
-   <h4>A correction applied to the input data</h4>
-   <p>The province field in the source lake inventory is not reliable: in it, every province spans nearly the whole longitude range of Nepal, which cannot be true of contiguous west-to-east provinces. The per-province totals are close to correct while individual lakes are not, which is the signature of a join that attached the right column in the wrong order. Province and district here are therefore recomputed by point-in-polygon against OpenStreetMap administrative relations; ${fmt((S.summary&&S.summary.province_reassigned)||0)} of ${fmt((S.summary&&S.summary.n_lakes)||0)} lakes changed province as a result. Spot checks land where they should: Tsho Rolpa in Dolakha, Imja Tsho in Solukhumbu, Thulagi in Manang.</p>
-
-   <h4>Earthquakes and landslides</h4>
-   <p>No shaking or landslide model is fitted here. Live earthquakes come from the USGS real-time feeds; where the USGS has published a ShakeMap, its MMI contours are drawn, and where it has published a ground-failure product, its landslide and liquefaction alerts are shown as issued. That product is the USGS operational run of the Nowicki Jessee et al. (2018) global coseismic landslide model. For each lake, the counts of catalogued nearby earthquakes are descriptive statistics from the USGS catalogue since 1913 — they are not a seismic hazard assessment.</p>
-
-   <h4>Why almost every lake comes out "very high" hazard</h4>
-   <p>Of 1,429 lakes, ${fmt((S.summary&&S.summary.hazard_counts['very high'])||0)} are classed very high hazard. That is not a scare figure, it is a limitation of applying a binary framework designed for eight large, already-suspect lakes to every pond in the inventory. In Himalayan terrain almost every lake has some slope above 30° that routes into it, and most have some steep ground within a kilometre, so both branches of the classification trip almost everywhere. The class is a statement about terrain, and terrain in Nepal is severe.</p>
-   <p>For triage, use the two quantities that actually discriminate: the potential flood volume, for which Fujita et al. (2013) give a published threshold of 10 million m³ ("a comparable volume to that of recorded major GLOFs"), and the number of people on the routed path. ${fmt((S.shown||[]).length)} lakes are shown under your current filter; ${fmt(S.lakes.filter(f=>f.properties.priority).length)} lakes in the whole inventory exceed the 10 million m³ threshold. That is the set worth a field campaign.</p>
-
-   <h4>What this is not — read this before using any number</h4>
-   <div class="callout"><ul style="margin:0 0 0 16px;color:inherit">
-     <li>It is <b>not a forecast</b>. Nothing here estimates the probability that a lake will fail in any period. "Very high hazard" means the terrain permits the known failure mechanisms, not that failure is imminent or likely.</li>
-     <li>Peak discharges carry roughly a factor-of-two typical error and a 95% interval spanning about two orders of magnitude. Treat the interval, not the median, as the result.</li>
-     <li>Arrival times are distance divided by a constant velocity. Real flood waves attenuate, pond behind constrictions, and can arrive in multiple surges — at Dig Tsho in 1985 bridges were destroyed 30 to 90 minutes after the first surge passed.</li>
-     <li>Inundation footprints are <b>not</b> computed. A 1 km corridor around the channel is a search radius for exposure, not a flood extent. Producing a real footprint needs 2D hydrodynamic modelling on a high-resolution DEM.</li>
-     <li>Buried ice in moraines cannot be seen in a DEM. It is taken only where the literature documents it, so hazard classes are a lower bound for every other lake.</li>
-     <li>OpenStreetMap coverage in Nepal is uneven. Absent bridges or clinics in this layer are not evidence of absence; counts are lower bounds.</li>
-     <li>The lake inventory is a snapshot. Lakes grow, new ones form, and a lake that drained is no longer a hazard — the Dig Tsho steep lakefront has gone since its 1985 flood, which this pipeline correctly finds.</li>
-     <li>Landslide susceptibility away from earthquakes (monsoon-triggered debris flows) is <b>not</b> modelled. Rainfall is shown as context only, because no validated rainfall threshold for moraine-dam failure in Nepal exists to apply.</li>
-     <li>Small potential flood volumes are systematically missed at 30 m resolution — see the Validation tab. Zero is not a clean bill of health.</li>
-     <li>Exposure stops at the Nepalese border, although several of these rivers cross into India within the routing distance.</li>
-   </ul></div>
-
-   <h4>Using it responsibly</h4>
-   <p>The defensible uses are triage and prioritisation: which lakes deserve a field campaign, bathymetry, or an instrumented monitoring station; which valleys should be mapped hydrodynamically; where a siren network would buy the most minutes. Operational warning requires in-situ instrumentation, a staffed decision chain, and a tested community response — none of which a web page can provide.</p>
-  </div>`;
-}
-function tabSources(){
-  const s = S.summary;
+  const s = S.summary, t = (s&&s.thresholds)||{};
   const refs = [
-    ['Rounce, D.R., McKinney, D.C., Lala, J.M., Byers, A.C., Watson, C.S. (2016)','A new remote hazard and risk assessment framework for glacial lakes in the Nepal Himalaya. Hydrol. Earth Syst. Sci. 20, 3455–3475.','https://doi.org/10.5194/hess-20-3455-2016','hazard and impact classification; avalanche and rockfall source and runout criteria'],
-    ['Fujita, K., Sakai, A., Takenaka, S., Nuimura, T., Surazakov, A.B., Sawagaki, T., Yamanokuchi, T. (2013)','Potential flood volume of Himalayan glacial lakes. Nat. Hazards Earth Syst. Sci. 13, 1827–1839.','https://doi.org/10.5194/nhess-13-1827-2013','steep lakefront area, potential lowering height, potential flood volume'],
-    ['Veh, G., Korup, O., Walz, A. (2020)','Hazard from Himalayan glacier lake outburst floods. PNAS 117(2), 907–912.','https://doi.org/10.1073/pnas.1914898117','depth–area posterior; dimensionless peak-discharge formulation; breach-rate distribution'],
-    ['Walder, J.S., O\'Connor, J.E. (1997)','Methods for predicting peak discharge of floods caused by failure of natural and constructed earth dams. Water Resour. Res. 33(10), 2337–2348.','https://doi.org/10.1029/97WR01616','the dimensionless peak-discharge relation'],
-    ['O\'Connor, J.E., Beebee, R.A. (2009)','Floods from natural rock-material dams. In: Megaflooding on Earth and Mars, Cambridge University Press, 128–171.','https://doi.org/10.1017/CBO9780511635632.008','the 63 dam-break observations and 19 breach rates'],
-    ['Huggel, C., Haeberli, W., Kääb, A., Bieri, D., Richardson, S. (2004)','An assessment procedure for glacial hazards in the Swiss Alps. Can. Geotech. J. 41(6), 1068–1083.','https://doi.org/10.1139/T04-053','the volume-dependent avalanche reach angle, tan α = 1.111 − 0.118 log₁₀V'],
-    ['Huggel, C., Zgraggen-Oswald, S., Haeberli, W., Kääb, A., Polkvoj, A., Galushkin, I., Evans, S.G. (2005)','The 2002 rock/ice avalanche at Kolka/Karmadon, Russian Caucasus. Nat. Hazards Earth Syst. Sci. 5(2), 173–187.','https://doi.org/10.5194/nhess-5-173-2005','the assumed avalanche release depths'],
-    ['Alean, J. (1985)','Ice avalanches: some empirical information about their formation and reach. J. Glaciol. 31(109), 324–333.','https://doi.org/10.3189/S0022143000006663','45° release-slope threshold for ice avalanches'],
-    ['Bolch, T., Peters, J., Yegorov, A., Pradhan, B., Buchroithner, M., Blagoveshchensky, V. (2011)','Identification of potentially dangerous glacial lakes in the northern Tien Shan. Nat. Hazards 59(3), 1691–1714.','https://doi.org/10.1007/s11069-011-9860-2','30° rockfall source threshold'],
-    ['Osti, R., Bhattarai, T.N., Miyake, K. (2011)','Causes of catastrophic failure of Tam Pokhari moraine dam in the Mt. Everest region. Nat. Hazards 58(3), 1209–1223.','https://doi.org/10.1007/s11069-011-9723-x','60° upper bound on avalanche release slopes'],
-    ['Shea, J.M., Immerzeel, W.W., Wagnon, P., Vincent, C., Bajracharya, S. (2015)','Modelling glacier change in the Everest region, Nepal Himalaya. The Cryosphere 9(3), 1105–1128.','https://doi.org/10.5194/tc-9-1105-2015','60° upper bound on avalanche release slopes'],
-    ['Lehner, B., Grill, G. (2013)','Global river hydrography and network routing. Hydrol. Process. 27(15), 2171–2186.','https://doi.org/10.1002/hyp.9740','the HydroRIVERS network used for downstream routing'],
-    ['Shrestha, F., Steiner, J.F., Shrestha, R., et al. (2023)','A comprehensive and version-controlled database of glacial lake outburst floods in High Mountain Asia. Earth Syst. Sci. Data 15(9), 3941–3961.','https://doi.org/10.5194/essd-15-3941-2023','HMAGLOFDB, the recorded-GLOF layer'],
-    ['Zhu, J., Baise, L.G., Thompson, E.M. (2017)','An updated geospatial liquefaction model for global application. Bull. Seismol. Soc. Am. 107(3), 1365–1385.','https://doi.org/10.1785/0120160198','the liquefaction half of the USGS ground-failure product shown live'],
-    ['Bajracharya, S.R., Mool, P. (2009)','Glaciers, glacial lakes and glacial lake outburst floods in the Mount Everest region, Nepal. Ann. Glaciol. 50(53), 81–86.','https://doi.org/10.3189/172756410790595895','Dig Tsho 1985 surge-front velocity and downstream damage times'],
-    ['Vuichard, D., Zimmermann, M. (1987)','The 1985 catastrophic drainage of a moraine-dammed lake, Khumbu Himal, Nepal: cause and consequences. Mt. Res. Dev. 7(2), 91–110.','https://doi.org/10.2307/3673305','Dig Tsho observations'],
-    ['Cenderelli, D.A., Wohl, E.E. (2001)','Peak discharge estimates of glacial-lake outburst floods and "normal" climatic floods in the Mount Everest region, Nepal. Geomorphology 40, 57–90.','https://doi.org/10.1016/S0169-555X(01)00037-X','reconstructed Dig Tsho peak discharge'],
-    ['Nowicki Jessee, M.A., Hamburger, M.W., Allstadt, K., Wald, D.J., Robeson, S.M., Tanyas, H., Hearne, M., Thompson, E.M. (2018)','A global empirical model for near-real-time assessment of seismically induced landslides. J. Geophys. Res. Earth Surf. 123, 1835–1859.','https://doi.org/10.1029/2017JF004494','the model behind the USGS ground-failure product shown live'],
-    ['Lala, J.M., Rounce, D.R., McKinney, D.C. (2018)','Modeling the glacial lake outburst flood process chain in the Nepal Himalaya: reassessing Imja Tsho\'s hazard. Hydrol. Earth Syst. Sci. 22, 3721–3737.','https://doi.org/10.5194/hess-22-3721-2018','process-chain context for what a full physical model adds'],
-    ['Cook, S.J., Quincey, D.J. (2015)','Estimating the volume of Alpine glacial lakes. Earth Surf. Dynam. 3, 559–575.','https://doi.org/10.5194/esurf-3-559-2015','why area–volume scaling must be treated as order-of-magnitude'],
+    ['Rounce, D.R. et al. (2016)','Hydrol. Earth Syst. Sci. 20, 3455–3475','https://doi.org/10.5194/hess-20-3455-2016','GLOF hazard, impact & risk decision trees; avalanche & rockfall runout'],
+    ['Fujita, K. et al. (2013)','Nat. Hazards Earth Syst. Sci. 13, 1827–1839','https://doi.org/10.5194/nhess-13-1827-2013','Steep lakefront area (10°), potential lowering height Hp & PFV ≥ 10 Mm³ triage'],
+    ['Veh, G., Korup, O., Walz, A. (2020)','PNAS 117(2), 907–912','https://doi.org/10.1073/pnas.1914898117','Bayesian depth–area posterior & dimensionless dam-break peak discharge'],
+    ['Walder, J.S., O\'Connor, J.E. (1997)','Water Resour. Res. 33(10), 2337–2348','https://doi.org/10.1029/97WR01616','Dimensionless peak-discharge scaling'],
+    ['Huggel, C. et al. (2004)','Can. Geotech. J. 41(6), 1068–1083','https://doi.org/10.1139/T04-053','Volume-dependent ice-avalanche reach angle'],
+    ['Dahal, R.K., Hasegawa, S. (2008)','Geomorphology 100(3–4), 429–443','https://doi.org/10.1016/j.geomorph.2008.01.014','Nepal Himalaya rainfall intensity–duration landslide threshold I = 73.90 D⁻⁰·⁷⁹'],
+    ['Guzzetti, F. et al. (2008)','Landslides 5(1), 3–17','https://doi.org/10.1007/s10346-007-0112-1','Global rainfall intensity–duration baseline threshold'],
+    ['Kirschbaum, D.B., Stanley, T. (2018)','Earth\'s Future 6, 531–550','https://doi.org/10.1002/2017EF000715','NASA COOLR / GLC landslide inventory & satellite situational awareness'],
+    ['Harrigan, S. et al. (2020)','Earth Syst. Sci. Data 12, 2043–2060','https://doi.org/10.5194/essd-12-2043-2020','Copernicus EMS GloFAS-ERA5 global river discharge reanalysis'],
+    ['Alfieri, L. et al. (2013)','Hydrol. Earth Syst. Sci. 17, 1161–1175','https://doi.org/10.5194/hess-17-1161-2013','GloFAS ensemble flood forecasting & return-period warning framework'],
+    ['Styron, R., Pagani, M. (2020)','Earthquake Spectra 36(1_suppl), 160–180','https://doi.org/10.1177/8755293020944182','GEM Global Active Faults Database (Himalayan MFT, MBT, MCT traces)'],
+    ['Nowicki Jessee, M.A. et al. (2018)','J. Geophys. Res. Earth Surf. 123, 1835–1859','https://doi.org/10.1029/2017JF004494','USGS operational coseismic landslide model'],
+    ['Gruber, S. (2012)','The Cryosphere 6, 221–233','https://doi.org/10.5194/tc-6-221-2012','Global high-resolution mountain permafrost zonation'],
+    ['Shrestha, F. et al. (2023)','Earth Syst. Sci. Data 15(9), 3941–3961','https://doi.org/10.5194/essd-15-3941-2023','HMAGLOFDB v4.0 recorded GLOF database'],
   ];
   return `<div class="prose">
-   <h4>Methods cited, and what each one is used for</h4>
-   <ul>${refs.map(r=>`<li><b>${esc(r[0])}</b> ${esc(r[1])} <a href="${r[2]}" target="_blank" rel="noopener">doi</a><br><span class="cite">used for: ${esc(r[3])}</span></li>`).join('')}</ul>
-   <h4>Data sets</h4>
-   <ul>${((s&&s.sources)||[]).map(d=>`<li><b>${esc(d.name)}</b> — ${esc(d.detail)}. <a href="${esc(d.url)}" target="_blank" rel="noopener">source</a><br><span class="cite">licence: ${esc(d.licence)}</span></li>`).join('')}</ul>
-   <h4>Basemaps</h4>
-   <p>None of the basemaps offered here needs an API key, and the tool works with none at all. CARTO's basemaps, used in an earlier version, began requiring a key and now return a watermarked tile, so they have been removed.</p>
-   <ul>
-     <li><b>Dark grey</b>, <b>Terrain (hillshade)</b> and <b>Satellite imagery</b> — Esri ArcGIS Online services (World Dark Gray Base, World Hillshade, World Imagery), attributed as Esri requires. These are free to use with attribution under Esri's terms of use; confirm those terms before any high-traffic or commercial deployment.</li>
-     <li><b>OpenTopoMap</b> — map style CC-BY-SA 3.0, data &copy; OpenStreetMap contributors (ODbL), elevation from SRTM. The clearest licence of the set, and the most informative for mountain terrain.</li>
-     <li><b>OpenStreetMap</b> standard tiles — &copy; OpenStreetMap contributors, ODbL, subject to the OSM Foundation tile usage policy.</li>
-   </ul>
-   <p class="muted">Your choice of basemap is remembered in your own browser only. If a provider stops serving tiles, the header says so and you can switch.</p>
+    <h4>Multi-hazard screening architecture &amp; 7-day automated refresh</h4>
+    <p><b>TRĀYA (त्राय)</b> integrates static high-resolution terrain screening (Copernicus DEM GLO-30, RGI 7.0, HydroRIVERS, WorldPop) with an automated <b>7-day GitHub Actions refresh pipeline</b> (<code>.github/workflows/weekly-refresh.yml</code>) and live keyless browser feeds:</p>
+    <ul>
+      <li><b>Glacial Lake Outburst Floods (GLOFs):</b> D8 mass-movement routing (${fmt(t.avalanche_slope&&t.avalanche_slope[0])}–${fmt(t.avalanche_slope&&t.avalanche_slope[1])}° ice avalanche; &gt;${fmt(t.rockfall_slope)}° rockfall), Fujita et al. (2013) steep lakefront depression (&gt;${fmt(t.sla_threshold)}°) and potential flood volume (PFV), Veh et al. (2020) Bayesian depth &amp; Walder–O'Connor peak discharge Qp, and 120 km HydroRIVERS corridor routing. Both readings of the Rounce et al. (2016) decision tree are exposed side by side.</li>
+      <li><b>Fluvial Floods (Copernicus GloFAS):</b> 30-day reanalysis + 30-day ensemble river discharge forecasts across Nepal's 10 major river outlets, graded against 35-year Gumbel EV1 return periods (Q₂, Q₅, Q₂₀).</li>
+      <li><b>Rainfall &amp; Coseismic Landslides:</b> Rolling 24 h, 72 h and 168 h Open-Meteo precipitation across 24 physiographic zones screened against Dahal &amp; Hasegawa (2008) (I = 73.90 D⁻⁰·⁷⁹), paired with NASA COOLR/GLC &amp; OSM landslide records and live USGS Nowicki Jessee (2018) coseismic ground-failure alerts.</li>
+      <li><b>Cryosphere &amp; Satellite EO:</b> Weekly Copernicus Sentinel-2 L2A cloud-screened STAC scene discovery (Element84 Earth Search), 10 m EOX Sentinel-2 cloudless basemap, daily NASA EOSDIS GIBS overlays (GPM IMERG, MODIS snow cover, VIIRS true colour), and 0 °C freezing-level isotherm tracking relative to lake elevation.</li>
+    </ul>
 
-   <h4>Live feeds read by your browser</h4>
-   <ul><li>USGS real-time earthquake GeoJSON summary feeds, plus the ShakeMap and ground-failure products of individual events.</li>
-       <li>Open-Meteo daily precipitation, past 7 days and 5-day forecast, requested only when you ask for a lake.</li></ul>
-   <h4>Reproducing this</h4>
-   <p>Every derived number comes from the pipeline in <code>src/</code>: <code>build_terrain.py</code> (DEM analysis), <code>models_glof.py</code> (depth, volume, peak discharge), <code>routing.py</code> (river network), <code>exposure.py</code> (OpenStreetMap), <code>seismic.py</code> (USGS catalogue), <code>build.py</code> (assembly), <code>validate.py</code> (the Validation tab). Thresholds live in one file, <code>config.py</code>, each with its citation. Build: <span class="mono">${esc((s&&s.build)||'unknown')}</span>.</p>
+    <div class="callout bad">
+      <b>Critical limitations — read before citing any figure:</b>
+      <ul style="margin:4px 0 0 16px;color:inherit">
+        <li>Nothing here is a failure probability or operational warning. Consult Nepal DHM (<code>hydrology.gov.np</code>) and NDRRMA (<code>bipadportal.gov.np</code>) for official warnings.</li>
+        <li>30 m DEM resolution under-detects small steep lakefronts (&lt;5 Mm³); PFV = 0 does not guarantee dam stability.</li>
+        <li>Peak discharge Qp spans ~2 orders of magnitude (95% interval); 1 km exposure buffers are search corridors, not 2D hydrodynamic inundation extents.</li>
+        <li>Dahal &amp; Hasegawa (2008) and ~5 km GloFAS grids represent regional hydrometeorological regimes, not site-specific geotechnical or local flash-flood forecasts.</li>
+      </ul>
+    </div>
+
+    <h4>Peer-reviewed methods cited</h4>
+    <ul>${refs.map(r=>`<li><b>${esc(r[0])}</b> ${esc(r[1])} <a href="${r[2]}" target="_blank" rel="noopener">doi</a> — <span class="cite">${esc(r[3])}</span></li>`).join('')}</ul>
+
+    <h4>Open-access datasets &amp; licences</h4>
+    <ul>${((s&&s.sources)||[]).map(d=>`<li><b>${esc(d.name)}</b> — ${esc(d.detail)}. <a href="${esc(d.url)}" target="_blank" rel="noopener">source</a> <span class="cite">(${esc(d.licence)})</span></li>`).join('')}</ul>
   </div>`;
 }
 
-/* ------------------------------------------------------------- wiring */
-function refresh(){ readFilters(); S.colourBy = document.getElementById('colourBy').value; drawLegend(); renderLakes(); }
-['fPriority','fOnlyRouted','fAva','fSla','fIce','fPast','fArea','fSearch','colourBy','lLakes']
-  .forEach(id => { const el = document.getElementById(id);
-    el.addEventListener(el.type === 'range' || el.type === 'search' ? 'input' : 'change', refresh); });
+/* ------------------------------------------------------------------ wiring */
+function refresh(){
+  readFilters();
+  S.colourBy = document.getElementById('colourBy').value;
+  drawLegend();
+  renderLakes();
+}
+['fPriority','fOnlyRouted','fAva','fSla','fIce','fContact','fPast','fProv','fArea','fSearch','colourBy','lLakes']
+  .forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener(el.type === 'range' || el.type === 'search' ? 'input' : 'change', refresh);
+  });
+document.getElementById('btnResetFilters').onclick = resetFilters;
 ['lRoute','lExp'].forEach(id => document.getElementById(id)
-  .addEventListener('change', () => S.sel && select(S.sel)));
-['lHydro','lEqHist','lGlof'].forEach(id => document.getElementById(id)
-  .addEventListener('change', () => { drawStatics(); toggle(id); }));
-document.getElementById('lEq').addEventListener('change', () => { drawEq(); toggle('lEq'); });
-document.getElementById('lMmi').addEventListener('change', () => { drawMmi(); toggle('lMmi'); });
-document.getElementById('eqWindow').addEventListener('change', loadEq);
-document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('#tabs button').forEach(x => x.classList.remove('on'));
-  b.classList.add('on'); S.tab = b.dataset.tab; renderTab();
-});
-const LG = {lHydro:gHydro, lEqHist:gEqH, lGlof:gGlof, lEq:gEq, lMmi:gMmi};
-function toggle(id){ const on = document.getElementById(id).checked, g = LG[id];
-  if (on) g.addTo(map); else map.removeLayer(g); }
+  .addEventListener('change', () => S.sel && S.selKind==='lake' && selectLake(S.sel, false)));
 
-/* ------------------------------------------------------------- startup */
+const MULTI_LAYERS = {lRivers:gRivers, lFaults:gFaults, lNodes:gNodes, lLandslides:gLs, lHydro:gHydro, lEqHist:gEqH, lGlof:gGlof, lGdacs:gGdacs};
+Object.keys(MULTI_LAYERS).forEach(id => document.getElementById(id).addEventListener('change', () => {
+  const on = document.getElementById(id).checked, g = MULTI_LAYERS[id];
+  if (on) g.addTo(map); else map.removeLayer(g);
+  drawMultiHazardLayers();
+}));
+document.getElementById('lEq').addEventListener('change', () => {
+  const on = document.getElementById('lEq').checked;
+  if (on) gEq.addTo(map); else map.removeLayer(gEq);
+  drawEq();
+});
+document.getElementById('lMmi').addEventListener('change', () => {
+  const on = document.getElementById('lMmi').checked;
+  if (on) gMmi.addTo(map); else map.removeLayer(gMmi);
+  drawMmi();
+});
+document.getElementById('eqWindow').addEventListener('change', loadEq);
+
+/* Satellite controls */
+['satLayer','satDate'].forEach(id => document.getElementById(id).addEventListener('change', updateSatOverlay));
+document.getElementById('satOp').addEventListener('input', () => {
+  const op = +document.getElementById('satOp').value / 100;
+  document.getElementById('satOpLbl').textContent = `${Math.round(op*100)}%`;
+  if (activeGibsTile) activeGibsTile.setOpacity(op);
+});
+document.getElementById('satPrev').onclick = () => shiftSatDate(-1);
+document.getElementById('satNext').onclick = () => shiftSatDate(1);
+document.getElementById('satOff').onclick = () => { document.getElementById('satLayer').value = 'none'; updateSatOverlay(); };
+
+/* Tabs, KPIs, Layout & Theme */
+function switchTab(t){
+  S.tab = t;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
+  document.getElementById('bottom').classList.remove('collapsed');
+  renderTab();
+  setTimeout(() => map.invalidateSize(), 200);
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+document.querySelectorAll('#kpiStrip .kpi').forEach(k => k.onclick = () => switchTab(k.dataset.goto));
+
+document.getElementById('dockMin').onclick = () => { const b=document.getElementById('bottom'); b.classList.add('collapsed'); b.classList.remove('expanded'); setTimeout(()=>map.invalidateSize(),200); };
+document.getElementById('dockMid').onclick = () => { const b=document.getElementById('bottom'); b.classList.remove('collapsed','expanded'); setTimeout(()=>map.invalidateSize(),200); };
+document.getElementById('dockMax').onclick = () => { const b=document.getElementById('bottom'); b.classList.add('expanded'); b.classList.remove('collapsed'); setTimeout(()=>map.invalidateSize(),200); };
+
+document.getElementById('btnToggleLeft').onclick = () => { document.getElementById('mainGrid').classList.toggle('hide-left'); setTimeout(()=>map.invalidateSize(),200); };
+document.getElementById('btnToggleRight').onclick = () => { document.getElementById('mainGrid').classList.toggle('hide-right'); setTimeout(()=>map.invalidateSize(),200); };
+document.getElementById('btnKpi').onclick = () => { document.getElementById('kpiStrip').classList.toggle('hidden'); setTimeout(()=>map.invalidateSize(),200); };
+document.getElementById('btnTheme').onclick = () => {
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', cur);
+  try { localStorage.setItem('traya.theme', cur); } catch(e){}
+  renderTab();
+};
+document.getElementById('btnRefreshLive').onclick = refreshAllLiveInBrowser;
+
+document.querySelectorAll('#regionBar .hud-btn').forEach(btn => btn.onclick = () => {
+  document.querySelectorAll('#regionBar .hud-btn').forEach(x => x.classList.remove('on'));
+  btn.classList.add('on');
+  const [la, lo, z] = btn.dataset.v.split(',').map(Number);
+  map.setView([la, lo], z);
+});
+
+window.addEventListener('keydown', e => {
+  if (e.key === '/' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){
+    e.preventDefault(); document.getElementById('fSearch').focus();
+  }
+});
+
+/* ----------------------------------------------------------------- startup */
 (function init(){
   const p = document.getElementById('pill-build');
   if (S.summary){
-    p.textContent = `${S.lakes.length} lakes · built ${S.summary.build.slice(0,10)}`;
-    const age = (Date.now() - Date.parse(S.summary.build)) / 86400000;
-    p.className = 'pill' + (age > 120 ? ' stale' : '');
-  } else { p.className = 'pill err'; p.textContent = 'data files did not load'; }
+    const dStr = S.summary.build.slice(0,10);
+    const age = Math.max(0, (Date.now() - Date.parse(S.summary.build)) / 86400000);
+    const cadence = S.summary.refresh_interval_days || 7;
+    p.className = 'pill ' + (age <= cadence + 1 ? 'live' : 'stale');
+    p.innerHTML = `<span class="dot"></span>built ${dStr} · 7d cycle`;
+    document.getElementById('k-lakes').textContent = fmt(S.lakes.length);
+    document.getElementById('k-prio').textContent = `${S.lakes.filter(f=>f.properties.priority).length} priority`;
+    if (S.valid && S.valid.checks){
+      const ok = S.valid.checks.filter(c=>c.pass).length;
+      document.getElementById('k-val').textContent = `${ok}/${S.valid.checks.length} pass`;
+    }
+  } else {
+    p.className = 'pill err'; p.innerHTML = '<span class="dot"></span>data missing';
+  }
   if (!S.lakes.length){
     document.getElementById('map').innerHTML =
-      '<div style="padding:28px;color:#9aa9b7">The <code>data/</code> files did not load. '
-      + 'Serve this folder over HTTP rather than opening the file directly.</div>';
+      '<div style="padding:28px;color:#9aa9b7">The <code>data/</code> files did not load. Serve this folder over HTTP rather than opening the file directly.</div>';
     return;
   }
+  populateProvinceDropdown();
   setBasemapPill(null);
-  refresh(); drawStatics(); renderTab(); loadEq();
+  updateStatusPills();
+  renderDefaultInspector();
+  refresh();
+  drawMultiHazardLayers();
+  loadEq();
   setInterval(loadEq, 5 * 60 * 1000);
+
+  // Restore deep-linked lake or tab from URL hash
+  const h = location.hash.slice(1);
+  if (h.startsWith('lake=')){
+    const lid = decodeURIComponent(h.slice(5));
+    setTimeout(() => selectLake(lid, true), 150);
+  } else if (h.startsWith('tab=')){
+    switchTab(decodeURIComponent(h.slice(4)));
+  }
 })();
 </script>
 </body>
