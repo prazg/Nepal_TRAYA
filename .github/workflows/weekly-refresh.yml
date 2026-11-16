@@ -1,0 +1,97 @@
+name: Weekly 7-Day Multi-Hazard Refresh & Deploy
+
+on:
+  schedule:
+    # Runs every 7 days on Monday at 03:15 UTC (09:00 Nepal Standard Time)
+    - cron: "15 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      refresh_osm:
+        description: "Force fresh OpenStreetMap Overpass query (exposure & admin)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-and-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh open-access datasets & validate (7-day cycle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install scientific dependencies
+        run: pip install -r requirements.txt
+
+      - name: Cache upstream spatial & calibration inputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            raw
+            lit
+            cache/overpass
+          key: traya-inputs-v2-${{ runner.os }}
+
+      - name: Run 7-day multi-hazard refresh & 28 validation checks
+        run: |
+          if [ "${{ inputs.refresh_osm }}" = "true" ]; then
+            python src/refresh_weekly.py --refresh-osm
+          else
+            python src/refresh_weekly.py
+          fi
+
+      - name: Commit refreshed data products
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ cache/usgs_catalogue.json cache/gem_faults.json cache/glofas_climatology.json cache/landslides.json cache/nepal_admin.json index.html
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore(data): automated 7-day multi-hazard & satellite refresh [skip ci]"
+            git push
+          fi
+
+      - name: Stage static site bundle
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r data vendor _site/
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Publish refreshed site to GitHub Pages
+    needs: refresh
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
