@@ -3,40 +3,66 @@ Terrain analysis for each glacial lake from the Copernicus DEM GLO-30.
 
 Implements, per lake:
 
-  * lake surface elevation and area
-  * slope field (anisotropic cell size, EPSG:4326 grid)
+  * lake surface elevation and area (interior-first rasterisation to avoid bank bias)
+  * slope field (true 3x3 Horn 1981 finite difference with affine cell spacing)
   * snow/ice avalanche and rockfall source areas
         Alean (1985); Bolch et al. (2011); Osti et al. (2011); Shea et al. (2015)
         as applied by Rounce et al. (2016)
   * reach-angle (Fahrboeschung) runout test with the volume-dependent avalanche
-    threshold of Huggel et al. (2004, Can. Geotech. J. 41, 1068-1083)
+    threshold of Huggel et al. (2004, Can. Geotech. J. 41, 1068-1083), using a
+    physically bounded slab-scenario thickness plus explicit 10/30/50 m scenarios
   * steep lakefront area (SLA), potential lowering height (Hp) and potential
     flood volume (PFV) exactly as defined by Fujita et al. (2013)
 
-Mass-movement trajectories follow Rounce et al. (2016): a single-flow-direction
-(D8) route is computed on the window DEM, only source cells whose route
-terminates in the lake are considered, and the reach angle is measured over the
-routed path length rather than the straight-line distance.
-
-Documented departure from Rounce et al. (2016): avalanche-prone area is taken as
-the part of the contiguous source patch that drains to the lake, rather than
-their variable-kernel filter. This is a different estimator of the same quantity
-and it only affects which reach-angle threshold applies (Huggel et al. 2004),
-not the routing.
+Mass-movement trajectories follow Rounce et al. (2016): depressions are filled
+with Barnes et al. (2014) Priority-Flood+epsilon in float64 precision so filled
+flats carry a strict monotonic epsilon gradient into the lake sink without
+terminating single-flow-direction (D8) routing at zero-gradient flats. Only
+source cells whose D8 route terminates in the lake are considered, and reach
+angle is measured over routed path length rather than straight-line distance.
 """
 from __future__ import annotations
+from collections import deque
+import heapq
 import math
 import os
-import numpy as np
-import rasterio
-from rasterio import features
-from rasterio.merge import merge as rio_merge
-from rasterio.windows import from_bounds
-from scipy import ndimage
-from shapely.geometry import shape, box
-from shapely.strtree import STRtree
+
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover - stdlib-only unit test mode
+    np = None
+
+try:
+    import rasterio
+    from rasterio import features
+    from rasterio.merge import merge as rio_merge
+    from rasterio.windows import from_bounds
+except ImportError:  # pragma: no cover
+    rasterio = features = rio_merge = from_bounds = None
+
+try:
+    from scipy import ndimage
+except ImportError:  # pragma: no cover
+    ndimage = None
+
+try:
+    from shapely.geometry import shape, box
+    from shapely.strtree import STRtree
+except ImportError:  # pragma: no cover
+    shape = box = STRtree = None
 
 import config as C
+
+
+def _require_geo_stack():
+    if np is None or rasterio is None or ndimage is None or shape is None:
+        raise ImportError(
+            "terrain raster analysis requires numpy, scipy, rasterio, and shapely"
+        )
+
+
+def _is_ndarray(obj) -> bool:
+    return np is not None and isinstance(obj, np.ndarray)
 
 
 # ---------------------------------------------------------------------------
@@ -47,6 +73,7 @@ class DemReader:
     across tile boundaries where necessary."""
 
     def __init__(self, tile_dir: str = C.DEM_DIR):
+        _require_geo_stack()
         self.tile_dir = tile_dir
         self.index = {}
         for fn in os.listdir(tile_dir):
@@ -83,35 +110,104 @@ class DemReader:
                 s.close()
 
 
-def cell_metres(lat_deg: float, res_deg: float) -> tuple[float, float]:
+def cell_metres(lat_deg: float, res_x_deg: float,
+                res_y_deg: float | None = None) -> tuple[float, float]:
     """Approximate east-west and north-south cell size in metres for a
     geographic grid at the given latitude (WGS84)."""
-    dy = 111_132.92 - 559.82 * math.cos(2 * math.radians(lat_deg))
-    dx = 111_412.84 * math.cos(math.radians(lat_deg)) \
-        - 93.5 * math.cos(3 * math.radians(lat_deg))
-    return abs(dx * res_deg), abs(dy * res_deg)
+    phi = math.radians(lat_deg)
+    dy_per_deg = 111_132.92 - 559.82 * math.cos(2.0 * phi)
+    dx_per_deg = (111_412.84 * math.cos(phi)
+                  - 93.5 * math.cos(3.0 * phi))
+    ry = res_x_deg if res_y_deg is None else res_y_deg
+    return abs(dx_per_deg * res_x_deg), abs(dy_per_deg * ry)
 
 
-def slope_deg(dem: np.ndarray, dx: float, dy: float) -> np.ndarray:
-    """Horn (1981) third-order finite difference slope, in degrees."""
-    z = dem
-    gy, gx = np.gradient(z, dy, dx)      # note: axis 0 is north-south
-    return np.degrees(np.arctan(np.hypot(gx, gy)))
+def cell_metres_from_transform(transform, lat_deg: float,
+                               fallback_deg: float = 1.0 / 3600.0) -> tuple[float, float]:
+    """Compute metric (dx, dy) cell spacing from a rasterio Affine transform
+    (or any object exposing `.a` and `.e` geographic degree steps)."""
+    res_x = abs(float(getattr(transform, "a", 0.0) or 0.0)) or fallback_deg
+    res_y = abs(float(getattr(transform, "e", 0.0) or 0.0)) or fallback_deg
+    return cell_metres(lat_deg, res_x, res_y)
+
+
+def slope_deg(dem, dx: float | None = None, dy: float | None = None, *,
+              transform=None, lat_deg: float | None = None):
+    """True 3x3 Horn (1981) weighted third-order finite difference slope (deg).
+
+    Accepts explicit metric spacing ``(dx, dy)`` in metres, or computes actual
+    cell spacing from a raster ``transform`` and ``lat_deg``. Works on both
+    NumPy arrays and pure-Python 2D nested lists.
+    """
+    if transform is not None:
+        if lat_deg is None:
+            raise ValueError("lat_deg is required when transform is provided")
+        dx, dy = cell_metres_from_transform(transform, lat_deg)
+    if dx is None or dy is None:
+        raise ValueError("dx and dy (or transform and lat_deg) must be provided")
+    if dx <= 0 or dy <= 0:
+        raise ValueError("dx and dy must be positive")
+
+    if _is_ndarray(dem):
+        z = np.asarray(dem, dtype="float64")
+        if z.ndim != 2:
+            raise ValueError("dem must be 2D")
+        if z.size == 0:
+            return np.empty_like(z, dtype="float64")
+        p = np.pad(z, 1, mode="edge")
+        a, b, c = p[:-2, :-2], p[:-2, 1:-1], p[:-2, 2:]
+        d, f = p[1:-1, :-2], p[1:-1, 2:]
+        g, h, i = p[2:, :-2], p[2:, 1:-1], p[2:, 2:]
+        gx = ((c + 2.0 * f + i) - (a + 2.0 * d + g)) / (8.0 * float(dx))
+        gy = ((g + 2.0 * h + i) - (a + 2.0 * b + c)) / (8.0 * float(dy))
+        return np.degrees(np.arctan(np.hypot(gx, gy)))
+
+    # Pure-Python stdlib fallback for 2D nested sequences
+    nrows = len(dem)
+    ncols = len(dem[0]) if nrows else 0
+    inv8x = 1.0 / (8.0 * float(dx))
+    inv8y = 1.0 / (8.0 * float(dy))
+    out = []
+    for r in range(nrows):
+        r_up = 0 if r == 0 else r - 1
+        r_dn = nrows - 1 if r == nrows - 1 else r + 1
+        row_up = dem[r_up]
+        row_md = dem[r]
+        row_dn = dem[r_dn]
+        out_row = []
+        for c in range(ncols):
+            c_lt = 0 if c == 0 else c - 1
+            c_rt = ncols - 1 if c == ncols - 1 else c + 1
+            a = float(row_up[c_lt]); b = float(row_up[c]); cc = float(row_up[c_rt])
+            dd = float(row_md[c_lt]); ff = float(row_md[c_rt])
+            gg = float(row_dn[c_lt]); hh = float(row_dn[c]); ii = float(row_dn[c_rt])
+            if not (math.isfinite(a) and math.isfinite(b) and math.isfinite(cc)
+                    and math.isfinite(dd) and math.isfinite(ff)
+                    and math.isfinite(gg) and math.isfinite(hh) and math.isfinite(ii)):
+                out_row.append(math.nan)
+                continue
+            gx = ((cc + 2.0 * ff + ii) - (a + 2.0 * dd + gg)) * inv8x
+            gy = ((gg + 2.0 * hh + ii) - (a + 2.0 * b + cc)) * inv8y
+            out_row.append(math.degrees(math.atan(math.hypot(gx, gy))))
+        out.append(out_row)
+    return out
 
 
 # ---------------------------------------------------------------------------
 # Per-lake analysis
 # ---------------------------------------------------------------------------
 def analyse_lake(lake_geom, lake_props, dem_reader: DemReader,
-                 glacier_tree: STRtree, glacier_geoms,
+                 glacier_tree, glacier_geoms,
                  buffer_km: float = 8.0) -> dict:
     """Run the full terrain analysis for a single lake polygon."""
+    _require_geo_stack()
     poly = shape(lake_geom)
     cx, cy = poly.centroid.x, poly.centroid.y
-    res = 1.0 / 3600.0
-    dxm, dym = cell_metres(cy, res)
-    bx = buffer_km * 1000.0 / dxm * res
-    by = buffer_km * 1000.0 / dym * res
+    # Rough arcsecond estimate solely to size the initial DEM window read
+    res_est = 1.0 / 3600.0
+    dx_est, dy_est = cell_metres(cy, res_est)
+    bx = buffer_km * 1000.0 / dx_est * res_est
+    by = buffer_km * 1000.0 / dy_est * res_est
     minx, miny, maxx, maxy = poly.bounds
     bounds = (minx - bx, miny - by, maxx + bx, maxy + by)
 
@@ -120,8 +216,21 @@ def analyse_lake(lake_geom, lake_props, dem_reader: DemReader,
         return dict(error="no DEM")
     h, w = dem.shape
 
-    lake_mask = features.rasterize([(poly, 1)], out_shape=(h, w), transform=tr,
-                                  dtype="uint8", all_touched=True).astype(bool)
+    # Actual raster cell spacing from the DEM affine transform
+    dxm, dym = cell_metres_from_transform(tr, cy)
+
+    # Interior-first rasterisation to prevent steep bank pixels biasing z_lake
+    # upward on small/narrow lakes; fall back to all_touched=True only when
+    # all_touched=False yields zero pixels.
+    lake_mask = features.rasterize(
+        [(poly, 1)], out_shape=(h, w), transform=tr,
+        dtype="uint8", all_touched=False,
+    ).astype(bool)
+    if not lake_mask.any():
+        lake_mask = features.rasterize(
+            [(poly, 1)], out_shape=(h, w), transform=tr,
+            dtype="uint8", all_touched=True,
+        ).astype(bool)
     if not lake_mask.any():
         # lake smaller than one cell: use the centroid cell
         r, c = rasterio.transform.rowcol(tr, cx, cy)
@@ -130,7 +239,11 @@ def analyse_lake(lake_geom, lake_props, dem_reader: DemReader,
         else:
             return dict(error="lake outside window")
 
-    z_lake = float(np.nanmedian(dem[lake_mask]))
+    lake_vals = dem[lake_mask]
+    lake_vals = lake_vals[np.isfinite(lake_vals)]
+    if lake_vals.size == 0:
+        return dict(error="no finite DEM on lake")
+    z_lake = float(np.median(lake_vals))
     slope = slope_deg(dem, dxm, dym)
 
     # ---- distance to the nearest lakeshore cell, in metres -----------------
@@ -146,15 +259,20 @@ def analyse_lake(lake_geom, lake_props, dem_reader: DemReader,
         if g.intersects(win_box):
             shapes.append((g, 1))
     glacier = (features.rasterize(shapes, out_shape=(h, w), transform=tr,
-                                 dtype="uint8", all_touched=True).astype(bool)
+                                  dtype="uint8", all_touched=True).astype(bool)
                if shapes else np.zeros((h, w), bool))
 
     # ---- steep lakefront area (Fujita et al. 2013) -------------------------
     sla = _sla(dem, lake_mask, dist_px, z_lake, dxm, dym)
 
     # ---- mass-movement source areas and runout -----------------------------
-    dem_filled = fill_depressions(dem)
-    dem_filled[lake_mask] = z_lake          # keep the lake itself as the sink
+    # Fill depressions with Barnes Priority-Flood+epsilon in float64, keeping
+    # the lake itself as an internal sink at z_lake so upslope depressions
+    # drain continuously into the lake rather than stalling on flat plateaus.
+    dem_for_fill = np.asarray(dem, dtype="float64").copy()
+    dem_for_fill[lake_mask] = z_lake
+    dem_filled = fill_depressions(dem_for_fill, sink_mask=lake_mask)
+    dem_filled[lake_mask] = z_lake
     drains, plen = d8_route_to_lake(dem_filled, lake_mask, dxm, dym)
     ava = _mass_movement(dem, slope, glacier, lake_mask, dist_px, z_lake,
                          dxm, dym, kind="avalanche", drains=drains, plen=plen)
@@ -172,7 +290,7 @@ def analyse_lake(lake_geom, lake_props, dem_reader: DemReader,
     )
 
 
-def _dilate(m: np.ndarray, n: int = 2) -> np.ndarray:
+def _dilate(m, n: int = 2):
     return ndimage.binary_dilation(m, iterations=n)
 
 
@@ -232,87 +350,246 @@ def _sla(dem, lake_mask, dist_px, z_lake, dxm, dym) -> dict:
     return out
 
 
-def fill_depressions(dem: np.ndarray) -> np.ndarray:
-    """Fill closed depressions by morphological reconstruction by erosion
-    (the Planchon-Darboux / Soille fill). Rounce et al. (2016) likewise route
-    mass movements on a sink-free DEM."""
-    from skimage.morphology import reconstruction
-    z = np.array(dem, dtype="float64")
-    bad = ~np.isfinite(z)
-    if bad.all():
-        return dem
-    z[bad] = np.nanmin(z[~bad])
-    seed = np.full_like(z, z.max())
-    seed[0, :] = z[0, :]
-    seed[-1, :] = z[-1, :]
-    seed[:, 0] = z[:, 0]
-    seed[:, -1] = z[:, -1]
-    filled = reconstruction(seed, z, method="erosion")
-    out = np.asarray(filled, dtype="float32")
-    out[bad] = np.nan
-    return out
+# ---------------------------------------------------------------------------
+# Barnes et al. (2014) Priority-Flood+epsilon depression filling
+# ---------------------------------------------------------------------------
+def fill_depressions(dem, sink_mask=None, eps: float = 1e-5):
+    """Fill closed depressions with Barnes et al. (2014) Priority-Flood+epsilon.
 
+    Every filled depression cell receives a tiny strict upslope increment
+    (default ``eps = 1e-5 m``) outward from its pour point in float64 precision,
+    eliminating zero-gradient flats so subsequent D8 routing never terminates
+    inside filled depressions (even at 5,000+ m Himalayan elevations where
+    float32 ULP exceeds 1e-5 m).
 
-def d8_route_to_lake(dem: np.ndarray, lake_mask: np.ndarray,
-                     dxm: float, dym: float):
-    """Single-flow-direction (D8) routing.
+    If ``sink_mask`` is supplied (e.g. a lake polygon mask), finite sink cells
+    are seeded alongside domain perimeter outlets so basins draining to the
+    lake preserve their inward drainage rather than filling over the moraine.
 
-    Returns (drains_to_lake, path_length_m):
-      drains_to_lake  bool array, True where the steepest-descent route from the
-                      cell terminates in the lake
-      path_length_m   float array, routed distance to the lake (inf elsewhere)
-
-    Cells with no lower neighbour (pits) terminate the route and do not drain.
-    Processing in ascending elevation order guarantees that a cell's receiver is
-    resolved before the cell itself, because a receiver is always lower.
+    Works on both NumPy arrays (returns float64 ndarray) and 2D Python lists
+    (returns nested float lists).
     """
-    h, w = dem.shape
-    z = np.where(np.isfinite(dem), dem, np.inf)
+    as_numpy = _is_ndarray(dem)
+    if as_numpy:
+        h, w = dem.shape
+        raw_rows = dem.astype("float64", copy=False).tolist()
+        sink_rows = (sink_mask.astype(bool, copy=False).tolist()
+                     if sink_mask is not None else None)
+    else:
+        h = len(dem)
+        w = len(dem[0]) if h else 0
+        raw_rows = [[float(v) for v in row] for row in dem]
+        sink_rows = ([[bool(v) for v in row] for row in sink_mask]
+                     if sink_mask is not None else None)
+
+    if h == 0 or w == 0:
+        return np.empty((h, w), dtype="float64") if as_numpy else []
+
+    # 1-cell halo eliminates bounds checks inside the 8-neighbour inner loop
+    H = h + 2
+    W = w + 2
+    closed = bytearray(H * W)
+    filled = [math.nan] * (H * W)
+
+    # Mark 1-cell outer halo closed
+    for c in range(W):
+        closed[c] = 1
+        closed[(H - 1) * W + c] = 1
+    for r in range(H):
+        closed[r * W] = 1
+        closed[r * W + (W - 1)] = 1
+
+    # Load interior elevations; mark NaN/non-finite cells closed immediately
+    has_finite = False
+    for r in range(h):
+        row = raw_rows[r]
+        base = (r + 1) * W + 1
+        for c in range(w):
+            v = row[c]
+            idx = base + c
+            if math.isfinite(v):
+                filled[idx] = v
+                has_finite = True
+            else:
+                closed[idx] = 1
+
+    if not has_finite:
+        return np.asarray(raw_rows, dtype="float64") if as_numpy else raw_rows
+
+    offs = (-W - 1, -W, -W + 1, -1, 1, W - 1, W, W + 1)
+    open_heap: list[tuple[float, int]] = []
+
+    # Seed perimeter cells, internal NaN-bordering cells, and optional sinks
+    for r in range(h):
+        base = (r + 1) * W + 1
+        on_row_edge = (r == 0 or r == h - 1)
+        srow = sink_rows[r] if sink_rows is not None else None
+        for c in range(w):
+            idx = base + c
+            if closed[idx]:
+                continue
+            seed = on_row_edge or (c == 0) or (c == w - 1)
+            if not seed and srow is not None and srow[c]:
+                seed = True
+            if not seed:
+                # Seed finite cells adjacent to an internal NaN cell
+                for off in offs:
+                    if not math.isfinite(filled[idx + off]):
+                        seed = True
+                        break
+            if seed:
+                closed[idx] = 1
+                open_heap.append((filled[idx], idx))
+
+    heapq.heapify(open_heap)
+    pit: deque[int] = deque()
+    heappop = heapq.heappop
+    heappush = heapq.heappush
+    pit_pop = pit.popleft
+    pit_push = pit.append
+    eps_f = float(eps)
+
+    while open_heap or pit:
+        if pit and (not open_heap or filled[pit[0]] <= open_heap[0][0]):
+            c = pit_pop()
+            zc = filled[c]
+        else:
+            zc, c = heappop(open_heap)
+        target = zc + eps_f
+        for off in offs:
+            n = c + off
+            if closed[n]:
+                continue
+            closed[n] = 1
+            zn = filled[n]
+            if zn <= target:
+                filled[n] = target
+                pit_push(n)
+            else:
+                heappush(open_heap, (zn, n))
+
+    out_rows = [filled[(r + 1) * W + 1:(r + 1) * W + 1 + w] for r in range(h)]
+    if as_numpy:
+        return np.asarray(out_rows, dtype="float64")
+    return out_rows
+
+
+def d8_route_to_lake(dem, lake_mask, dxm: float, dym: float):
+    """Single-flow-direction (D8) routing in float64 precision.
+
+    Returns ``(drains_to_lake, path_length_m)``:
+      drains_to_lake  bool array (or 2D list), True where the steepest-descent
+                      route from the cell terminates in the lake
+      path_length_m   float64 array (or 2D list), routed distance to the lake
+                      (inf elsewhere)
+
+    Uses float64 elevation differences throughout so epsilon gradients created
+    by ``fill_depressions()`` are preserved even at 5,000+ m elevation.
+    Processing in ascending elevation order guarantees that a cell's receiver
+    is resolved before the cell itself, because a receiver is always strictly
+    lower.
+    """
     offs = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-    step = np.array([math.hypot(dxm * abs(dc), dym * abs(dr)) for dr, dc in offs])
+    steps = [math.hypot(dxm * abs(dc), dym * abs(dr)) for dr, dc in offs]
 
-    # steepest descent receiver
-    best_slope = np.zeros((h, w), "float32")
-    recv = np.full((h, w), -1, "int64")
-    rr0 = np.arange(h)[:, None]
-    cc0 = np.arange(w)[None, :]
-    for k, (dr, dc) in enumerate(offs):
-        nb = np.full((h, w), np.inf, "float32")
-        # nb[r, c] must hold z[r + dr, c + dc]
-        dst = (slice(max(0, -dr), h - max(0, dr)), slice(max(0, -dc), w - max(0, dc)))
-        srcsl = (slice(max(0, dr), h + min(0, dr)), slice(max(0, dc), w + min(0, dc)))
-        nb[dst] = z[srcsl]
-        with np.errstate(invalid="ignore"):
-            drop = (z - nb) / step[k]
-        inb = np.zeros((h, w), bool)
-        inb[dst] = True
-        better = (drop > best_slope) & np.isfinite(nb) & inb
-        best_slope = np.where(better, drop, best_slope)
-        idx = (rr0 + dr) * w + (cc0 + dc)
-        recv = np.where(better, idx, recv)
+    if _is_ndarray(dem):
+        h, w = dem.shape
+        z = np.where(np.isfinite(dem), np.asarray(dem, dtype="float64"), np.inf)
+        lm = np.asarray(lake_mask, dtype=bool)
+        best_slope = np.zeros((h, w), dtype="float64")
+        recv = np.full((h, w), -1, dtype="int64")
+        rr0 = np.arange(h)[:, None]
+        cc0 = np.arange(w)[None, :]
+        for k, (dr, dc) in enumerate(offs):
+            nb = np.full((h, w), np.inf, dtype="float64")
+            dst = (slice(max(0, -dr), h - max(0, dr)),
+                   slice(max(0, -dc), w - max(0, dc)))
+            srcsl = (slice(max(0, dr), h + min(0, dr)),
+                     slice(max(0, dc), w + min(0, dc)))
+            nb[dst] = z[srcsl]
+            with np.errstate(invalid="ignore"):
+                drop = (z - nb) / steps[k]
+            inb = np.zeros((h, w), bool)
+            inb[dst] = True
+            better = (drop > best_slope) & np.isfinite(nb) & inb
+            best_slope = np.where(better, drop, best_slope)
+            idx = (rr0 + dr) * w + (cc0 + dc)
+            recv = np.where(better, idx, recv)
 
-    flat_recv = recv.ravel()
-    drains = lake_mask.ravel().copy()
-    plen = np.where(lake_mask.ravel(), 0.0, np.inf)
-    order = np.argsort(z.ravel(), kind="stable")          # ascending elevation
-    stepm = np.zeros(h * w, "float32")
-    rr, cc = np.divmod(np.arange(h * w), w)
-    r2, c2 = np.divmod(np.maximum(flat_recv, 0), w)
-    stepm = np.hypot((c2 - cc) * dxm, (r2 - rr) * dym).astype("float32")
+        flat_recv = recv.ravel()
+        drains = lm.ravel().copy()
+        plen = np.where(lm.ravel(), 0.0, np.inf).astype("float64")
+        order = np.argsort(z.ravel(), kind="stable")
+        rr, cc = np.divmod(np.arange(h * w), w)
+        r2, c2 = np.divmod(np.maximum(flat_recv, 0), w)
+        stepm = np.hypot((c2 - cc) * dxm, (r2 - rr) * dym)
 
+        for i in order:
+            if drains[i]:
+                continue
+            j = flat_recv[i]
+            if j >= 0 and drains[j]:
+                drains[i] = True
+                plen[i] = plen[j] + stepm[i]
+
+        return drains.reshape(h, w), plen.reshape(h, w)
+
+    # Pure-Python stdlib fallback for 2D nested lists
+    h = len(dem)
+    w = len(dem[0]) if h else 0
+    n_cells = h * w
+    z_flat = [math.inf] * n_cells
+    drains = [False] * n_cells
+    plen = [math.inf] * n_cells
+    for r in range(h):
+        for c in range(w):
+            i = r * w + c
+            v = float(dem[r][c])
+            z_flat[i] = v if math.isfinite(v) else math.inf
+            if lake_mask[r][c]:
+                drains[i] = True
+                plen[i] = 0.0
+
+    recv = [-1] * n_cells
+    stepm = [0.0] * n_cells
+    for r in range(h):
+        for c in range(w):
+            i = r * w + c
+            zi = z_flat[i]
+            if not math.isfinite(zi) or drains[i]:
+                continue
+            best_s = 0.0
+            best_j = -1
+            best_step = 0.0
+            for k, (dr, dc) in enumerate(offs):
+                r2, c2 = r + dr, c + dc
+                if 0 <= r2 < h and 0 <= c2 < w:
+                    j = r2 * w + c2
+                    zj = z_flat[j]
+                    if math.isfinite(zj):
+                        s = (zi - zj) / steps[k]
+                        if s > best_s:
+                            best_s = s
+                            best_j = j
+                            best_step = steps[k]
+            recv[i] = best_j
+            stepm[i] = best_step
+
+    order = sorted(range(n_cells), key=lambda idx: z_flat[idx])
     for i in order:
         if drains[i]:
             continue
-        j = flat_recv[i]
+        j = recv[i]
         if j >= 0 and drains[j]:
             drains[i] = True
             plen[i] = plen[j] + stepm[i]
 
-    return drains.reshape(h, w), plen.reshape(h, w)
+    drains_2d = [drains[r * w:(r + 1) * w] for r in range(h)]
+    plen_2d = [plen[r * w:(r + 1) * w] for r in range(h)]
+    return drains_2d, plen_2d
 
 
-def catchment_of_lake(dem: np.ndarray, lake_mask: np.ndarray,
-                      dxm: float, dym: float, tol: float = 0.01):
+def catchment_of_lake(dem, lake_mask, dxm: float, dym: float, tol: float = 0.01):
     """Cells from which the lake can be reached by a monotonically non-ascending
     path, with the length of the shortest such path.
 
@@ -321,11 +598,11 @@ def catchment_of_lake(dem: np.ndarray, lake_mask: np.ndarray,
     Huggel et al. (2003), which lets a trajectory diverge from the line of
     steepest descent. Implemented as a priority flood outward from the lake.
     """
-    import heapq
+    _require_geo_stack()
     h, w = dem.shape
-    z = np.where(np.isfinite(dem), dem, np.inf).ravel()
+    z = np.where(np.isfinite(dem), np.asarray(dem, dtype="float64"), np.inf).ravel()
     inside = np.zeros(h * w, bool)
-    plen = np.full(h * w, np.inf, "float32")
+    plen = np.full(h * w, np.inf, "float64")
     offs = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
     heap = []
@@ -353,9 +630,36 @@ def catchment_of_lake(dem: np.ndarray, lake_mask: np.ndarray,
     return inside.reshape(h, w), plen.reshape(h, w)
 
 
+def avalanche_reach_threshold_deg(volume_m3: float) -> float:
+    """Volume-dependent reach-angle threshold (deg) of Huggel et al. (2004)."""
+    min_tan = math.tan(math.radians(C.REACH_ANGLE_AVALANCHE))
+    if volume_m3 >= C.HUGGEL_V_LIMIT:
+        return float(C.REACH_ANGLE_AVALANCHE)
+    tan_a = C.HUGGEL_A - C.HUGGEL_B * math.log10(max(float(volume_m3), 1.0))
+    return math.degrees(math.atan(max(tan_a, min_tan)))
+
+
+def _avalanche_reach_threshold_arr(vol):
+    min_tan = math.tan(math.radians(C.REACH_ANGLE_AVALANCHE))
+    tan_a = np.where(
+        vol >= C.HUGGEL_V_LIMIT,
+        min_tan,
+        C.HUGGEL_A - C.HUGGEL_B * np.log10(np.maximum(vol, 1.0)),
+    )
+    return np.degrees(np.arctan(np.maximum(tan_a, min_tan)))
+
+
 def _mass_movement(dem, slope, glacier, lake_mask, dist_px, z_lake,
                    dxm, dym, kind: str, drains=None, plen=None) -> dict:
-    """Identify source areas that route into the lake and test the reach angle."""
+    """Identify source areas that route into the lake and test the reach angle.
+
+    For avalanches, coherent slab detachment area is bounded by
+    ``C.AVALANCHE_SLAB_AREA_CAP_M2`` so an entire multi-km2 steep headwall is
+    not multiplied uniformly by 50 m. Default screening uses the physically
+    bounded representative thickness ``C.AVALANCHE_REPRESENTATIVE_DEPTH_M``,
+    while all three published scenario depths in ``C.AVALANCHE_DEPTHS_M``
+    (10, 30, 50 m) are explicitly evaluated and exposed under ``scenarios``.
+    """
     cell_area = dxm * dym
     if kind == "avalanche":
         src = glacier & (slope > C.AVALANCHE_SLOPE_MIN) & (slope < C.AVALANCHE_SLOPE_MAX)
@@ -364,6 +668,15 @@ def _mass_movement(dem, slope, glacier, lake_mask, dist_px, z_lake,
     src &= ~lake_mask & np.isfinite(dem) & (dem > z_lake)
     empty = dict(source_area_m2=0.0, connected_area_m2=0.0, can_reach=False,
                  n_reaching_cells=0, max_volume_m3=0.0, min_reach_angle_deg=None)
+    if kind == "avalanche":
+        empty["representative_depth_m"] = float(C.AVALANCHE_REPRESENTATIVE_DEPTH_M)
+        empty["slab_area_cap_m2"] = float(C.AVALANCHE_SLAB_AREA_CAP_M2)
+        empty["scenarios"] = {
+            f"{int(d)}m": dict(depth_m=float(d), can_reach=False,
+                               n_reaching_cells=0, max_volume_m3=0.0,
+                               min_reach_angle_deg=None)
+            for d in C.AVALANCHE_DEPTHS_M
+        }
     if not src.any():
         return empty
 
@@ -379,28 +692,49 @@ def _mass_movement(dem, slope, glacier, lake_mask, dist_px, z_lake,
 
     # contiguous source patches, restricted to the part that drains to the lake
     lab, n = ndimage.label(src)
-    conn_area = ndimage.sum(connected.astype("float32"), lab,
+    conn_area = ndimage.sum(connected.astype("float64"), lab,
                             range(1, n + 1)) * cell_area
     comp_area = conn_area[lab[rows, cols] - 1]
 
     if kind == "avalanche":
-        vol = comp_area * max(C.AVALANCHE_DEPTHS_M)
-        tan_a = np.where(vol >= C.HUGGEL_V_LIMIT,
-                         math.tan(math.radians(C.REACH_ANGLE_AVALANCHE)),
-                         C.HUGGEL_A - C.HUGGEL_B * np.log10(np.maximum(vol, 1.0)))
-        thresh = np.degrees(np.arctan(np.maximum(
-            tan_a, math.tan(math.radians(C.REACH_ANGLE_AVALANCHE)))))
-    else:
-        vol = np.zeros(rows.shape)
-        thresh = np.full(rows.shape, C.REACH_ANGLE_ROCKFALL, float)
+        eff_area = np.minimum(comp_area, C.AVALANCHE_SLAB_AREA_CAP_M2)
+        vol = eff_area * C.AVALANCHE_REPRESENTATIVE_DEPTH_M
+        thresh = _avalanche_reach_threshold_arr(vol)
+        reaching = ang >= thresh
 
+        scenarios = {}
+        for d_m in C.AVALANCHE_DEPTHS_M:
+            vol_s = eff_area * float(d_m)
+            thr_s = _avalanche_reach_threshold_arr(vol_s)
+            reach_s = ang >= thr_s
+            scenarios[f"{int(d_m)}m"] = dict(
+                depth_m=float(d_m),
+                can_reach=bool(reach_s.any()),
+                n_reaching_cells=int(reach_s.sum()),
+                max_volume_m3=float(vol_s[reach_s].max()) if reach_s.any() else 0.0,
+                min_reach_angle_deg=float(ang[reach_s].min()) if reach_s.any() else None,
+            )
+
+        return dict(
+            source_area_m2=float(src.sum() * cell_area),
+            connected_area_m2=float(connected.sum() * cell_area),
+            n_reaching_cells=int(reaching.sum()),
+            can_reach=bool(reaching.any()),
+            max_volume_m3=float(vol[reaching].max()) if reaching.any() else 0.0,
+            min_reach_angle_deg=float(ang[reaching].min()) if reaching.any() else None,
+            representative_depth_m=float(C.AVALANCHE_REPRESENTATIVE_DEPTH_M),
+            slab_area_cap_m2=float(C.AVALANCHE_SLAB_AREA_CAP_M2),
+            scenarios=scenarios,
+        )
+
+    thresh = np.full(rows.shape, C.REACH_ANGLE_ROCKFALL, float)
     reaching = ang >= thresh
     return dict(
         source_area_m2=float(src.sum() * cell_area),
         connected_area_m2=float(connected.sum() * cell_area),
         n_reaching_cells=int(reaching.sum()),
         can_reach=bool(reaching.any()),
-        max_volume_m3=float(vol[reaching].max()) if reaching.any() and kind == "avalanche" else 0.0,
+        max_volume_m3=0.0,
         min_reach_angle_deg=float(ang[reaching].min()) if reaching.any() else None,
     )
 

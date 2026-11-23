@@ -1,0 +1,4 @@
+# Additional dependencies for generating manuscript figures (src/make_figures.py)
+# and LaTeX tables (src/make_tables.py).
+-r requirements.txt
+matplotlib>=3.8

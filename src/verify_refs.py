@@ -9,8 +9,9 @@ the registered metadata. Anything that does not match is printed.
 This exists because the most likely error in a manuscript of this kind is a
 citation that looks plausible and is wrong.
 
-Run:  python3 verify_refs.py [--fix-authors]
-Exit status is non-zero if any entry fails.
+Run:  python3 verify_refs.py [--bib PATH] [--strict]
+Exit status is non-zero if any entry fails (or if the BibTeX file is missing
+when --strict or an explicit --bib path is given).
 """
 from __future__ import annotations
 import argparse
@@ -38,7 +39,8 @@ def strip_accents(s: str) -> str:
 
 
 def parse_bib(path: str) -> list[dict]:
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
     entries = []
     for m in re.finditer(r"@(\w+)\s*\{\s*([^,]+),(.*?)\n\}", text, re.S):
         kind, key, body = m.group(1), m.group(2).strip(), m.group(3)
@@ -53,7 +55,7 @@ def fetch(doi: str) -> dict | None:
     req = urllib.request.Request(
         f"https://doi.org/{doi}",
         headers={"Accept": "application/vnd.citationstyles.csl+json",
-                 "User-Agent": "nepal-ews/1.0 (mailto:prajwal.1.ghimire@kcl.ac.uk)"})
+                 "User-Agent": "nepal-traya/2.0 (mailto:prajwal.1.ghimire@kcl.ac.uk)"})
     for _ in range(3):
         try:
             with urllib.request.urlopen(req, timeout=45) as r:
@@ -139,9 +141,23 @@ def check(entry: dict, rec: dict) -> list[str]:
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--bib", default=BIB)
+    ap = argparse.ArgumentParser(
+        description="Verify BibTeX entries against DOI registries (Crossref / DataCite)."
+    )
+    ap.add_argument("--bib", default=BIB,
+                    help="Path to the BibTeX file (default: paper/refs.bib)")
+    ap.add_argument("--strict", action="store_true",
+                    help="Exit non-zero if the BibTeX file is not present")
     a = ap.parse_args()
+    if not os.path.exists(a.bib):
+        msg = (f"BibTeX file not found at {a.bib}; "
+               "pass --bib PATH to verify a specific .bib file.")
+        explicit = os.path.abspath(a.bib) != os.path.abspath(BIB)
+        if a.strict or explicit:
+            print(f"error: {msg}", file=sys.stderr)
+            return 2
+        print(f"note: {msg} Skipping reference verification.")
+        return 0
     entries = parse_bib(a.bib)
     print(f"{len(entries)} entries in {os.path.basename(a.bib)}")
     failed, nodoi = [], []

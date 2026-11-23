@@ -4,7 +4,8 @@ Downstream routing along the HydroRIVERS v1.0 network.
 For each source lake we find the nearest river reach, follow the NEXT_DOWN
 topology downstream, and report:
 
-  * the routed flow path as a polyline (for mapping)
+  * the routed flow path as a polyline (unsimplified for metric exposure
+    matching and UTM corridor buffering; simplified only for web display)
   * cumulative distance and elevation drop
   * travel time to each point for a bracket of surge-front velocities
   * the ratio of the estimated GLOF peak discharge to the reach's long-term mean
@@ -20,9 +21,12 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 
-import geopandas as gpd
-from shapely.geometry import LineString, Point
-from shapely.ops import linemerge
+try:
+    import geopandas as gpd
+    from shapely.geometry import LineString, Point
+    from shapely.ops import linemerge
+except ImportError:  # pragma: no cover - stdlib-only unit test mode
+    gpd = LineString = Point = linemerge = None
 
 import config as C
 
@@ -33,6 +37,8 @@ ROUTE_BBOX = (78.0, 22.0, 92.0, 31.5)
 
 class RiverNetwork:
     def __init__(self, shp: str = SHP, bbox=ROUTE_BBOX):
+        if gpd is None or LineString is None:
+            raise ImportError("RiverNetwork requires geopandas and shapely")
         self.gdf = gpd.read_file(shp, bbox=bbox).set_index("HYRIV_ID")
         self.next_down = self.gdf["NEXT_DOWN"].to_dict()
         self.length_km = self.gdf["LENGTH_KM"].to_dict()
@@ -90,13 +96,31 @@ class RiverNetwork:
                     stack.append((u, d2))
         return out
 
-    def path_geometry(self, trace, simplify_deg: float = 0.004) -> LineString | None:
+    def raw_path_geometry(self, trace):
+        """Return the unsimplified upstream-to-downstream LineString for metric
+        point-to-segment exposure matching and UTM corridor buffering."""
+        return self.path_geometry(trace, simplify_deg=0.0)
+
+    def path_geometry(self, trace, simplify_deg: float | None = 0.004):
+        """Merge trace reaches into a single upstream-to-downstream LineString.
+
+        Pass ``simplify_deg=0.0`` or ``None`` to keep the full unsimplified
+        river geometry; apply positive ``simplify_deg`` only to display output.
+        """
         parts = [self.geom[r] for r, _ in trace if r in self.geom]
         if not parts:
             return None
         merged = linemerge(parts)
         if merged.geom_type == "MultiLineString":
             merged = max(merged.geoms, key=lambda g: g.length)
+        # Ensure orientation runs upstream -> downstream so chainage starts at the lake
+        coords = list(merged.coords)
+        if len(coords) >= 2 and len(parts) >= 2:
+            head_pt = parts[0].centroid
+            if Point(coords[-1]).distance(head_pt) < Point(coords[0]).distance(head_pt):
+                merged = LineString(coords[::-1])
+        if simplify_deg is None or simplify_deg <= 0.0:
+            return merged
         return merged.simplify(simplify_deg, preserve_topology=False)
 
     def mean_discharge(self, rid: int) -> float | None:

@@ -1,0 +1,43 @@
+# Python bytecode, caches & virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Static site staging directory (GitHub Pages artifact)
+_site/
+
+# Downloaded literature calibration archives (re-fetched by src/fetch_inputs.py)
+lit/
+
+# Large locally downloaded GIS/DEM/raster inputs (fetched on demand)
+raw/dem/
+raw/hydro/
+raw/pop/
+raw/*.zip
+
+# Manuscript build artefacts
+paper/generated/
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# OS & editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.vscode/
+.idea/

@@ -32,8 +32,30 @@ INK, ACC, WARN, BAD = "#1b2733", "#2f6f9f", "#d08c2a", "#b33a2e"
 
 
 def rd(fn):
-    t = open(os.path.join(C.DATA, fn)).read()
+    with open(os.path.join(C.DATA, fn), encoding="utf-8") as fh:
+        t = fh.read()
     return json.loads(t.split("=", 1)[1].rsplit(";", 1)[0])
+
+
+def _exterior_ring(geom: dict):
+    gtype = geom.get("type")
+    coords = geom.get("coordinates") or []
+    if gtype == "Polygon" and coords:
+        return coords[0]
+    if gtype == "MultiPolygon" and coords:
+        rings = [poly[0] for poly in coords if poly and poly[0]]
+        return max(rings, key=len) if rings else []
+    if gtype == "Point" and len(coords) >= 2:
+        return [coords]
+    return []
+
+
+def _student_t_crit_95(nu: int) -> float:
+    try:
+        from scipy import stats
+        return float(stats.t.ppf(0.975, df=nu))
+    except Exception:
+        return C.STUDENT_T_95_CRIT if int(nu) == C.STUDENT_T_NU else 2.228
 
 
 def _province_outlines(ax):
@@ -169,9 +191,12 @@ def fig_validation(V):
     ax.scatter(x, y, s=13, c="#6b7f91", lw=0, alpha=0.85, label=f"{len(x)} natural dam breaks")
     xs = np.linspace(x.min() - 0.2, x.max() + 0.2, 300)
     mu = MG._piecewise(xs, fit["alpha"], fit["beta"], fit["chgpoint"])
+    nu = int(fit.get("nu", C.STUDENT_T_NU))
+    t_crit = _student_t_crit_95(nu)
     ax.plot(xs, mu, color=BAD, lw=1.3, label="piecewise fit")
-    ax.fill_between(xs, mu - 1.96 * fit["sigma"], mu + 1.96 * fit["sigma"],
-                    color=BAD, alpha=0.12, lw=0, label="95% predictive band")
+    ax.fill_between(xs, mu - t_crit * fit["sigma"], mu + t_crit * fit["sigma"],
+                    color=BAD, alpha=0.12, lw=0,
+                    label=rf"95% predictive band ($t_{{\nu={nu}}}$)")
     ax.axvline(fit["chgpoint"], color=INK, lw=0.7, ls="--")
     ax.text(fit["chgpoint"] + 0.06, y.min() + 0.15,
             f"change point\n$\\log_{{10}}\\eta = {fit['chgpoint']:.2f}$", fontsize=6.3, color=INK)
@@ -190,7 +215,9 @@ def main():
     P = []
     for f in feats:
         p = dict(f["properties"])
-        ring = f["geometry"]["coordinates"][0]
+        ring = _exterior_ring(f["geometry"])
+        if not ring:
+            continue
         p["_lon"] = float(np.mean([c[0] for c in ring]))
         p["_lat"] = float(np.mean([c[1] for c in ring]))
         P.append(p)

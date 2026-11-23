@@ -11,35 +11,52 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages-and-refresh
-  cancel-in-progress: true
+  group: pages-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    name: Verify and deploy static observatory to GitHub Pages
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Run pre-deploy verification gate
+        run: python src/verify_site.py
 
       - name: Stage static site bundle
         run: |
+          set -euo pipefail
           test -f index.html
-          mkdir -p _site
+          test -d assets
+          test -d data
+          test -d vendor
+          rm -rf _site
+          mkdir -p _site/data
           cp index.html _site/
-          cp -r data vendor _site/
+          cp -r assets vendor _site/
+          cp data/*.json _site/data/
+          touch _site/.nojekyll
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
 
       - name: Upload static site artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

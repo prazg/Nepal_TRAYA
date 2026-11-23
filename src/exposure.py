@@ -13,8 +13,10 @@ nothing is there. Counts are a lower bound.
 Data (c) OpenStreetMap contributors, ODbL 1.0.
 """
 from __future__ import annotations
+import argparse
 import json
 import os
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -83,38 +85,93 @@ KIND_WEIGHT = {          # used only to order the exposure table, not a risk sco
 }
 
 
-def _fetch(name: str, query: str, retries: int = 3) -> dict:
+def _atomic_write_json(path: str, payload: dict) -> None:
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    tmp = f"{path}.tmp.{os.getpid()}"
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False)
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        raise
+
+
+def _load_valid_cache(cache_path: str) -> dict | None:
+    if not os.path.exists(cache_path) or os.path.getsize(cache_path) <= 200:
+        return None
+    try:
+        with open(cache_path, encoding="utf-8") as fh:
+            payload = json.load(fh)
+        if isinstance(payload, dict) and payload.get("elements"):
+            return payload
+    except Exception:
+        return None
+    return None
+
+
+def _is_fresh(cache_path: str, max_age_days: float | None) -> bool:
+    if not os.path.exists(cache_path):
+        return False
+    if max_age_days is None:
+        return True
+    age_days = (time.time() - os.path.getmtime(cache_path)) / 86400.0
+    return age_days <= max_age_days
+
+
+def _fetch(name: str, query: str, retries: int = 3,
+           refresh: bool = False, max_age_days: float | None = None,
+           allow_stale_fallback: bool = True) -> dict:
+    """Fetch an Overpass query with caching, TTL, and strict non-empty validation.
+
+    Empty responses (``elements: []``) are rejected on EVERY retry attempt and
+    are never written to disk.
+    """
     os.makedirs(CACHE_DIR, exist_ok=True)
     cache = os.path.join(CACHE_DIR, f"{name}.json")
-    if os.path.exists(cache) and os.path.getsize(cache) > 200:
-        with open(cache) as fh:
-            return json.load(fh)
-    data = urllib.parse.urlencode({"data": query}).encode()
+    existing = _load_valid_cache(cache)
+    if existing is not None and not refresh and _is_fresh(cache, max_age_days):
+        return existing
+
+    data = urllib.parse.urlencode({"data": query}).encode("utf-8")
     last = None
     for attempt in range(retries):
         for url in OVERPASS_MIRRORS:
             try:
-                req = urllib.request.Request(url, data=data,
-                                             headers={"User-Agent": "nepal-ews/1.0 (research)"})
+                req = urllib.request.Request(
+                    url, data=data,
+                    headers={"User-Agent": "nepal-traya/2.0 (research)"},
+                )
                 with urllib.request.urlopen(req, timeout=400) as r:
-                    payload = json.load(r)
-                if not payload.get("elements") and attempt < retries - 1:
-                    raise RuntimeError("empty response")
-                with open(cache, "w") as fh:
-                    json.dump(payload, fh)
+                    payload = json.loads(r.read().decode("utf-8"))
+                # Reject empty responses on ALL attempts -- never cache empty!
+                if not isinstance(payload, dict) or not payload.get("elements"):
+                    raise RuntimeError("empty Overpass response (0 elements)")
+                _atomic_write_json(cache, payload)
                 return payload
             except Exception as exc:        # rate limit, gateway timeout, mirror down
                 last = f"{url}: {exc}"
                 time.sleep(5)
-        time.sleep(15 * (attempt + 1))
+        if attempt < retries - 1:
+            time.sleep(15 * (attempt + 1))
+
+    if existing is not None and allow_stale_fallback:
+        print(f"  WARNING: Overpass refresh for '{name}' failed ({last}); "
+              "using existing valid cache.", file=sys.stderr)
+        return existing
     raise RuntimeError(f"Overpass query {name} failed: {last}")
 
 
-def collect() -> list[dict]:
+def collect(refresh: bool = False,
+            max_age_days: float | None = None) -> list[dict]:
     """Return a flat list of exposure objects with lon, lat, kind, name, tags."""
     out = []
     for name, q in QUERIES.items():
-        payload = _fetch(name, q)
+        payload = _fetch(name, q, refresh=refresh, max_age_days=max_age_days)
         for el in payload.get("elements", []):
             if el["type"] == "node":
                 lon, lat = el.get("lon"), el.get("lat")
@@ -162,9 +219,23 @@ def _mw(v):
         return None
 
 
-if __name__ == "__main__":
-    objs = collect()
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(
+        description="Collect Nepal OpenStreetMap downstream exposure via Overpass."
+    )
+    ap.add_argument("--refresh", action="store_true",
+                    help="Force fresh Overpass download for all layers")
+    ap.add_argument("--max-age-days", type=float, default=None,
+                    help="Re-fetch cached layers older than this many days")
+    a = ap.parse_args(argv)
+
+    objs = collect(refresh=a.refresh, max_age_days=a.max_age_days)
     from collections import Counter
     print(Counter(o["kind"] for o in objs))
     print("named places with population tag:",
           sum(1 for o in objs if o["kind"] == "places" and o["pop"]))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -106,9 +106,9 @@ def overall_hazard(avalanche: bool, rockfall: bool, upstream_glof: bool,
     if ORDER[dyn] > 0 and ORDER[sdf] > 0:
         return "very high"
     if ORDER[dyn] > 0:
-        return "high" if avalanche else "moderate"
+        return dyn
     if ORDER[sdf] > 0:
-        return "moderate"
+        return sdf
     return "low"
 
 

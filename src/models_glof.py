@@ -31,11 +31,22 @@ from __future__ import annotations
 import json
 import math
 import os
-
-import numpy as np
-import pyreadr
 import zlib
-from scipy import optimize, stats
+
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover - stdlib-only unit test mode
+    np = None
+
+try:
+    import pyreadr
+except ImportError:  # pragma: no cover
+    pyreadr = None
+
+try:
+    from scipy import optimize, stats
+except ImportError:  # pragma: no cover
+    optimize = stats = None
 
 import config as C
 
@@ -43,21 +54,35 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 LIT = C.LIT
 
 
+def _require_numpy():
+    if np is None:
+        raise ImportError("numpy is required for array Monte Carlo GLOF modelling")
+
+
+def _require_fit_stack():
+    if np is None or pyreadr is None or optimize is None or stats is None:
+        raise ImportError(
+            "fitting and RDS loading require numpy, scipy, and pyreadr"
+        )
+
+
 # ---------------------------------------------------------------------------
 # 1. Lake depth from lake area  (Veh et al. 2020 posterior)
 # ---------------------------------------------------------------------------
-def load_depth_posterior() -> np.ndarray:
+def load_depth_posterior():
     """Return an (n, 3) array of posterior draws [beta0, beta1, sigma].
 
     Model (log10 space):  log10(depth_m) ~ Normal(beta0 + beta1*log10(area_m2), sigma)
     """
+    _require_fit_stack()
     path = os.path.join(LIT, "mcmcChain.rds")
     df = list(pyreadr.read_r(path).values())[0]
     return df[["beta0", "beta1", "sigma"]].to_numpy()
 
 
-def depth_samples(area_m2: float, post: np.ndarray, n: int, rng) -> np.ndarray:
+def depth_samples(area_m2: float, post, n: int, rng):
     """Posterior-predictive draws of maximum lake depth (m) for one lake area."""
+    _require_numpy()
     idx = rng.integers(0, post.shape[0], n)
     b0, b1, sig = post[idx, 0], post[idx, 1], post[idx, 2]
     mu = b0 + b1 * math.log10(area_m2)
@@ -67,12 +92,12 @@ def depth_samples(area_m2: float, post: np.ndarray, n: int, rng) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # 2. Lake and flood volume  (half-ellipsoid bathymetry, Veh et al. 2020)
 # ---------------------------------------------------------------------------
-def total_volume(area_m2: float, depth_m: np.ndarray) -> np.ndarray:
+def total_volume(area_m2: float, depth_m):
     """Half-ellipsoid volume: V = (4/3) pi r^2 c / 2 = (2/3) A d, with r = sqrt(A/pi)."""
     return (2.0 / 3.0) * area_m2 * depth_m
 
 
-def released_volume(area_m2: float, depth_m: np.ndarray, breach_depth_m: np.ndarray) -> np.ndarray:
+def released_volume(area_m2: float, depth_m, breach_depth_m):
     """Flood volume V0 released when the dam is breached to `breach_depth_m` below
     the lake surface.
 
@@ -91,16 +116,19 @@ def released_volume(area_m2: float, depth_m: np.ndarray, breach_depth_m: np.ndar
 # ---------------------------------------------------------------------------
 # 3. Peak discharge  (Walder & O'Connor 1997 dimensionless formulation)
 # ---------------------------------------------------------------------------
-def load_dambreak_data() -> tuple[np.ndarray, np.ndarray]:
+def load_dambreak_data():
     """Return (log10 eta, log10 Qp*) for the 63 natural dam breaks used by Veh et al."""
+    _require_fit_stack()
     path = os.path.join(LIT, "beebee-oconnor-2009-data.rds")
     df = list(pyreadr.read_r(path).values())[0]
     return df["eta"].to_numpy(float), df["Qp_star"].to_numpy(float)
 
 
-def _piecewise(x, alpha, beta, chg):
+def _piecewise(x, alpha: float, beta: float, chg: float):
     """Linear below the change point, constant above (Veh et al. Stan model)."""
-    return alpha + beta * x - beta * (x - chg) * (x >= chg)
+    if np is not None and isinstance(x, np.ndarray):
+        return alpha + beta * x - beta * (x - chg) * (x >= chg)
+    return alpha + beta * (chg if x >= chg else x)
 
 
 def fit_piecewise(nu: int = C.STUDENT_T_NU) -> dict:
@@ -109,6 +137,7 @@ def fit_piecewise(nu: int = C.STUDENT_T_NU) -> dict:
     Returns a dict of parameters in the ORIGINAL (unstandardised) log10 space,
     plus fit diagnostics.
     """
+    _require_fit_stack()
     x, y = load_dambreak_data()
 
     def nll(p):
@@ -139,15 +168,20 @@ def fit_piecewise(nu: int = C.STUDENT_T_NU) -> dict:
 
 
 def breach_rate_lognormal() -> tuple[float, float, float]:
-    """MLE lognormal fit to the 19 published natural-dam breach rates, and the cap."""
-    k = np.asarray(C.PUBLISHED_BREACH_RATES, float)
-    lk = np.log(k)
-    return float(lk.mean()), float(lk.std(ddof=0)), float(k.max() * C.BREACH_RATE_MAX_FACTOR)
+    """Lognormal fit (unbiased sample sd, ddof=1, n=19) to the 19 published
+    natural-dam breach rates, and the upper cap."""
+    rates = [float(v) for v in C.PUBLISHED_BREACH_RATES]
+    lk = [math.log(v) for v in rates]
+    n = len(lk)
+    meanlog = sum(lk) / n
+    var = sum((v - meanlog) ** 2 for v in lk) / (n - 1)   # unbiased ddof=1
+    sdlog = math.sqrt(var)
+    kmax = max(rates) * C.BREACH_RATE_MAX_FACTOR
+    return float(meanlog), float(sdlog), float(kmax)
 
 
-def peak_discharge(v0_m3: np.ndarray, breach_depth_m: np.ndarray,
-                   k_ms: np.ndarray, fit: dict, rng,
-                   include_noise: bool = True) -> np.ndarray:
+def peak_discharge(v0_m3, breach_depth_m, k_ms, fit: dict, rng=None,
+                   include_noise: bool = True):
     """Peak discharge Qp (m3/s) from released volume, breach depth and breach rate.
 
     Dimensionless variables (Walder & O'Connor 1997):
@@ -156,6 +190,7 @@ def peak_discharge(v0_m3: np.ndarray, breach_depth_m: np.ndarray,
         k*     = k / (g^0.5 h^0.5)
         eta    = V0* k*
     """
+    _require_numpy()
     h = np.asarray(breach_depth_m, float)
     v0 = np.asarray(v0_m3, float)
     k = np.asarray(k_ms, float)
@@ -172,22 +207,37 @@ def peak_discharge(v0_m3: np.ndarray, breach_depth_m: np.ndarray,
 # ---------------------------------------------------------------------------
 # 4. Per-lake Monte Carlo
 # ---------------------------------------------------------------------------
-def lake_magnitudes(area_m2: float, post: np.ndarray, fit: dict,
-                    n_depth: int = 200, n_k: int = 100, seed: int = 0) -> dict:
+def lake_magnitudes(area_m2: float, post, fit: dict,
+                    n_depth: int = 200, n_k: int = 100, seed: int = 0,
+                    breach_min: float = 0.05,
+                    breach_alpha: float = 1.0,
+                    breach_beta: float = 1.0) -> dict:
     """Monte Carlo estimate of depth, volume, released volume and Qp for one lake.
 
-    Following Veh et al. (2020), every breach depth between a small fraction and
-    the full lake depth is treated as possible, and the resulting peak discharges
-    are pooled. The pooled distribution is the headline output; the individual
-    breach-fraction scenarios are also reported for transparency.
+    Following Veh et al. (2020), every breach depth fraction between a small
+    partial breach (``breach_min``, default 0.05) and full lake depth (1.00) is
+    treated as possible. The headline ``pooled`` distribution draws continuous
+    breach fractions from a scaled Beta(``breach_alpha``, ``breach_beta``) on
+    ``[breach_min, 1.0]`` (default Beta(1, 1) = uniform), while the four fixed
+    breach-fraction scenarios (10%, 30%, 50%, 100%) and their discrete pool
+    (``pooled_discrete``) are also reported for transparency.
 
-    Note on model behaviour: because the dimensionless response Qp* saturates
-    above a change point in eta, a partial breach can yield a peak discharge
-    comparable to a full breach. That is a property of the published model, not
-    an artefact of this implementation, and it means the breach fraction is not
-    the dominant control on Qp for Himalayan lakes of this size; lake depth and
-    breach rate are.
+    Note on piecewise model non-monotonicity:
+      * Above the change point (saturated regime, eta >= eta_c), Qp* is constant
+        so Qp = Qp* g^0.5 h^2.5 scales as h^(+2.5) and increases strongly with
+        breach depth h.
+      * Below the change point (breach-rate-limited / unsaturated regime,
+        eta < eta_c), Qp* = 10^alpha * eta^beta with eta = V0 k / (g^0.5 h^3.5)
+        and fitted beta ~ 0.942, giving
+            Qp ~ V0^beta * k^beta * h^(2.5 - 3.5*beta) ~ V0^0.942 * k^0.942 * h^(-0.797).
+        Because the explicit h exponent is negative (-0.797) and the
+        half-ellipsoid released volume V0(h) flattens near full depth
+        (dV0/dh -> 0 as h -> d), Qp(h) is non-monotonic in the unsaturated
+        regime: a partial breach (e.g. 50%) can yield a higher Qp than a 100%
+        breach. That behaviour is an intrinsic algebraic property of the
+        published Walder & O'Connor (1997) / Veh et al. (2020) piecewise model.
     """
+    _require_numpy()
     rng = np.random.default_rng(seed)
     d = depth_samples(area_m2, post, n_depth, rng)
     d = d[d > 1.0]                                    # discard non-physical draws
@@ -198,9 +248,13 @@ def lake_magnitudes(area_m2: float, post: np.ndarray, fit: dict,
     meanlog, sdlog, kmax = breach_rate_lognormal()
     k = rng.lognormal(meanlog, sdlog, n_k)
     k = k[k < kmax]
+    if k.size == 0:
+        return {}
 
     out = dict(depth_m=_q(d), volume_m3=_q(vt), scenarios={})
-    pooled_qp, pooled_v0 = [], []
+
+    # Fixed discrete breach-fraction scenarios (10%, 30%, 50%, 100%)
+    disc_qp, disc_v0 = [], []
     for frac in C.BREACH_FRACTIONS:
         bd = d * frac                                  # breach depth below lake surface
         v0 = np.clip(released_volume(area_m2, d, bd), 1.0, None)
@@ -211,20 +265,45 @@ def lake_magnitudes(area_m2: float, post: np.ndarray, fit: dict,
         qp = qp[np.isfinite(qp) & (qp > 0)]
         out["scenarios"][f"{int(frac * 100)}pct"] = dict(
             flood_volume_m3=_q(v0), peak_discharge_m3s=_q(qp))
-        pooled_qp.append(qp)
-        pooled_v0.append(v0)
-    out["pooled"] = dict(flood_volume_m3=_q(np.concatenate(pooled_v0)),
-                         peak_discharge_m3s=_q(np.concatenate(pooled_qp)))
+        disc_qp.append(qp)
+        disc_v0.append(v0)
+
+    # Continuous breach-fraction sampling over [breach_min, 1.0] via scaled Beta
+    D_rep = np.repeat(d, k.size)
+    K_tile = np.tile(k, d.size)
+    f_cont = breach_min + (1.0 - breach_min) * rng.beta(
+        breach_alpha, breach_beta, size=D_rep.size
+    )
+    H_cont = D_rep * f_cont
+    V0_cont = np.clip(released_volume(area_m2, D_rep, H_cont), 1.0, None)
+    qp_cont = peak_discharge(V0_cont, H_cont, K_tile, fit, rng)
+    qp_cont = qp_cont[np.isfinite(qp_cont) & (qp_cont > 0)]
+
+    out["pooled"] = dict(
+        flood_volume_m3=_q(V0_cont),
+        peak_discharge_m3s=_q(qp_cont),
+    )
+    out["pooled_discrete"] = dict(
+        flood_volume_m3=_q(np.concatenate(disc_v0)),
+        peak_discharge_m3s=_q(np.concatenate(disc_qp)),
+    )
+    out["continuous_sampling"] = dict(
+        distribution="scaled_beta",
+        min_fraction=float(breach_min),
+        max_fraction=1.0,
+        alpha=float(breach_alpha),
+        beta=float(breach_beta),
+    )
     return out
 
 
 def stable_seed(key: str) -> int:
     """Process-independent seed, so the pipeline output is byte-deterministic
     (Python's built-in hash() is randomised per process)."""
-    return zlib.crc32(key.encode()) & 0x7FFFFFFF
+    return zlib.crc32(key.encode("utf-8")) & 0x7FFFFFFF
 
 
-def _q(a: np.ndarray) -> dict:
+def _q(a) -> dict:
     a = np.asarray(a, float)
     a = a[np.isfinite(a)]
     if a.size == 0:

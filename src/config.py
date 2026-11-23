@@ -1,5 +1,5 @@
 """
-Configuration and provenance for the Nepal Multi-Hazard Early Warning System.
+Configuration and provenance for the Nepal Multi-Hazard Risk Observatory & Screening Platform.
 
 Every numeric threshold and empirical relation used anywhere in this pipeline is
 declared here with its source, so that the scientific basis of the outputs can be
@@ -9,6 +9,10 @@ Nothing in this file is tuned or fitted by us. Values are as published.
 """
 from __future__ import annotations
 import os
+
+PLATFORM_NAME = "Nepal TRĀYA"
+PLATFORM_TITLE = "Nepal Multi-Hazard Risk Observatory & Screening Platform"
+REFRESH_INTERVAL_DAYS = 7
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -57,8 +61,14 @@ HUGGEL_V_LIMIT = 6.67e6       # m3; above this the fixed 17 deg threshold applie
 
 # Assumed avalanche release depths (m); Rounce et al. (2016) after Huggel et al.
 # (2004, Can. Geotech. J.) and Huggel et al. (2005, NHESS 5, 173-187,
-# doi:10.5194/nhess-5-173-2005, the Kolka/Karmadon rock/ice avalanche)
+# doi:10.5194/nhess-5-173-2005, the Kolka/Karmadon rock/ice avalanche).
+# All three scenario depths (low / mid / high) are explicitly evaluated in
+# terrain._mass_movement(); default screening uses a physically bounded
+# representative slab thickness and coherent detachment area cap so an entire
+# multi-km2 steep headwall is not multiplied uniformly by 50 m.
 AVALANCHE_DEPTHS_M = (10.0, 30.0, 50.0)
+AVALANCHE_REPRESENTATIVE_DEPTH_M = 15.0   # m, representative slab scenario thickness
+AVALANCHE_SLAB_AREA_CAP_M2 = 5.0e5        # m2 (0.5 km2) upper bound on coherent single-event slab area
 
 # ---------------------------------------------------------------------------
 # GLOF: moraine self-destruction
@@ -99,6 +109,7 @@ PFV_REPORTED_UNCERTAINTY = 0.26   # Fujita et al. (2013): PFV uncertainty ~26%
 # ---------------------------------------------------------------------------
 G = 9.81                      # m s-2, as used in the original scripts
 STUDENT_T_NU = 10             # robust noise dof, as in Veh et al. (2020)
+STUDENT_T_95_CRIT = 2.2281388519649385  # two-sided 95% critical value t_{0.975, df=10}
 
 # Breach rates k (m s-1) reported for natural dam failures,
 # O'Connor & Beebee (2009) pp. 148-162, as compiled by Veh et al. (2020).
@@ -127,6 +138,41 @@ FRONT_VELOCITY_MS = (2.0, 5.0, 10.0)     # slow / observed / fast bracket
 ROUTING_MAX_DISTANCE_KM = 120.0          # beyond ~60-120 km downstream effects diminish
                                          # (Vuichard & Zimmermann, 1987, via Rounce et al. 2016)
 EXPOSURE_CORRIDOR_M = 1000.0             # search radius around the routed channel
+SAME_REACH_UPSTREAM_MIN_DZ_M = 5.0       # min elevation drop (m) to flag same-reach lake cascades
+
+# ---------------------------------------------------------------------------
+# Administrative provinces & hydrometeorological / fluvial sanity bounds
+# ---------------------------------------------------------------------------
+CANONICAL_PROVINCES = (
+    "Koshi Province",
+    "Madhesh Province",
+    "Bagmati Province",
+    "Gandaki Province",
+    "Lumbini Province",
+    "Karnali Province",
+    "Sudurpashchim Province",
+)
+
+# Cryosphere & rainfall-landslide thresholds (Gruber 2012; Dahal & Hasegawa 2008)
+PERMAFROST_LOWER_M = 4800.0
+FREEZING_LEVEL_MARGIN_M = 300.0
+DAHAL_HASEGAWA = (73.9, -0.79)           # I = 73.90 * D^-0.79 mm/h (Dahal & Hasegawa 2008)
+
+# Conservative physical lower bounds (min_q50_m3s, min_q2_m3s) for Nepal's 10
+# major GloFAS mainstem river basins. Designed to flag off-mainstem hillslope /
+# tributary grid-cell mis-snapping (which drops discharges by 10x-3000x).
+GLOFAS_BASIN_SANITY_BOUNDS = {
+    "mahakali":     (50.0,  800.0),
+    "karnali":      (150.0, 2500.0),
+    "bheri":        (50.0,  800.0),
+    "babai":        (5.0,   200.0),
+    "west_rapti":   (10.0,  400.0),
+    "kali_gandaki": (80.0,  1000.0),
+    "narayani":     (200.0, 3000.0),
+    "bagmati":      (10.0,  300.0),
+    "saptakoshi":   (300.0, 4000.0),
+    "kankai":       (5.0,   200.0),
+}
 
 # ---------------------------------------------------------------------------
 # Seismic
@@ -145,6 +191,14 @@ USGS_LIVE_FEEDS = {
     "month": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_month.geojson",
 }
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
+OPEN_METEO_FLOOD = "https://flood-api.open-meteo.com/v1/flood"
+STAC_EARTH_SEARCH = "https://earth-search.aws.element84.com/v1/search"
+NASA_GIBS_WMTS = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
+EOX_S2_CLOUDLESS = (
+    "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/"
+    "GoogleMapsCompatible/{z}/{y}/{x}.jpg"
+)
+GDACS_API = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH"
 
 # ---------------------------------------------------------------------------
 # Data sources, for the provenance panel in the dashboard
@@ -159,18 +213,32 @@ SOURCES = [
          url="https://rds.icimod.org/", licence="ICIMOD terms"),
     dict(name="HydroRIVERS v1.0", detail="river network with downstream topology",
          url="https://www.hydrosheds.org/products/hydrorivers", licence="HydroSHEDS licence (free for non-commercial use)"),
-    dict(name="OpenStreetMap", detail="settlements, hospitals, hydropower, bridges (via Overpass)",
+    dict(name="WorldPop Nepal 2020", detail="100 m UN-adjusted constrained and unconstrained population grids",
+         url="https://hub.worldpop.org/", licence="CC-BY-4.0"),
+    dict(name="OpenStreetMap", detail="settlements, hospitals, hydropower, bridges, admin boundaries, mapped landslides (via Overpass)",
          url="https://www.openstreetmap.org/copyright", licence="ODbL 1.0"),
-    dict(name="USGS earthquake catalogue and real-time feeds", detail="FDSN event service and GeoJSON summary feeds",
+    dict(name="USGS earthquake catalogue and real-time feeds", detail="FDSN event service, ShakeMap MMI contours, and Nowicki Jessee (2018) ground-failure products",
          url="https://earthquake.usgs.gov/", licence="public domain"),
+    dict(name="GEM Global Active Faults Database", detail="active Himalayan fault traces, kinematics, and slip parameters (Styron & Pagani 2020)",
+         url="https://github.com/GEMScienceTools/gem-global-active-faults", licence="CC-BY-SA-4.0"),
+    dict(name="Copernicus EMS GloFAS (via Open-Meteo Flood API)", detail="daily river discharge reanalysis and 30-day ensemble flood forecasts across 10 major Nepalese river basins",
+         url="https://open-meteo.com/en/docs/flood-api", licence="CC-BY-4.0 (Copernicus Emergency Management Service / Open-Meteo)"),
+    dict(name="Open-Meteo Weather & Cryosphere Feed", detail="precipitation, snowfall, 0 C freezing-level altitude, and topsoil moisture",
+         url="https://open-meteo.com/", licence="CC-BY-4.0"),
+    dict(name="NASA Global Landslide Catalog / COOLR", detail="reported rainfall- and earthquake-triggered landslide events in Nepal",
+         url="https://landslides.nasa.gov/", licence="NASA Open Data (public domain)"),
+    dict(name="Copernicus Sentinel-2 L2A (Element84 Earth Search STAC & EOX Cloudless)", detail="10 m optical satellite quicklooks, cloud-cover metadata, and cloudless global mosaic",
+         url="https://earth-search.aws.element84.com/v1", licence="Copernicus Sentinel open data / EOX s2maps CC-BY-4.0"),
+    dict(name="NASA EOSDIS GIBS Satellite Overlays", detail="near-real-time GPM IMERG precipitation rate, MODIS Terra NDSI snow cover, and VIIRS true-colour imagery",
+         url="https://nasa-gibs.github.io/gibs-api-docs/", licence="NASA EOSDIS open access"),
+    dict(name="UN OCHA / EC JRC GDACS", detail="regional multi-hazard disaster alerts (earthquakes, floods, cyclones, droughts, wildfires)",
+         url="https://www.gdacs.org/", licence="GDACS public information terms"),
     dict(name="Esri ArcGIS Online basemaps",
          detail="World Dark Gray Base, World Hillshade and World Imagery tiles, used keyless with attribution",
          url="https://www.esri.com/en-us/legal/terms/full-master-agreement",
          licence="Esri terms of use; free with attribution, confirm before commercial or high-traffic deployment"),
     dict(name="OpenTopoMap", detail="alternative topographic basemap",
          url="https://opentopomap.org/", licence="map style CC-BY-SA 3.0; data ODbL 1.0"),
-    dict(name="Open-Meteo", detail="past and forecast precipitation",
-         url="https://open-meteo.com/", licence="CC-BY-4.0"),
     dict(name="Veh, Korup & Walz (2020) supplementary data", detail="lake depth-area bathymetry sample and natural dam-break compilation",
          url="https://doi.org/10.5281/zenodo.3523213", licence="CC-BY-4.0"),
 ]

@@ -1,8 +1,15 @@
+# Full GIS, Copernicus DEM, HydroRIVERS routing, and Bayesian GLOF rebuild dependencies.
+#
+# Note: The automated 7-day refresh pipeline (src/refresh_weekly.py, src/floods.py,
+# src/hydromet.py, src/landslides.py, src/alerts.py, src/faults.py), pre-deploy
+# verification gate (src/verify_site.py), and unit-test suite
+# (src/test_pipeline.py --unit-only) use Python 3.12 stdlib ONLY and require no
+# third-party packages.
 numpy>=1.26
+pandas>=2.1
 scipy>=1.11
 shapely>=2.0
 rasterio>=1.3
 geopandas>=0.14
 pyreadr>=0.5
 scikit-image>=0.22
-matplotlib>=3.8
