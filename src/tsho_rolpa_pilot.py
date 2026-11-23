@@ -43,12 +43,17 @@ SCHEMA_VERSION = "tsho_rolpa_pilot.v1"
 DATA_CLASS = "static_assessment"
 STATUS_NOTE = (
     "Pre-simulation 2D hydrodynamic case-study benchmark & scenario framework "
-    "(LISFLOOD-FP / BASEMENT target) — NOT yet a 2D inundation map"
+    "(LISFLOOD-FP / BASEMENT target) — screening-resolution ~90 m 2D inertial "
+    "simulation available in data/tsho_rolpa_2d_inundation.json, but NOT yet a 2D "
+    "inundation map of design-grade engineering fidelity (awaiting <=5 m LiDAR/UAV DEM)"
 )
 TARGET_LAKE_IDS = ("GL_27.86153_86.47679", "GL_27.86029_86.47725")
 TARGET_REF_COORD = (86.47679, 27.86153)  # (lon, lat)
 
 OUT_JSON = os.path.join(C.DATA, "tsho_rolpa_pilot.json")
+SIM_2D_RELPATH = "data/tsho_rolpa_2d_inundation.json"
+FOOTPRINTS_2D_RELPATH = "data/tsho_rolpa_2d_footprints.geojson"
+HPC_PACK_RELDIR = "simulations/tsho_rolpa"
 
 
 def _atomic_write_json(path: str, obj: Any) -> None:
@@ -420,6 +425,76 @@ def build_tsho_rolpa_pilot(
     overpass_hydro = _load_json_optional(os.path.join(odir, "hydropower.json"))
     checkpoints = _extract_route_checkpoints(route, expo_by_id, overpass_hydro)
 
+    # Link and summarize the screening-resolution 2D inertial simulation if present
+    sim2d_doc = _load_json_optional(os.path.join(ddir, "tsho_rolpa_2d_inundation.json"))
+    footprints_exists = os.path.isfile(os.path.join(ddir, "tsho_rolpa_2d_footprints.geojson"))
+    sim2d_summary: dict[str, Any] | None = None
+    s2_cp_lookup: dict[str, dict[str, Any]] = {}
+    if isinstance(sim2d_doc, dict) and isinstance(sim2d_doc.get("scenarios"), list):
+        dm = sim2d_doc.get("dem_metadata") or {}
+        scfg = sim2d_doc.get("solver_config") or {}
+        cond = dm.get("conditioning") or {}
+        scn_summaries: list[dict[str, Any]] = []
+        for sc in sim2d_doc["scenarios"]:
+            mb = sc.get("mass_balance") or {}
+            ds = sc.get("domain_summary") or {}
+            ih = sc.get("inflow_hydrograph") or {}
+            cp_compact = {}
+            for c in sc.get("checkpoints") or []:
+                cid = c.get("id")
+                if not cid:
+                    continue
+                rec = {
+                    "name": c.get("name"),
+                    "along_river_km": c.get("along_river_km"),
+                    "max_depth_m": c.get("max_depth_m"),
+                    "max_velocity_ms": c.get("max_velocity_ms"),
+                    "max_hv_m2s": c.get("max_hv_m2s"),
+                    "peak_discharge_m3s": c.get("peak_discharge_m3s"),
+                    "arrival_time_min": c.get("arrival_time_min"),
+                    "time_to_peak_min": c.get("time_to_peak_min"),
+                }
+                cp_compact[cid] = rec
+                if sc.get("scenario_id") == "TR-S2-MODERATE-30PCT":
+                    s2_cp_lookup[cid] = rec
+            scn_summaries.append({
+                "scenario_id": sc.get("scenario_id"),
+                "breach_fraction": sc.get("breach_fraction"),
+                "is_primary_benchmark": bool(sc.get("is_primary_benchmark")),
+                "volume_in_Mm3": mb.get("volume_in_Mm3"),
+                "volume_out_Mm3": mb.get("volume_out_Mm3"),
+                "volume_stored_Mm3": mb.get("volume_stored_Mm3"),
+                "peak_inflow_m3s": ih.get("target_peak_q_m3s"),
+                "mass_balance_error_pct": mb.get("mass_balance_error_pct"),
+                "inundated_area_km2": ds.get("inundated_area_km2"),
+                "max_depth_m": ds.get("max_depth_m"),
+                "max_velocity_ms": ds.get("max_velocity_ms"),
+                "checkpoints": cp_compact,
+            })
+        sim2d_summary = {
+            "schema_version": sim2d_doc.get("schema_version"),
+            "generated_utc": sim2d_doc.get("generated_utc"),
+            "is_design_grade_engineering_map": False,
+            "methodology_notice": sim2d_doc.get("methodology_notice"),
+            "dem_source": dm.get("source"),
+            "grid_spacing_m": [dm.get("dx_m"), dm.get("dy_m")],
+            "active_cells": dm.get("active_cells"),
+            "active_faces": dm.get("active_faces"),
+            "thalweg_max_carve_m": cond.get("max_carve_m"),
+            "solver_formulation": "Bates et al. (2010) 2D inertial shallow-water (LISFLOOD-FP formulation)",
+            "duration_hr": scfg.get("duration_hr"),
+            "max_mass_balance_error_pct": max(
+                (float((s.get("mass_balance_error_pct") or 0.0)) for s in scn_summaries),
+                default=0.0,
+            ),
+            "scenarios": scn_summaries,
+        }
+        # Attach primary TR-S2 30% screening 2D metrics onto matching valley checkpoints
+        for cp in checkpoints:
+            hit_2d = s2_cp_lookup.get(cp.get("id", ""))
+            if hit_2d:
+                cp["screening_2d_s2_30pct"] = hit_2d
+
     now_utc = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Breach scenario matrix combining TRĀYA Veh et al. (2020) breach-fraction discharges
@@ -469,6 +544,12 @@ def build_tsho_rolpa_pilot(
         "data_class": DATA_CLASS,
         "status_note": STATUS_NOTE,
         "is_2d_inundation_map": False,
+        "is_design_grade_2d_map": False,
+        "has_screening_2d_simulation": bool(sim2d_summary is not None),
+        "simulation_2d_available": bool(sim2d_summary is not None),
+        "simulation_2d_path": SIM_2D_RELPATH if sim2d_summary is not None else None,
+        "footprints_geojson_path": FOOTPRINTS_2D_RELPATH if (sim2d_summary is not None and footprints_exists) else None,
+        "hpc_reproducibility_pack_dir": HPC_PACK_RELDIR,
         "target_solvers": ["LISFLOOD-FP", "BASEMENT (ETH Zurich)"],
         "lake_identification": {
             "requested_reference_id": TARGET_LAKE_IDS[0],
@@ -582,6 +663,7 @@ def build_tsho_rolpa_pilot(
         "valley_checkpoints": checkpoints,
         "exposure_and_isolation_screening": tr_iso,
         "breach_scenario_framework": breach_scenarios,
+        "simulation_2d_summary": sim2d_summary,
         "pre_simulation_2d_requirements": {
             "required_inputs_for_lisflood_basement": [
                 "High-resolution <=2-5 m bare-earth DEM (UAV photogrammetry / airborne LiDAR / Pleiades stereo) of the Rolwaling gorge and Tama Koshi floodplains",
@@ -611,6 +693,11 @@ def build_tsho_rolpa_pilot(
                 {"provider_id": "traya_validation", "path": "data/validation.json", "lake_id": lid},
                 {"provider_id": "hmaglofdb_v4", "path": "data/glof_history.json"},
                 {"provider_id": "osm_overpass", "path": "cache/overpass/hydropower.json"},
+                *(
+                    [{"provider_id": "traya_tsho_rolpa_2d_sim", "path": SIM_2D_RELPATH}]
+                    if sim2d_summary is not None
+                    else []
+                ),
             ],
         },
     }

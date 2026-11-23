@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="Nepal TRĀYA Multi-Hazard Observatory Emblem">
+  <defs>
+    <linearGradient id="trayaBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#111c2b"/>
+      <stop offset="100%" stop-color="#0a0f16"/>
+    </linearGradient>
+    <linearGradient id="trayaPeak" x1="0" y1="0" x2="0.2" y2="1">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="55%" stop-color="#56ccf2"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="trayaGlacier" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5eead4"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <linearGradient id="trayaWave" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#4fd1c5"/>
+      <stop offset="100%" stop-color="#56ccf2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Full-bleed dark slate canvas for maskable & standard icons -->
+  <rect width="192" height="192" fill="url(#trayaBg)"/>
+  <rect x="10" y="10" width="172" height="172" rx="34" fill="#0d1520" stroke="#364960" stroke-width="3"/>
+
+  <!-- Subtle high-altitude horizon arc -->
+  <circle cx="74" cy="54" r="30" fill="#facc15" fill-opacity="0.08"/>
+
+  <!-- Primary Himalayan summit & glacier face -->
+  <path d="M28 134 L74 48 L104 98 L128 64 L164 134 Z" fill="url(#trayaPeak)" fill-opacity="0.94"/>
+  <!-- Shaded alpine facet for depth -->
+  <path d="M74 48 L88 104 L104 98 Z" fill="#0c4a6e" fill-opacity="0.38"/>
+  <path d="M128 64 L142 134 L164 134 Z" fill="#0c4a6e" fill-opacity="0.32"/>
+
+  <!-- Glacial moraine ridge & turquoise tarn basin -->
+  <path d="M46 134 L86 86 L112 114 L136 90 L164 134 Z" fill="url(#trayaGlacier)" fill-opacity="0.72"/>
+  <ellipse cx="104" cy="126" rx="22" ry="5.5" fill="#e0f2fe" fill-opacity="0.32"/>
+
+  <!-- High-mountain beacon / sentinel sun -->
+  <circle cx="74" cy="48" r="11" fill="#facc15"/>
+  <circle cx="74" cy="48" r="5" fill="#fef9c3"/>
+
+  <!-- Hydrodynamic flood & seismic wave ribbon -->
+  <path d="M28 148 Q62 134 96 146 T164 144" fill="none" stroke="url(#trayaWave)" stroke-width="7.5" stroke-linecap="round"/>
+  <path d="M44 161 Q76 152 106 160 T152 158" fill="none" stroke="#56ccf2" stroke-opacity="0.55" stroke-width="4" stroke-linecap="round"/>
+</svg>

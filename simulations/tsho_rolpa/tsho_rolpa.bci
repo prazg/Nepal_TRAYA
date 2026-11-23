@@ -1,0 +1,20 @@
+# =============================================================================
+# LISFLOOD-FP v8.1 Boundary Condition Index (.bci) — Tsho Rolpa GLOF Corridor
+# CRS: EPSG:32645 (WGS 84 / UTM Zone 45N, metres)
+# =============================================================================
+# 1. Upstream moraine-breach inflow immediately below Tsho Rolpa spillway outlet
+#    WGS84 (27.8696 N, 86.4621 E) -> UTM 45N (447048.3 E, 3082873.6 N)
+#    Point inflow QVAR references `breach_inflow` block in the scenario .bdy file
+#    (total discharge m3/s; for distributed line inflow on <=5 m LiDAR DEMs,
+#    replace P with an E/W edge segment or split across a 25 m spillway transect).
+P  447048.3  3082873.6  QVAR  breach_inflow
+
+# 2. Tama Koshi mainstem dry-season baseflow entering upstream of Chetchet confluence
+#    WGS84 (27.8820 N, 86.2235 E) -> UTM 45N (423568.2 E, 3084373.2 N)
+#    Pre-monsoon reference ~60 m3/s (adjust to 350 m3/s for peak-monsoon runs).
+P  423568.2  3084373.2  QFIX  60.0
+
+# 3. Open free-outflow boundary along southern Tama Koshi exit below Singati
+#    WGS84 lat <= 27.725 N (approx UTM 45N N = 3066891.0, E = 415500..418500)
+#    Zero-gradient FREE outflow with local bed slope S0 = 0.015 m/m.
+S  415500.0  418500.0   FREE  0.015

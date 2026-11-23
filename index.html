@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://server.arcgisonline.com https://tiles.maps.eox.at https://*.tile.opentopomap.org https://tile.openstreetmap.org https://gibs.earthdata.nasa.gov https://sentinel-cogs.s3.us-west-2.amazonaws.com https://*.amazonaws.com https://earth-search.aws.element84.com https://earthquake.usgs.gov https://*.usgs.gov; connect-src 'self' https://earthquake.usgs.gov https://*.usgs.gov https://api.open-meteo.com https://flood-api.open-meteo.com https://earth-search.aws.element84.com https://www.gdacs.org; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
-<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://server.arcgisonline.com https://tiles.maps.eox.at https://*.tile.opentopomap.org https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://gibs.earthdata.nasa.gov https://sentinel-cogs.s3.us-west-2.amazonaws.com https://*.amazonaws.com https://earth-search.aws.element84.com https://earthquake.usgs.gov https://*.usgs.gov; connect-src 'self' https://earthquake.usgs.gov https://*.usgs.gov https://api.open-meteo.com https://flood-api.open-meteo.com https://earth-search.aws.element84.com https://www.gdacs.org; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0a0f16">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Nepal TRĀYA (त्राय) — 7-Day Open-Data Multi-Hazard Risk Observatory</title>
 <meta name="description" content="Nepal TRĀYA (त्राय): 7-day open-data multi-hazard risk observatory and screening platform covering glacial lake outburst floods (GLOFs), Copernicus GloFAS river floods, USGS earthquakes, GEM surface faults, and Dahal-Hasegawa rainfall-landslides across all 77 Nepal districts. Not an official early warning system.">
 <link rel="canonical" href="https://prazg.github.io/Nepal_TRAYA/">
@@ -60,11 +62,20 @@
         <span class="pill" id="pill-flood" title="Copernicus GloFAS 10-basin river flood watch"><span class="dot"></span>rivers …</span>
         <span class="pill" id="pill-ls" title="Dahal &amp; Hasegawa (2008) liquid-rain landslide threshold watch"><span class="dot"></span>landslides …</span>
         <span class="pill" id="pill-base" title="Active map basemap status"><span class="dot"></span>basemap</span>
+        <span class="pill" id="pill-net" title="Offline PWA connectivity and local field report queue status"><span class="dot"></span>online</span>
       </div>
       <div class="actions-bar">
         <button type="button" class="btn pri" id="btnRefreshLive" data-i18n="btnRefreshLive" title="Re-fetch live USGS earthquakes, Open-Meteo GloFAS rivers, and Open-Meteo rainfall right now">↻ Refresh live</button>
+        <button type="button" class="btn" id="btnReportHeader" data-i18n="btnReportLandslide" aria-haspopup="dialog" aria-controls="reportModal" title="Queue an offline, EXIF-stripped community landslide field report">+ Report Landslide</button>
         <button type="button" class="btn health-btn" id="btnSourceHealth" aria-haspopup="dialog" aria-controls="sourceHealthModal" title="Inspect dataset provenance, 6-state data classifications, SLA freshness, and KPI baseline scorecard"><span class="dot" aria-hidden="true"></span><span id="sourceHealthBtnLbl" data-i18n="btnSourceHealth">Source Health</span></button>
-        <button type="button" class="btn" id="btnLang" data-i18n="btnLang" title="Switch interface language between English and Nepali">नेपाली</button>
+        <select id="langSelect" class="btn lang-select" aria-label="Language / भाषा" title="Select interface language (6 Nepal languages)">
+          <option value="en">English</option>
+          <option value="ne">नेपाली</option>
+          <option value="mai">मैथिली</option>
+          <option value="bho">भोजपुरी</option>
+          <option value="thr">थारू</option>
+          <option value="taj">तामाङ</option>
+        </select>
         <button type="button" class="btn" id="btnKpi" data-i18n="btnKpi" aria-expanded="true" title="Toggle summary cards">KPIs</button>
         <button type="button" class="btn" id="btnTheme" data-i18n="btnTheme" title="Switch dark and light theme">◐ Theme</button>
         <button type="button" class="btn emerg" id="btnEmergency" data-i18n="btnEmergency" aria-haspopup="dialog" aria-controls="emergencyModal">Emergency · आपतकालीन</button>
@@ -88,8 +99,15 @@
     </div>
   </section>
 
-  <!-- Dynamic Stale Snapshot, Compound Hazard & Live Toast Alerts -->
+  <!-- Dynamic Regional Language Draft, Map Pick, Stale Snapshot, Compound Hazard & Live Toast Alerts -->
   <div id="alertStack">
+    <div id="langDraftBar" class="alert-banner lang-draft-bar" data-lang-draft-notice hidden role="note" aria-live="polite">
+      <div class="alert-banner-msg"><span class="hbadge h-info">Regional Draft</span> <span data-i18n="langDraftNotice">Regional language interface draft (pending native-speaker linguistic review). Official Government of Nepal warnings are issued in Nepali/English by DHM, DMG/NEMRC &amp; NDRRMA.</span></div>
+    </div>
+    <div id="mapPickBanner" class="alert-banner pick-banner is-hidden" role="status" aria-live="polite">
+      <div class="alert-banner-msg"><b data-i18n="repPickHint">Click or tap anywhere on the map to set the landslide location.</b></div>
+      <button type="button" class="btn sm" id="btnCancelMapPick">✕ Cancel</button>
+    </div>
     <div id="staleBanner" class="alert-banner stale-warn is-hidden" role="status" aria-live="polite">
       <div class="alert-banner-msg" id="staleBannerMsg"></div>
       <button type="button" class="btn sm pri" id="btnStaleRefresh" data-i18n="staleRefreshCta">Refresh live feeds now</button>
@@ -214,6 +232,8 @@
         <label class="row"><input type="checkbox" id="lGlof"><span class="layer-sym sym-glof" aria-hidden="true">▼</span><span data-i18n="lGlof">Recorded GLOFs (HMAGLOFDB)</span></label>
         <label class="row"><input type="checkbox" id="lHydro"><span class="layer-sym sym-hydro" aria-hidden="true">▪</span><span data-i18n="lHydro">Hydropower plants (OSM)</span></label>
         <label class="row"><input type="checkbox" id="lGdacs"><span class="layer-sym sym-gdacs" aria-hidden="true">⬡</span><span data-i18n="lGdacs">GDACS regional alerts</span></label>
+        <label class="row"><input type="checkbox" id="lTsho2d"><span class="layer-sym sym-tsho2d" aria-hidden="true">▓</span><span data-i18n="tr2dToggleLayer">Show Tsho Rolpa 2D flood envelope on map</span></label>
+        <label class="row"><input type="checkbox" id="lLocalReports" checked><span class="layer-sym sym-localrep" aria-hidden="true">◌</span><span data-i18n="repShowLocalPins">Show local queued report pins on map</span></label>
       </section>
 
       <section class="blk">
@@ -403,6 +423,173 @@
     </div>
     <div id="sourceHealthBody" aria-live="polite">
       <p class="loading" data-i18n="shLoading">Loading provenance manifest &amp; KPI baseline…</p>
+    </div>
+  </div>
+</div>
+
+<!-- 9. TRĀYA 2.0 Offline-First PWA Community Landslide Reporting Modal (TRAYA-008) -->
+<div id="reportModal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="repModalTitle">
+  <div class="modal-dialog modal-wide">
+    <div class="modal-head">
+      <div>
+        <h2 id="repModalTitle" data-i18n="repModalTitle">Community Landslide Field Report (Offline Queue)</h2>
+        <div class="muted" id="repModalSub" data-i18n="repModalSub">Capture field slope-failure observations offline. Photos have EXIF/GPS stripped and notes are scrubbed of personal details before storage.</div>
+      </div>
+      <button type="button" class="btn sm" id="btnCloseReportModal" data-i18n="emergClose">Close</button>
+    </div>
+
+    <div class="callout info">
+      <span class="dc-badge dc-forecast">feature_type: hazard_report</span>
+      <span class="dc-badge dc-cached">pilot_sandbox_post_mou</span>
+      <div class="field-gap">
+        <b>Offline pilot sandbox:</b> Photos are EXIF-stripped and PII is redacted on-device; live agency submission awaits signed NDRRMA/DEOC MOU.
+        <span class="muted" data-i18n="repGovernanceNote">Pilot sandbox (post-MOU agency moderation): Reports remain ONLY on your device until exported for NDRRMA/DEOC human review — never auto-published or auto-merged into official records.</span>
+      </div>
+    </div>
+
+    <div class="report-modal-grid">
+      <form id="reportForm" class="rep-form" novalidate>
+        <div class="rep-section-head">
+          <h3>1. Location &amp; Administrative Context</h3>
+          <div class="btn-row">
+            <button type="button" class="btn sm pri" id="btnRepGps" data-i18n="repUseGps">◎ Use Device GPS</button>
+            <button type="button" class="btn sm" id="btnRepPickMap" data-i18n="repPickOnMap">⊕ Pick on Map</button>
+          </div>
+        </div>
+        <div class="muted" id="repLocStatus" aria-live="polite"></div>
+
+        <div class="form-grid-2">
+          <label class="form-field">
+            <span>Latitude (°N) *</span>
+            <input type="number" id="repLat" step="0.00001" min="26.0" max="31.0" placeholder="e.g. 27.71640" required>
+          </label>
+          <label class="form-field">
+            <span>Longitude (°E) *</span>
+            <input type="number" id="repLon" step="0.00001" min="79.5" max="88.8" placeholder="e.g. 86.16520" required>
+          </label>
+          <label class="form-field">
+            <span>Nepal District (77)</span>
+            <select id="repDistrict" aria-label="Landslide report district">
+              <option value="">Auto-resolve or select district…</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span>Province</span>
+            <input type="text" id="repProvince" readonly placeholder="Auto-filled from district">
+          </label>
+        </div>
+
+        <label class="form-field">
+          <span>Municipality / Ward (optional)</span>
+          <input type="text" id="repMuniWard" maxlength="100" placeholder="e.g. Gaurishankar RM-5">
+        </label>
+
+        <div class="form-grid-3">
+          <label class="form-field">
+            <span data-i18n="repTimePrecision">Date precision</span>
+            <select id="repTimePrecision">
+              <option value="exact_hour">Exact hour</option>
+              <option value="day" selected>Day</option>
+              <option value="month">Month</option>
+              <option value="year">Year</option>
+              <option value="unknown">Unknown (undated)</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span data-i18n="repDate">Event date (optional)</span>
+            <input type="date" id="repEventDate">
+          </label>
+          <label class="form-field">
+            <span>Hour (UTC/local, optional)</span>
+            <input type="time" id="repEventTime">
+          </label>
+        </div>
+
+        <div class="form-grid-2">
+          <label class="form-field">
+            <span data-i18n="repTrigger">Apparent trigger</span>
+            <select id="repTrigger">
+              <option value="rainfall">Rainfall / monsoon</option>
+              <option value="earthquake">Earthquake / shaking</option>
+              <option value="road_cut">Road cut / excavation</option>
+              <option value="river_undercut">River toe undercut</option>
+              <option value="snowmelt">Snowmelt / freeze-thaw</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span data-i18n="repRoadBlocked">Road blocked?</span>
+            <select id="repRoadBlocked">
+              <option value="">Unknown / not observed</option>
+              <option value="yes">Yes — road blocked</option>
+              <option value="no">No — road clear</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-grid-2">
+          <label class="form-field">
+            <span>Observed fatalities (optional — leave blank if unknown)</span>
+            <input type="number" id="repFatalities" min="1" step="1" placeholder="Leave blank → null (never forced to 0)">
+          </label>
+          <label class="form-field">
+            <span>Observed injuries (optional — leave blank if unknown)</span>
+            <input type="number" id="repInjuries" min="1" step="1" placeholder="Leave blank → null (never forced to 0)">
+          </label>
+        </div>
+
+        <label class="form-field">
+          <span data-i18n="repNotesLabel">Observation notes (omit personal names &amp; phone numbers)</span>
+          <textarea id="repNotes" rows="3" maxlength="1000" placeholder="Describe slope movement, road/bridge impacts, debris width…"></textarea>
+        </label>
+        <div id="repPiiPreview" class="pii-preview-box" aria-live="polite">
+          <span class="muted" data-i18n="repPiiNotice">Automatic PII redaction strips phone numbers, emails, IDs, and @handles before saving.</span>
+        </div>
+
+        <div class="form-field">
+          <label for="repPhoto" data-i18n="repPhotoLabel">Field photo (optional — EXIF stripped on device)</label>
+          <input type="file" id="repPhoto" accept="image/*" capture="environment">
+          <div id="repPhotoStatus" class="rep-photo-box is-hidden" aria-live="polite">
+            <img id="repPhotoPreview" class="rep-photo-thumb is-hidden" alt="EXIF-stripped field photo preview">
+            <div class="rep-photo-meta">
+              <div id="repPhotoMetaText" class="muted"></div>
+              <button type="button" class="btn sm" id="btnRepClearPhoto">✕ Remove photo</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="repDupWarn" class="callout is-hidden" role="status" aria-live="polite"></div>
+        <div id="repFormStatus" class="muted" aria-live="polite"></div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn pri" id="btnRepSave" data-i18n="repSaveOffline">Save to Offline Queue</button>
+          <button type="button" class="btn" id="btnRepReset">Reset form</button>
+        </div>
+      </form>
+
+      <section class="rep-queue-panel" aria-label="Queued offline landslide reports">
+        <div class="rep-section-head">
+          <h3 id="repQueueHeading"><span data-i18n="repQueueTitle">Local Offline Queue (Pending DEOC Review)</span> <span class="mono" id="repQueueBadge">(0)</span></h3>
+        </div>
+        <label class="row">
+          <input type="checkbox" id="chkShowLocalPins" checked>
+          <span data-i18n="repShowLocalPins">Show local queued report pins on map</span>
+        </label>
+        <div class="btn-row">
+          <button type="button" class="btn sm pri" id="btnExportModerationBundle" data-i18n="repExportBundle">⬇ Export Redacted Moderation Bundle (JSON)</button>
+        </div>
+        <div id="repQueueList" class="rep-queue-list field-gap" aria-live="polite"></div>
+
+        <details class="review-queue-panel field-gap" id="repUatSandboxDetails">
+          <summary>
+            <span>▸ Pre-MOU Agency Moderation Sandbox Fixtures (<code>data/moderation_queue.json</code>)</span>
+            <span class="fb-tag is-mou">public_live_endpoint_enabled: false</span>
+          </summary>
+          <div class="review-queue-body" id="repUatSandboxBody">
+            <p class="loading">Loading sandbox fixtures…</p>
+          </div>
+        </details>
+      </section>
     </div>
   </div>
 </div>

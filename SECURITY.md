@@ -55,7 +55,9 @@ GitHub issue.
   is vendored under `vendor/leaflet/`).
 - **Browser hardening:** Strict `<meta http-equiv="Content-Security-Policy">`
   (no `'unsafe-inline'` scripts, no `'unsafe-eval'`),
-  `<meta name="referrer" content="no-referrer">`, zero inline `<script>`,
+  `<meta name="referrer" content="strict-origin-when-cross-origin">` (required
+  for OpenStreetMap tile-policy compliance while omitting paths/queries across
+  origins), zero inline `<script>`,
   `<style>`, or `on*=` attributes, and explicit HTML escaping + URL-scheme
   validation for external API payloads.
 - **Automated CI verification gate:** Every deployment runs

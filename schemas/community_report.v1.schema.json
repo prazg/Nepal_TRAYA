@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prazg.github.io/Nepal_TRAYA/schemas/community_report.v1.schema.json",
+  "title": "TRĀYA 2.0 Community Landslide & Slope-Hazard Report Schema (v1)",
+  "description": "Formal schema for offline-captured citizen and field slope-hazard observations entering TRĀYA's authenticated agency moderation queue (TRAYA-008 / Issue #5). Enforces mandatory client-side EXIF stripping, deterministic PII redaction, strict null-not-0 casualty semantics for unverified reports, and SHA-256 deduplication fingerprinting.",
+  "type": "object",
+  "required": [
+    "report_id",
+    "feature_type",
+    "moderation_status",
+    "captured_at_utc",
+    "event_date_utc",
+    "time_precision",
+    "location_source",
+    "lon",
+    "lat",
+    "district",
+    "province",
+    "trigger",
+    "road_blocked",
+    "fatalities",
+    "injuries",
+    "description_redacted",
+    "photo_attached",
+    "exif_stripped",
+    "dedup_fingerprint",
+    "pii_redaction_applied"
+  ],
+  "properties": {
+    "report_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "description": "Stable unique identifier for the community/field report (e.g., uat_cr_dolakha_001 or cr_20261123_abc123)."
+    },
+    "feature_type": {
+      "type": "string",
+      "const": "hazard_report",
+      "description": "Strictly fixed to 'hazard_report' until verified and promoted by an authorized agency officer into a canonical landslide_event.v1 record."
+    },
+    "moderation_status": {
+      "type": "string",
+      "enum": [
+        "pending_agency_review",
+        "verified_promoted",
+        "rejected_duplicate",
+        "rejected_pii",
+        "rejected_unverifiable"
+      ],
+      "description": "Authenticated agency moderation lifecycle state."
+    },
+    "captured_at_utc": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$",
+      "description": "ISO-8601 UTC timestamp when the report was captured on-device (including offline IndexedDB capture)."
+    },
+    "event_date_utc": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      "description": "Nullable ISO-8601 UTC date or timestamp of the observed slope failure; MUST be null when unknown."
+    },
+    "time_precision": {
+      "type": "string",
+      "enum": [
+        "exact_hour",
+        "day",
+        "month",
+        "year",
+        "unknown"
+      ],
+      "description": "Temporal precision of event_date_utc; MUST be 'unknown' whenever event_date_utc is null."
+    },
+    "location_source": {
+      "type": "string",
+      "enum": [
+        "gps",
+        "manual_pin"
+      ],
+      "description": "How coordinates were acquired on-device (live GNSS/GPS fix vs. manual map pin placement)."
+    },
+    "lon": {
+      "type": "number",
+      "minimum": 79.5,
+      "maximum": 88.8,
+      "description": "WGS84 longitude in decimal degrees within Nepal region bounds."
+    },
+    "lat": {
+      "type": "number",
+      "minimum": 26.0,
+      "maximum": 31.0,
+      "description": "WGS84 latitude in decimal degrees within Nepal region bounds."
+    },
+    "district": {
+      "type": ["string", "null"],
+      "description": "Canonical Nepal district name (77-district lookup); null if unresolved."
+    },
+    "province": {
+      "type": ["string", "null"],
+      "enum": [
+        "Koshi Province",
+        "Madhesh Province",
+        "Bagmati Province",
+        "Gandaki Province",
+        "Lumbini Province",
+        "Karnali Province",
+        "Sudurpashchim Province",
+        null
+      ],
+      "description": "Canonical Nepal province name (7 provinces); null if unresolved."
+    },
+    "trigger": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Observed or suspected physical trigger (e.g., rainfall, earthquake, road_cut, snowmelt, river_undercutting, unknown)."
+    },
+    "road_blocked": {
+      "type": ["boolean", "null"],
+      "description": "Whether an adjacent road or trail corridor is reported blocked; null if unknown."
+    },
+    "fatalities": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Reported fatalities. Strict null-not-0 rule: MUST be null (never 0) on unverified reports; 0 is permitted only after agency verification (verified_promoted)."
+    },
+    "injuries": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Reported injuries. Strict null-not-0 rule: MUST be null (never 0) on unverified reports; 0 is permitted only after agency verification (verified_promoted)."
+    },
+    "description_redacted": {
+      "type": "string",
+      "description": "PII-free narrative description after deterministic redaction of Nepal phone numbers, emails, citizenship/license IDs, and social handles."
+    },
+    "photo_attached": {
+      "type": "boolean",
+      "description": "Whether a field photograph accompanies the submission."
+    },
+    "exif_stripped": {
+      "type": "boolean",
+      "const": true,
+      "description": "Mandatory privacy invariant confirming all EXIF/XMP/IPTC/GPS metadata was stripped prior to queue ingestion."
+    },
+    "dedup_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Deterministic SHA-256 hex digest computed from quantized coordinates, event date, and normalized trigger for flag-only deduplication."
+    },
+    "pii_redaction_applied": {
+      "type": "boolean",
+      "const": true,
+      "description": "Mandatory privacy invariant confirming deterministic PII redaction ran on free-text fields."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional concise PII-free English/Latin summary title."
+    },
+    "title_ne": {
+      "type": ["string", "null"],
+      "description": "Optional concise PII-free Nepali (Devanagari) summary title."
+    },
+    "municipality_ward": {
+      "type": ["string", "null"],
+      "description": "Optional local municipality/rural municipality and ward label (e.g., Gaurishankar RM-5)."
+    },
+    "location_accuracy_m": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Optional reported GNSS horizontal accuracy in meters when location_source is 'gps'."
+    },
+    "photo_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Optional SHA-256 hex digest of the EXIF-stripped image bytes when photo_attached is true."
+    },
+    "pii_redaction_tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "phone",
+          "email",
+          "id",
+          "handle"
+        ]
+      },
+      "uniqueItems": true,
+      "description": "Redaction category tags emitted by redact_pii() during sanitization."
+    },
+    "offline_captured": {
+      "type": "boolean",
+      "description": "True when captured offline into IndexedDB PWA storage prior to deferred upload."
+    },
+    "is_uat_fixture": {
+      "type": "boolean",
+      "description": "True strictly for synthetic exercise/UAT records in pre-MOU sandbox queues."
+    },
+    "duplicate_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "inventory_event_id",
+          "distance_km",
+          "reason",
+          "review_status",
+          "auto_merged"
+        ],
+        "properties": {
+          "report_id": { "type": "string" },
+          "inventory_event_id": { "type": "string" },
+          "inventory_source": { "type": ["string", "null"] },
+          "inventory_provider_id": { "type": ["string", "null"] },
+          "inventory_feature_type": { "type": ["string", "null"] },
+          "inventory_title": { "type": ["string", "null"] },
+          "inventory_date_utc": { "type": ["string", "null"] },
+          "distance_km": { "type": "number", "minimum": 0 },
+          "days_apart": { "type": ["number", "null"], "minimum": 0 },
+          "reason": { "type": "string" },
+          "review_status": { "type": "string", "const": "pending_review" },
+          "auto_merged": { "type": "boolean", "const": false }
+        },
+        "additionalProperties": false
+      },
+      "description": "Flag-only candidate matches against existing landslide inventory records (auto_merged is always false)."
+    },
+    "moderation_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "timestamp_utc",
+          "from_status",
+          "to_status",
+          "moderator_role",
+          "agency_id",
+          "note"
+        ],
+        "properties": {
+          "timestamp_utc": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+          },
+          "from_status": { "type": "string" },
+          "to_status": { "type": "string" },
+          "moderator_role": {
+            "type": "string",
+            "enum": [
+              "deoc_officer",
+              "ndrrma_verifier",
+              "dhm_verifier"
+            ]
+          },
+          "agency_id": { "type": "string", "minLength": 1 },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "description": "Append-only agency officer moderation audit trail."
+    },
+    "promoted_landslide_record": {
+      "type": ["object", "null"],
+      "description": "Canonical landslide_event.v1 compatible record produced only when moderation_status transitions to 'verified_promoted'."
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "event_date_utc": { "type": "null" } },
+        "required": ["event_date_utc"]
+      },
+      "then": {
+        "properties": { "time_precision": { "const": "unknown" } }
+      },
+      "else": {
+        "properties": {
+          "time_precision": {
+            "enum": ["exact_hour", "day", "month", "year"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "moderation_status": {
+            "not": { "const": "verified_promoted" }
+          }
+        },
+        "required": ["moderation_status"]
+      },
+      "then": {
+        "properties": {
+          "fatalities": { "not": { "const": 0 } },
+          "injuries": { "not": { "const": 0 } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "photo_attached": { "const": false } },
+        "required": ["photo_attached"]
+      },
+      "then": {
+        "properties": {
+          "photo_sha256": { "type": "null" }
+        }
+      }
+    }
+  ]
+}

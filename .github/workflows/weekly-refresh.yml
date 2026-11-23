@@ -52,16 +52,16 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${REFRESH_OSM:-false}" = "true" ]; then
-            python src/refresh_weekly.py --refresh-osm
+            python -B src/refresh_weekly.py --refresh-osm
           else
-            python src/refresh_weekly.py
+            python -B src/refresh_weekly.py
           fi
 
       - name: Run pure-stdlib unit tests
-        run: python src/test_pipeline.py --unit-only
+        run: python -B src/test_pipeline.py --unit-only
 
       - name: Run site verification gate
-        run: python src/verify_site.py
+        run: python -B src/verify_site.py
 
       - name: Commit refreshed data products
         run: |
@@ -69,6 +69,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # data/ covers refreshed .json, .geojson, and .xml outputs
           CANDIDATE_PATHS=(
             data/
             cache/usgs_catalogue.json
@@ -82,6 +83,7 @@ jobs:
             cache/nepal_admin.json
             cache/bipad_snapshot.json
             cache/eo_sar.json
+            cache/tsho_rolpa_dem_90m.json
             index.html
             src/template.html
           )
@@ -103,22 +105,27 @@ jobs:
         run: |
           set -euo pipefail
           test -f index.html
+          test -f manifest.webmanifest
+          test -f sw.js
           test -d assets
           test -d data
           test -d vendor
+          test -d schemas
           rm -rf _site
           mkdir -p _site/data
-          cp index.html _site/
-          cp -r assets vendor _site/
+          cp index.html manifest.webmanifest sw.js _site/
+          cp -r assets vendor schemas _site/
           cp data/*.json _site/data/
           for gj in data/*.geojson; do
             if [ -e "$gj" ]; then
               cp "$gj" _site/data/
             fi
           done
-          if [ -d schemas ]; then
-            cp -r schemas _site/
-          fi
+          for xf in data/*.xml; do
+            if [ -e "$xf" ]; then
+              cp "$xf" _site/data/
+            fi
+          done
           touch _site/.nojekyll
 
       - name: Upload static site artifact

@@ -1,0 +1,131 @@
+{
+  "schema_version": "moderation_queue.v1",
+  "generated_utc": "2026-11-23T23:03:51Z",
+  "governance_mode": "pilot_sandbox_post_mou",
+  "public_live_endpoint_enabled": false,
+  "requires_authenticated_moderation": true,
+  "authorized_moderator_roles": [
+    "deoc_officer",
+    "ndrrma_verifier",
+    "dhm_verifier"
+  ],
+  "schema_ref": "schemas/community_report.v1.schema.json",
+  "promoted_target_schema_ref": "schemas/landslide_event.v1.schema.json",
+  "non_operational_notice": "Community landslide reporting is NOT an emergency dispatch channel. For life-safety emergencies in Nepal call DHM 1155, NEOC 1149, APF Rescue 1114, Nepal Police 100, or Ambulance 102.",
+  "pii_redaction_policy": {
+    "deterministic_regex_redactor": "src/moderation.py::redact_pii",
+    "redacted_categories": {
+      "phone": "[REDACTED_PHONE] (+977/00977, 98/97/96 mobile, 01/STD landlines, Devanagari digits)",
+      "email": "[REDACTED_EMAIL] (RFC-style email addresses)",
+      "id": "[REDACTED_ID] (Nepal citizenship, driving license, NID, passport numeric IDs)",
+      "handle": "[REDACTED_HANDLE] (@social_handles)"
+    },
+    "exif_stripping_mandatory": true,
+    "reporter_identity_stored": false,
+    "unverified_null_not_zero_casualties": true,
+    "legal_alignment": "Individual Privacy Act, 2075 (2018), Government of Nepal"
+  },
+  "dedup_policy": {
+    "mode": "flag_only_never_auto_merge",
+    "max_km": 1.5,
+    "max_days": 3,
+    "undated_max_km": 0.35,
+    "inventory_records_checked": 763
+  },
+  "queue_summary": {
+    "n_live_public_submissions": 0,
+    "n_uat_fixtures": 2,
+    "n_pending_agency_review": 2,
+    "n_verified_promoted": 0,
+    "n_rejected": 0
+  },
+  "sample_redacted_uat_fixtures": [
+    {
+      "report_id": "uat_cr_dolakha_001",
+      "feature_type": "hazard_report",
+      "moderation_status": "pending_agency_review",
+      "captured_at_utc": "2026-11-23T06:15:00Z",
+      "event_date_utc": "2026-11-23T05:30:00Z",
+      "time_precision": "exact_hour",
+      "location_source": "gps",
+      "lon": 86.1652,
+      "lat": 27.7164,
+      "district": "Dolakha",
+      "province": "Bagmati Province",
+      "trigger": "rainfall",
+      "road_blocked": true,
+      "fatalities": null,
+      "injuries": null,
+      "description_redacted": "[SYNTHETIC UAT EXERCISE FIXTURE] Shallow debris flow across Singati–Gonggar feeder track following intense overnight shower; single-lane vehicle passage blocked (~18 m width). Ward volunteer contact [REDACTED_PHONE] redacted prior to queue entry; verify directly with Dolakha DEOC.",
+      "photo_attached": true,
+      "exif_stripped": true,
+      "dedup_fingerprint": "dab08263482d5b7e8d979d9e2596a271340a83e047c805b89542df189535054e",
+      "pii_redaction_applied": true,
+      "title": "[UAT Exercise] Slope debris slip near Singati–Gonggar corridor, Dolakha",
+      "title_ne": "[UAT अभ्यास] दोलखाको सिँगटी–गोंगर करिडोर नजिक पहिरो अवलोकन",
+      "municipality_ward": "Gaurishankar RM-5",
+      "location_accuracy_m": 12.5,
+      "photo_sha256": "c876908b59c114f994d4b9da286d4c51cd265c1923c7dd8bb4f4a032ae6ecc92",
+      "pii_redaction_tags": [
+        "phone"
+      ],
+      "offline_captured": true,
+      "is_uat_fixture": true,
+      "duplicate_candidates": [],
+      "moderation_history": [],
+      "promoted_landslide_record": null
+    },
+    {
+      "report_id": "uat_cr_sindhupalchok_002",
+      "feature_type": "hazard_report",
+      "moderation_status": "pending_agency_review",
+      "captured_at_utc": "2026-11-23T09:40:00Z",
+      "event_date_utc": "2026-11-23T00:00:00Z",
+      "time_precision": "day",
+      "location_source": "manual_pin",
+      "lon": 85.8994,
+      "lat": 27.7892,
+      "district": "Sindhupalchok",
+      "province": "Bagmati Province",
+      "trigger": "road_cut",
+      "road_blocked": true,
+      "fatalities": null,
+      "injuries": null,
+      "description_redacted": "[SYNTHETIC UAT EXERCISE FIXTURE] Fresh cut-slope rockfall and wet talus slump on uphill shoulder of Araniko Highway near Barhabise; traffic halted pending DoR loader clearance. Submitted via offline PWA drill by [REDACTED_HANDLE] ([REDACTED_EMAIL]) with all PII stripped.",
+      "photo_attached": false,
+      "exif_stripped": true,
+      "dedup_fingerprint": "b9ddff56f8ac2e78a1bee1e471bc48ed475348fc0197358eae0631c28413f3d3",
+      "pii_redaction_applied": true,
+      "title": "[UAT Exercise] Cut-slope rockfall along Araniko Highway (NH03), Sindhupalchok",
+      "title_ne": "[UAT अभ्यास] सिन्धुपाल्चोकको अरनिको राजमार्ग (NH03) खण्डमा पहिरो/चट्टान खसेको",
+      "municipality_ward": "Barhabise Municipality-3",
+      "location_accuracy_m": null,
+      "photo_sha256": null,
+      "pii_redaction_tags": [
+        "email",
+        "handle"
+      ],
+      "offline_captured": true,
+      "is_uat_fixture": true,
+      "duplicate_candidates": [],
+      "moderation_history": [],
+      "promoted_landslide_record": null
+    }
+  ],
+  "provenance": {
+    "schema_version": "2.0.0",
+    "source": "Nepal TRĀYA Community Reporting Moderation Sandbox (Pre-MOU UAT)",
+    "dataset": "community_report_moderation_queue",
+    "data_class": "static_assessment",
+    "status": "available",
+    "retrieved_at_utc": "2026-11-23T23:03:51Z",
+    "observation_time_utc": "2026-11-23T23:03:51Z",
+    "valid_until_utc": null,
+    "fallback_used": false,
+    "license_ref": "MIT (TRĀYA schema & moderation engine); synthetic UAT exercise fixtures (non-operational)",
+    "sla_hours": 168,
+    "record_count": 2,
+    "notes": "Pre-MOU sandbox moderation queue (`public_live_endpoint_enabled: false`). Contains synthetic Dolakha & Sindhupalchok UAT exercise fixtures only; live citizen ingestion requires signed Wave D DEOC/NDRRMA/DHM MOUs.",
+    "requires_institutional_agreement": true
+  }
+}

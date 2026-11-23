@@ -205,7 +205,7 @@ html[data-theme="light"] {
 
   --shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
   --hud-bg: rgba(255, 255, 255, 0.94);
-  --suite-bg: #e2eaf3;
+  --suite-bg: #ebf1f7;
 }
 
 /* Base Reset & Typography */
@@ -375,6 +375,13 @@ html[data-theme="light"] .skip-link {
   color: var(--accent);
   border-color: var(--accent-border);
   font-weight: 700;
+}
+
+html[data-theme="light"] .prazg-suite-bar a[aria-current="page"],
+html[data-theme="light"] .prazg-suite-bar a[aria-current="page"]:hover {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
 }
 
 .suite-sep {
@@ -645,6 +652,11 @@ header.topbar {
   font-size: 11.8px;
 }
 
+.safety-ne[hidden],
+.lang-draft-bar[hidden] {
+  display: none !important;
+}
+
 html[lang="ne"] .safety-ne {
   display: none;
 }
@@ -700,6 +712,25 @@ html[data-theme="light"] .alert-banner.compound-warn {
   background: var(--accent-soft);
   border-bottom-color: var(--accent-border);
   color: var(--ink);
+}
+
+.alert-banner.lang-draft-bar {
+  background: var(--accent-soft);
+  border-bottom-color: var(--accent-border);
+  color: var(--ink);
+  font-size: 11.8px;
+  padding: 4px 12px;
+}
+
+.alert-banner.pick-banner {
+  background: var(--ok-bg);
+  border-bottom-color: var(--ok-bd);
+  color: var(--ink);
+}
+
+#map.is-picking-map,
+#map.is-picking-map .leaflet-grab {
+  cursor: crosshair !important;
 }
 
 .alert-banner-msg {
@@ -1008,10 +1039,33 @@ label.row input[type="checkbox"] {
 .sym-glof { color: #14b8a6; }
 .sym-hydro { color: #eab308; }
 .sym-gdacs { color: #c084fc; }
+.sym-tsho2d { color: #38bdf8; }
+.sym-localrep { color: #f59e0b; }
+
+/* Light-theme sidebar layer glyph overrides (WCAG 2.1 AA >= 4.5:1 & SC 1.4.11 >= 3:1 on #ffffff) */
+html[data-theme="light"] .sym-lake { color: #0369a1; }
+html[data-theme="light"] .sym-route { color: #0369a1; }
+html[data-theme="light"] .sym-exp { color: #a16207; }
+html[data-theme="light"] .sym-river { color: #0f766e; }
+html[data-theme="light"] .sym-fault { color: #c81e1e; }
+html[data-theme="light"] .sym-node { color: #b45309; }
+html[data-theme="light"] .sym-ls { color: #a16207; }
+html[data-theme="light"] .sym-eq { color: #c81e1e; }
+html[data-theme="light"] .sym-mmi { color: #b45309; }
+html[data-theme="light"] .sym-eqh { color: #b91c1c; }
+html[data-theme="light"] .sym-glof { color: #0f766e; }
+html[data-theme="light"] .sym-hydro { color: #a16207; }
+html[data-theme="light"] .sym-gdacs { color: #7e22ce; }
+html[data-theme="light"] .sym-tsho2d { color: #0369a1; }
+html[data-theme="light"] .sym-localrep { color: #b45309; }
 
 select,
 input[type="search"],
-input[type="date"] {
+input[type="date"],
+input[type="time"],
+input[type="number"],
+input[type="text"],
+textarea {
   width: 100%;
   min-width: 0;
   background: var(--panel2);
@@ -1020,6 +1074,34 @@ input[type="date"] {
   padding: 5px 8px;
   font-size: 12.5px;
   color: var(--ink);
+}
+
+textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+input[readonly] {
+  background: var(--panel3);
+  color: var(--ink2);
+}
+
+select.lang-select {
+  width: auto;
+  min-width: 94px;
+  padding: 3px 8px;
+  min-height: 30px;
+  cursor: pointer;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+select.lang-select:hover {
+  background: var(--panel3);
+  border-color: var(--accent);
 }
 
 select:focus,
@@ -2550,8 +2632,407 @@ td.wrap-cell {
   border: 1px solid var(--line);
 }
 
+/* --------------------------------------------------------------------------
+   10c. TRĀYA 2.0 Wave D: Multilingual CAP v1.2 / SMS / IVR, Offline PWA
+        Community Landslide Reporting Modal & Tsho Rolpa 2D Case Study
+   -------------------------------------------------------------------------- */
+/* Governed Multilingual CAP v1.2 & SMS/IVR Relay Panel */
+.cap-panel {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--warn);
+  border-radius: 8px;
+  padding: 11px 13px;
+  margin: 12px 0;
+}
+
+.cap-gov-lock {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-bd);
+  border-radius: 6px;
+  padding: 8px 11px;
+  margin-bottom: 10px;
+  font-size: 12.2px;
+  color: var(--ink);
+}
+
+.cap-lock-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cap-adv-tabs,
+.cap-lang-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 7px 0;
+}
+
+.cap-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+  cursor: pointer;
+}
+
+.cap-lang-btn:hover,
+.cap-lang-btn.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cap-draft-dot {
+  font-size: 9.5px;
+  padding: 0.5px 4px;
+  border-radius: 3px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  border: 1px solid var(--warn-bd);
+}
+
+.cap-meta-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 11px;
+  margin: 8px 0;
+}
+
+.cap-meta-card h5 {
+  margin: 0 0 5px;
+  font-size: 13.8px;
+  color: var(--ink);
+}
+
+.cap-channels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  margin-top: 9px;
+}
+
+.cap-channel-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cap-channel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12.2px;
+  font-weight: 700;
+}
+
+.cap-sms-bubble {
+  font-family: var(--font-mono);
+  font-size: 12.2px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--panel2);
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 9px 11px;
+  color: var(--ink);
+}
+
+.cap-ivr-script {
+  font-size: 12.6px;
+  line-height: 1.55;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent2);
+  border-radius: 0 6px 6px 0;
+  padding: 9px 11px;
+  color: var(--ink);
+}
+
+/* Offline-First PWA Community Landslide Reporting Modal */
+.report-modal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(290px, 0.95fr);
+  gap: 14px;
+  align-items: start;
+  margin-top: 10px;
+}
+
+.rep-form,
+.rep-queue-panel {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rep-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rep-section-head h3 {
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11.8px;
+  color: var(--ink2);
+  font-weight: 600;
+}
+
+.pii-preview-box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.pii-preview-box.has-pii {
+  border-color: var(--warn-bd);
+  background: var(--warn-bg);
+}
+
+.pii-tag-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--h-mod-bg);
+  color: var(--h-mod-fg);
+  margin-right: 4px;
+}
+
+.rep-photo-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 7px;
+  background: var(--panel);
+  border: 1px solid var(--ok-bd);
+  border-radius: 6px;
+}
+
+.rep-photo-thumb {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.rep-photo-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.rep-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.rep-queue-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rep-queue-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.rep-queue-thumb {
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  margin-top: 3px;
+}
+
+/* Tsho Rolpa 2D Hydrodynamic Case Study Controls, Legend & Charts */
+.tsho2d-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 8px 0;
+}
+
+.tsho2d-ctrl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 170px;
+  flex: 1 1 180px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tsho2d-ctrl-group select {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+.tsho2d-legend-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin: 6px 0 10px;
+  font-size: 11.6px;
+}
+
+.tsho2d-legend-items {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tsho2d-leg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink);
+}
+
+.tsho2d-sw {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.tr2d-sw-1 { background: #38bdf8; }
+.tr2d-sw-2 { background: #0284c7; }
+.tr2d-sw-3 { background: #f59e0b; }
+.tr2d-sw-4 { background: #b91c1c; }
+.tr2d-sw-a1 { background: #b91c1c; }
+.tr2d-sw-a2 { background: #c2410c; }
+.tr2d-sw-a3 { background: #eab308; }
+.tr2d-sw-a4 { background: #0f766e; }
+
+.tsho2d-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.tsho2d-chart-box {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px 11px;
+}
+
+.tsho2d-chart-box h5 {
+  margin: 0 0 6px;
+  font-size: 12.8px;
+  color: var(--ink);
+}
+
+.tsho2d-svg {
+  width: 100%;
+  height: 215px;
+  display: block;
+  background: var(--chart-bg);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
 @media (max-width: 960px) {
-  .cascade-layout {
+  .cascade-layout,
+  .report-modal-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-grid-2 {
     grid-template-columns: 1fr;
   }
 }

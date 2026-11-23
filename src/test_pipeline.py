@@ -19,6 +19,7 @@ import os
 import sys
 import tempfile
 import warnings
+import xml.etree.ElementTree as ET
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
@@ -31,6 +32,7 @@ except ImportError:
 
 import admin as AD
 import build as BD
+import cap_relay as CAP
 import cascades as CAS
 import config as C
 import exposure as EX
@@ -39,11 +41,13 @@ import hazard as HZ
 import hydromet as HM
 import landslides as LS
 import models_glof as MG
+import moderation as MOD
 import refresh_weekly as RW
 import routing as RT
 import seismic as SZ
 import sensitivity as SN
 import terrain as TR
+import tsho_rolpa_2d_sim as TR2D
 import validate as VL
 from integrations import (
     bipad as BIPAD,
@@ -1441,6 +1445,96 @@ def test_ui_contrast_severity_and_csp_alignment():
         f"hosts={thumb_hosts}, unaligned={unaligned}",
     )
 
+    # 4. Light-theme active .prazg-suite-bar link (>= 4.5:1 AA) and .sym-* glyphs (>= 4.5:1 / SC 1.4.11)
+    def _lin_srgb(ch: float) -> float:
+        v = ch / 255.0
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+    def _hex_rgb(hx: str) -> tuple[int, int, int]:
+        h = hx.lstrip("#")
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+    def _contrast(rgb1: tuple[float, float, float], rgb2: tuple[float, float, float]) -> float:
+        l1 = 0.2126 * _lin_srgb(rgb1[0]) + 0.7152 * _lin_srgb(rgb1[1]) + 0.0722 * _lin_srgb(rgb1[2])
+        l2 = 0.2126 * _lin_srgb(rgb2[0]) + 0.7152 * _lin_srgb(rgb2[1]) + 0.0722 * _lin_srgb(rgb2[2])
+        return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+
+    m_acc = re.search(r"--accent\s*:\s*(#[0-9a-fA-F]{6})", light_block)
+    m_suite_rule = re.search(
+        r'html\[data-theme="light"\]\s+\.prazg-suite-bar\s+a\[aria-current="page"\][^{]*\{([^}]+)\}',
+        css,
+    )
+    suite_cr = 0.0
+    if m_acc and m_suite_rule:
+        sblock = m_suite_rule.group(1)
+        bg_tok = re.search(r"background\s*:\s*([^;]+);", sblock)
+        fg_tok = re.search(r"(?<![-\w])color\s*:\s*([^;]+);", sblock)
+        if bg_tok and fg_tok:
+            bg_val = bg_tok.group(1).strip()
+            fg_val = fg_tok.group(1).strip()
+            bg_hex = m_acc.group(1) if bg_val == "var(--accent)" else bg_val
+            fg_hex = m_acc.group(1) if fg_val == "var(--accent)" else fg_val
+            if re.fullmatch(r"#[0-9a-fA-F]{6}", bg_hex) and re.fullmatch(r"#[0-9a-fA-F]{6}", fg_hex):
+                suite_cr = _contrast(_hex_rgb(fg_hex), _hex_rgb(bg_hex))
+
+    base_syms = re.findall(r"^\.(sym-[a-z0-9]+)\s*\{\s*color\s*:\s*(#[0-9a-fA-F]{6})\s*;", css, re.M)
+    light_syms = dict(
+        re.findall(
+            r'^html\[data-theme="light"\]\s+\.(sym-[a-z0-9]+)\s*\{\s*color\s*:\s*(#[0-9a-fA-F]{6})\s*;',
+            css,
+            re.M,
+        )
+    )
+    min_sym_cr = 99.0
+    missing_light_syms: list[str] = []
+    for sname, _ in base_syms:
+        if sname not in light_syms:
+            missing_light_syms.append(sname)
+        else:
+            min_sym_cr = min(min_sym_cr, _contrast(_hex_rgb(light_syms[sname]), (255, 255, 255)))
+    check(
+        "light-theme active .prazg-suite-bar link & all .sym-* glyphs meet WCAG 2.1 AA (>= 4.5:1)",
+        suite_cr >= 4.5 and bool(base_syms) and not missing_light_syms and min_sym_cr >= 4.5,
+        f"suite_active={suite_cr:.2f}:1, syms={len(light_syms)}/{len(base_syms)}, min_sym={min_sym_cr:.2f}:1",
+    )
+
+    # 5. Basemap tileerror fallback guards baselayerchange, uses cross-provider chain & parameterized i18n
+    with open(os.path.join(root, "assets", "i18n.js"), encoding="utf-8") as fh:
+        i18n_js = fh.read()
+    m_chain = re.search(r"const\s+BASEMAP_FALLBACK_CHAIN\s*=\s*\[([^\]]+)\]", app_js)
+    chain_items = re.findall(r"['\"]([^'\"]+)['\"]", m_chain.group(1)) if m_chain else []
+    fallback_notices = re.findall(r"basemapFallbackNotice\s*:\s*'([^']+)'", i18n_js)
+    has_basemap_guard = (
+        "let isAutoFallbackSwitching = false;" in app_js
+        and "if (isAutoFallbackSwitching) return;" in app_js
+        and "isAutoFallbackSwitching = true;" in app_js
+        and "isAutoFallbackSwitching = false;" in app_js
+        and "CARTO Voyager" in chain_items
+        and "OpenStreetMap" in chain_items
+        and "Esri World Topo" not in chain_items
+        and "t('basemapFallbackNotice', { basemap: fallbackName })" in app_js
+        and len(fallback_notices) == 6
+        and all("{basemap}" in msg and "OpenStreetMap" not in msg for msg in fallback_notices)
+    )
+    check(
+        "basemap tileerror fallback guards baselayerchange, crosses providers & formats all 6 i18n notices",
+        has_basemap_guard,
+        f"chain={chain_items}, i18n_notices={len(fallback_notices)}",
+    )
+
+    # 6. SECURITY.md documents strict-origin-when-cross-origin (zero stale no-referrer)
+    with open(os.path.join(root, "SECURITY.md"), encoding="utf-8") as fh:
+        sec_md = fh.read()
+    sec_ref_ok = (
+        '<meta name="referrer" content="strict-origin-when-cross-origin">' in sec_md
+        and "no-referrer" not in sec_md.lower()
+    )
+    check(
+        "SECURITY.md documents strict-origin-when-cross-origin with zero stale no-referrer",
+        sec_ref_ok,
+        "aligned with index.html and src/template.html",
+    )
+
 
 def test_copernicus_sentinel1_sar_parsing():
     """Verify Sentinel-1 GRD all-weather SAR STAC item parsing preserves polarizations & HTTPS URLs."""
@@ -1468,6 +1562,382 @@ def test_copernicus_sentinel1_sar_parsing():
         and parsed["all_weather_capability"] is True
         and str(parsed.get("copernicus_browser_url") or "").startswith("https://"),
         f"platform={parsed['platform']}, mode={parsed['instrument_mode']}, pols={parsed['polarizations']}",
+    )
+
+
+def test_bates_2d_shallow_water_solver():
+    """Verify 2D Bates (2010) inertial shallow-water solver:
+    1. Flat-water stillness (Lake-at-Rest C-property over uneven submerged bed);
+    2. Exact mass conservation (< 1% error) on both closed and open-outflow valleys;
+    3. Downhill floodwave propagation with strictly positive monotonic arrival times."""
+    # 1. Lake-at-Rest stillness over non-flat submerged bathymetry
+    n = 9
+    eta0 = 100.0
+    z_lake = [[110.0 for _ in range(n)] for _ in range(n)]
+    h_lake = [[0.0 for _ in range(n)] for _ in range(n)]
+    for r in range(1, n - 1):
+        for c in range(1, n - 1):
+            bed = 96.0 + (2.5 if (r == 4 and c == 4) else (1.2 if (r == 3 and c == 4) else 0.0))
+            z_lake[r][c] = bed
+            h_lake[r][c] = eta0 - bed
+
+    still = TR2D.run_2d_solver_on_grid(
+        z_lake,
+        dx=50.0,
+        dy=50.0,
+        h_init_grid=h_lake,
+        manning_n=0.05,
+        duration_s=120.0,
+    )
+    max_v_still = max(v for row in still["v_max"] for v in row)
+    max_dh_still = max(
+        abs(still["h_final"][r][c] - h_lake[r][c])
+        for r in range(n) for c in range(n)
+    )
+    check(
+        "2D Bates solver preserves exact Lake-at-Rest flat-water stillness over uneven bed",
+        max_v_still == 0.0
+        and max_dh_still < 1e-12
+        and still["mass_balance_error_pct"] < 1e-9,
+        f"max_v={max_v_still:.3e} m/s, max_dh={max_dh_still:.3e} m, mb_err={still['mass_balance_error_pct']:.3e}%",
+    )
+
+    # 2. Sloped 2D valley channel with asymmetric gamma breach pulse (open outflow + closed check)
+    rows, cols = 16, 7
+    mid_c = cols // 2
+    z_val = [
+        [1000.0 - r * 5.0 + abs(c - mid_c) * 15.0 for c in range(cols)]
+        for r in range(rows)
+    ]
+    tp_s, qp_eff, shape_m = TR2D.build_gamma_hydrograph_params(
+        vol_m3=5.0e5, q_peak_m3s=350.0, duration_s=400.0
+    )
+
+    def _pulse(t_s: float) -> float:
+        return TR2D.eval_gamma_hydrograph(t_s, tp_s, qp_eff, shape_m)
+
+    sim_open = TR2D.run_2d_solver_on_grid(
+        z_val,
+        dx=50.0,
+        dy=50.0,
+        manning_n=0.055,
+        inflow_cells=[(0, mid_c)],
+        inflow_fn=_pulse,
+        outflow_cells=[(rows - 1, c) for c in range(cols)],
+        duration_s=400.0,
+    )
+    sim_closed = TR2D.run_2d_solver_on_grid(
+        z_val,
+        dx=50.0,
+        dy=50.0,
+        manning_n=0.055,
+        inflow_cells=[(0, mid_c)],
+        inflow_fn=_pulse,
+        outflow_cells=[],
+        duration_s=200.0,
+    )
+    min_h_open = min(h for row in sim_open["h_final"] for h in row)
+    min_h_closed = min(h for row in sim_closed["h_final"] for h in row)
+    check(
+        "2D Bates solver conserves global mass (< 1% error) with non-negative depths",
+        sim_open["volume_in_m3"] > 0.0
+        and sim_open["volume_out_m3"] > 0.0
+        and sim_open["mass_balance_error_pct"] < 1.0
+        and sim_closed["mass_balance_error_pct"] < 1.0
+        and sim_closed["volume_out_m3"] == 0.0
+        and min_h_open >= 0.0
+        and min_h_closed >= 0.0,
+        f"open_err={sim_open['mass_balance_error_pct']:.5f}% (out={sim_open['volume_out_m3']:.0f} m3), "
+        f"closed_err={sim_closed['mass_balance_error_pct']:.5f}%",
+    )
+
+    # 3. Downhill floodwave propagation & strictly increasing positive arrival times
+    probe_rows = (2, 6, 10, 14)
+    arr_times = [sim_open["t_arrival_s"][r][mid_c] for r in probe_rows]
+    peak_depths = [sim_open["h_max"][r][mid_c] for r in probe_rows]
+    max_vel = max(v for row in sim_open["v_max"] for v in row)
+    strictly_increasing = all(t > 0.0 for t in arr_times) and all(
+        arr_times[i] < arr_times[i + 1] for i in range(len(arr_times) - 1)
+    )
+    all_wet = all(d >= TR2D.WET_THRESHOLD_M for d in peak_depths)
+    check(
+        "2D Bates solver propagates wave downhill with strictly positive monotonic arrival times",
+        strictly_increasing and all_wet and 0.0 < max_vel <= TR2D.MAX_VELOCITY_MS,
+        f"t_arr(r={probe_rows})={[round(t, 1) for t in arr_times]}s, "
+        f"h_max={[round(d, 2) for d in peak_depths]}m, max_v={max_vel:.2f} m/s",
+    )
+
+
+def test_community_moderation_engine():
+    """Verify src/moderation.py PII redaction, EXIF-required rejection, unverified
+    null-not-0 casualty lock, flag-only duplicate detection & authenticated role promotion."""
+    # 1. Deterministic Nepal PII redaction + hotline/coord preservation + idempotence
+    raw_pii = (
+        "Slope slip at 27.8603, 86.4772 near Singati. Contact +977-9841234567 or 9801234567 "
+        "or 01-4211234 or ९८४१२३४५६७, email field.observer@example.org, citizenship 27-01-74-01234, "
+        "license 01-06-00123456, NID 123-456-789-0, handle @dolakha_scout. "
+        "Official hotlines: 100, 102, 1114, 1149, 1155."
+    )
+    redacted, tags = MOD.redact_pii(raw_pii)
+    redacted_again, tags_again = MOD.redact_pii(redacted)
+    leaked_literals = [
+        tok for tok in (
+            "9841234567", "9801234567", "01-4211234", "९८४१२३४५६७",
+            "field.observer@example.org", "27-01-74-01234", "01-06-00123456",
+            "123-456-789-0", "@dolakha_scout",
+        )
+        if tok in redacted
+    ]
+    preserved_safe = all(
+        tok in redacted for tok in ("27.8603", "86.4772", "100", "102", "1114", "1149", "1155")
+    )
+    check(
+        "moderation.redact_pii strips Nepal phones/emails/IDs/handles, keeps hotlines & is idempotent",
+        set(tags) == {"email", "phone", "id", "handle"}
+        and not leaked_literals
+        and preserved_safe
+        and "[REDACTED_PHONE]" in redacted
+        and "[REDACTED_EMAIL]" in redacted
+        and "[REDACTED_ID]" in redacted
+        and "[REDACTED_HANDLE]" in redacted
+        and redacted_again == redacted
+        and tags_again == [],
+        f"tags={tags}, leaked={leaked_literals}",
+    )
+
+    # 2. EXIF-required, PII-leak & unverified zero-casualty validation rejections
+    base_report = {
+        "report_id": "cr_unit_dolakha_001",
+        "feature_type": "hazard_report",
+        "moderation_status": "pending_agency_review",
+        "captured_at_utc": "2026-11-23T08:00:00Z",
+        "event_date_utc": "2026-11-23T06:00:00Z",
+        "time_precision": "exact_hour",
+        "location_source": "gps",
+        "lon": 86.1652,
+        "lat": 27.7164,
+        "district": "Dolakha",
+        "province": "Bagmati Province",
+        "trigger": "rainfall",
+        "road_blocked": True,
+        "fatalities": None,
+        "injuries": None,
+        "description_redacted": redacted,
+        "photo_attached": True,
+        "exif_stripped": True,
+        "dedup_fingerprint": MOD.compute_dedup_fingerprint(86.1652, 27.7164, "2026-11-23T06:00:00Z", "rainfall"),
+        "pii_redaction_applied": True,
+    }
+    errs_valid = MOD.validate_community_report(base_report)
+    errs_no_exif = MOD.validate_community_report({**base_report, "exif_stripped": False})
+    errs_zero_fat = MOD.validate_community_report({**base_report, "fatalities": 0})
+    errs_zero_inj = MOD.validate_community_report({**base_report, "injuries": 0})
+    errs_pii_leak = MOD.validate_community_report({**base_report, "description_redacted": "Call 9841234567"})
+    check(
+        "moderation.validate_community_report enforces EXIF stripping, PII scrubbing & unverified null-not-0",
+        errs_valid == []
+        and any("exif_stripped" in e for e in errs_no_exif)
+        and any("null-not-0" in e for e in errs_zero_fat)
+        and any("null-not-0" in e for e in errs_zero_inj)
+        and any("unredacted PII" in e for e in errs_pii_leak),
+        f"valid={len(errs_valid)}, no_exif={len(errs_no_exif)}, zero_fat={len(errs_zero_fat)}, pii_leak={len(errs_pii_leak)}",
+    )
+
+    # 3. Flag-only duplicate detection against landslide inventory
+    inv_events = [
+        {
+            "id": "bipad_near_dated", "source": "BIPAD Portal", "provider_id": "bipad_ndrrma",
+            "feature_type": "landslide_event", "title": "Singati slope failure",
+            "lon": 86.1670, "lat": 27.7175, "event_date_utc": "2026-11-22T12:00:00Z",
+        },
+        {
+            "id": "osm_near_scar", "source": "OpenStreetMap", "provider_id": "osm_overpass",
+            "feature_type": "landslide_scar", "title": "Mapped valley scar",
+            "lon": 86.1655, "lat": 27.7166, "event_date_utc": None,
+        },
+        {
+            "id": "bipad_far_or_old", "source": "BIPAD Portal", "provider_id": "bipad_ndrrma",
+            "feature_type": "landslide_event", "title": "Old distant event",
+            "lon": 85.3240, "lat": 27.7172, "event_date_utc": "2026-10-01T00:00:00Z",
+        },
+    ]
+    dups = MOD.check_duplicate_against_inventory(base_report, inv_events, max_km=1.5, max_days=3)
+    dup_by_id = {d["inventory_event_id"]: d for d in dups}
+    check(
+        "moderation.check_duplicate_against_inventory flags dated & undated matches with auto_merged=False",
+        dup_by_id.get("bipad_near_dated", {}).get("reason") == "dated_spatiotemporal_proximity"
+        and dup_by_id.get("osm_near_scar", {}).get("reason") == "undated_spatial_proximity"
+        and "bipad_far_or_old" not in dup_by_id
+        and all(d["auto_merged"] is False and d["review_status"] == "pending_review" for d in dups),
+        f"flagged={list(dup_by_id.keys())}",
+    )
+
+    # 4. Authenticated role enforcement & verified promotion to landslide_event.v1
+    blocked_role = False
+    try:
+        MOD.transition_moderation_state(base_report, "verified_promoted", "public_user", "PUBLIC-1", "attempt")
+    except PermissionError:
+        blocked_role = True
+    blocked_agency = False
+    try:
+        MOD.transition_moderation_state(base_report, "verified_promoted", "deoc_officer", "   ", "missing id")
+    except PermissionError:
+        blocked_agency = True
+
+    promoted_rep = MOD.transition_moderation_state(
+        base_report,
+        "verified_promoted",
+        "deoc_officer",
+        "DEOC-DOLAKHA-01",
+        "Verified on site by Dolakha DEOC duty officer.",
+    )
+    promoted_ls = promoted_rep.get("promoted_landslide_record") or {}
+    ls_errs = LS.validate_landslide_record(promoted_ls) if promoted_ls else ["missing promoted record"]
+
+    blocked_terminal = False
+    try:
+        MOD.transition_moderation_state(
+            promoted_rep, "rejected_duplicate", "ndrrma_verifier", "NDRRMA-01", "re-transition"
+        )
+    except ValueError:
+        blocked_terminal = True
+
+    with tempfile.TemporaryDirectory() as tmpd:
+        mq = MOD.build_moderation_queue(tmpd, write=True)
+    check(
+        "moderation.transition_moderation_state blocks unauthorized callers & promotes valid landslide_event.v1",
+        blocked_role
+        and blocked_agency
+        and blocked_terminal
+        and promoted_rep["moderation_status"] == "verified_promoted"
+        and len(promoted_rep["moderation_history"]) == 1
+        and promoted_ls.get("verified") is True
+        and promoted_ls.get("feature_type") == "landslide_event"
+        and not ls_errs
+        and mq["public_live_endpoint_enabled"] is False,
+        f"blocked=(role={blocked_role}, agency={blocked_agency}, terminal={blocked_terminal}), "
+        f"promoted_type={promoted_ls.get('feature_type')}, sandbox_live={mq['public_live_endpoint_enabled']}",
+    )
+
+
+def test_cap_v12_multilingual_relay():
+    """Verify src/cap_relay.py generates valid OASIS CAP v1.2 Exercise XML,
+    hard-locks status=Exercise & relay_enabled=False, and covers all 6 languages + SMS/IVR."""
+    with tempfile.TemporaryDirectory() as tmpd:
+        ddir = os.path.join(tmpd, "data")
+        os.makedirs(ddir, exist_ok=True)
+        with open(os.path.join(ddir, "cascades.json"), "w", encoding="utf-8") as fh:
+            json.dump({
+                "generated_utc": "2026-11-23T12:00:00Z",
+                "active_scenarios": [
+                    {
+                        "scenario_id": "SCN-GLOF-INFRA-ISOLATION",
+                        "chain_id": "glof_infra_isolation",
+                        "severity": "high",
+                        "status": "active_dynamic",
+                        "evidence_types": ["observed", "modelled_static"],
+                        "affected_districts": ["Dolakha", "Ramechhap"],
+                        "affected_provinces": ["Bagmati Province"],
+                        "summary_en": "Synthetic GLOF corridor exercise scenario for Dolakha and Ramechhap.",
+                    }
+                ],
+            }, fh)
+        with open(os.path.join(ddir, "rivers_watch.json"), "w", encoding="utf-8") as fh:
+            json.dump({
+                "basins": [
+                    {
+                        "id": "koshi", "name": "Saptakoshi", "district": "Sunsari",
+                        "prov": "Koshi Province", "dhm_ref": "Chatara",
+                        "status_now": "q5_warning", "status_14d": "q5_warning",
+                        "current_m3s": 4200.0, "peak_14d_median_m3s": 5100.0,
+                    }
+                ]
+            }, fh)
+        with open(os.path.join(ddir, "bipad_official.json"), "w", encoding="utf-8") as fh:
+            json.dump({
+                "alerts": [
+                    {
+                        "id": 9001, "public": True, "hazard": 11,
+                        "title": "Flood alert in Dhanusha and Kailali",
+                        "description": "Synthetic exercise mirror.",
+                        "startedOn": "2026-11-23T06:00:00+05:45",
+                    }
+                ]
+            }, fh)
+
+        payload = CAP.build_cap_drafts(tmpd, write=True)
+        xml_path = os.path.join(ddir, "cap_exercise_latest.xml")
+        xml_text = open(xml_path, encoding="utf-8").read()
+
+    # 1. Governance locks & rejection of Actual / relay_enabled=True
+    adv0 = payload["advisories"][0]
+    xml_blocks_actual = False
+    try:
+        CAP.advisory_to_cap_xml({**adv0, "status": "Actual"})
+    except ValueError:
+        xml_blocks_actual = True
+    errs_actual = CAP.validate_cap_advisory({**adv0, "status": "Actual"})
+    errs_relay_on = CAP.validate_cap_advisory({
+        **adv0,
+        "relay_governance": {**adv0["relay_governance"], "relay_enabled": True},
+    })
+    gov = payload["relay_governance"]
+    check(
+        "cap_relay hard-locks <status>Exercise</status> & relay_enabled=False (blocks Actual)",
+        gov["relay_enabled"] is False
+        and gov["requires_signed_mou"] is True
+        and gov["statutory_warning"] is False
+        and gov["cap_status"] == "Exercise"
+        and payload["summary"]["all_cap_status_exercise"] is True
+        and len(payload["advisories"]) == 3
+        and xml_blocks_actual
+        and bool(errs_actual)
+        and bool(errs_relay_on),
+        f"advisories={len(payload['advisories'])}, relay_enabled={gov['relay_enabled']}, blocks_actual={xml_blocks_actual}",
+    )
+
+    # 2. Valid OASIS CAP v1.2 XML structure
+    xml_errs = CAP.validate_cap_xml(xml_text)
+    root_el = ET.fromstring(xml_text)
+    ns = {"cap": CAP.CAP_XMLNS}
+    xml_langs = [el.findtext("cap:language", default="", namespaces=ns) for el in root_el.findall("cap:info", ns)]
+    check(
+        "cap_relay emits well-formed OASIS CAP v1.2 XML with Exercise status & 6 <info> blocks",
+        not xml_errs
+        and root_el.tag == f"{{{CAP.CAP_XMLNS}}}alert"
+        and root_el.findtext("cap:status", namespaces=ns) == "Exercise"
+        and xml_langs == ["en", "ne", "mai", "bho", "thr", "taj"],
+        f"status={root_el.findtext('cap:status', namespaces=ns)}, langs={xml_langs}",
+    )
+
+    # 3. All 6 language info blocks + SMS budgets + IVR voice scripts + 5 hotlines
+    expected_langs = ["en", "ne", "mai", "bho", "thr", "taj"]
+    block_issues: list[str] = []
+    for adv in payload["advisories"]:
+        if [i["language"] for i in adv["info"]] != expected_langs:
+            block_issues.append(f"{adv['identifier']}: language list mismatch")
+        for info in adv["info"]:
+            lc = info["language"]
+            sms = info["sms_draft"]
+            ivr = info["ivr_voice_script"]
+            budget = 160 if lc == "en" else 140
+            if not sms["within_budget"] or len(sms["text"]) > budget:
+                block_issues.append(f"{lc}: SMS len {len(sms['text'])} > {budget}")
+            if lc == "en" and (sms["encoding"] != "GSM-7" or not sms["text"].isascii()):
+                block_issues.append("en: SMS must be ASCII GSM-7")
+            if lc != "en" and sms["encoding"] != "UCS-2":
+                block_issues.append(f"{lc}: SMS must be UCS-2")
+            if not (20.0 <= float(ivr["estimated_duration_sec"]) <= 40.0) or not ivr["repeat_key_instruction"]:
+                block_issues.append(f"{lc}: invalid IVR script ({ivr['estimated_duration_sec']}s)")
+            for hl in CAP.REQUIRED_HOTLINES:
+                if hl not in info["instruction"]:
+                    block_issues.append(f"{lc}: missing hotline {hl}")
+    check(
+        "cap_relay validates all 6 languages (en/ne/mai/bho/thr/taj), SMS budgets, IVR scripts & 5 hotlines",
+        not block_issues,
+        f"{payload['summary']['n_info_blocks']} info blocks verified across 6 languages"
+        if not block_issues
+        else "; ".join(block_issues[:5]),
     )
 
 
@@ -1578,6 +2048,9 @@ def main(argv=None) -> int:
         test_cascade_graph_evaluation,
         test_ui_contrast_severity_and_csp_alignment,
         test_copernicus_sentinel1_sar_parsing,
+        test_bates_2d_shallow_water_solver,
+        test_community_moderation_engine,
+        test_cap_v12_multilingual_relay,
     )
 
     print(f"unit tests ({'stdlib --unit-only' if args.unit_only else 'full mode'})")

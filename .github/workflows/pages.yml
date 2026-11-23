@@ -30,28 +30,33 @@ jobs:
           python-version: "3.12"
 
       - name: Run pre-deploy verification gate
-        run: python src/verify_site.py
+        run: python -B src/verify_site.py
 
       - name: Stage static site bundle
         run: |
           set -euo pipefail
           test -f index.html
+          test -f manifest.webmanifest
+          test -f sw.js
           test -d assets
           test -d data
           test -d vendor
+          test -d schemas
           rm -rf _site
           mkdir -p _site/data
-          cp index.html _site/
-          cp -r assets vendor _site/
+          cp index.html manifest.webmanifest sw.js _site/
+          cp -r assets vendor schemas _site/
           cp data/*.json _site/data/
           for gj in data/*.geojson; do
             if [ -e "$gj" ]; then
               cp "$gj" _site/data/
             fi
           done
-          if [ -d schemas ]; then
-            cp -r schemas _site/
-          fi
+          for xf in data/*.xml; do
+            if [ -e "$xf" ]; then
+              cp "$xf" _site/data/
+            fi
+          done
           touch _site/.nojekyll
 
       - name: Configure GitHub Pages

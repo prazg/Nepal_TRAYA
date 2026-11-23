@@ -6,11 +6,13 @@ Runs cleanly on pure Python 3.12 standard library (zero numpy/scipy/shapely/
 rasterio/requests dependencies), supporting:
   * `--offline`      : zero network calls; normalizes caches, recomputes true
                        perpendicular point-to-segment downstream exposure,
-                       and builds all TRĀYA 2.0 `data/*.json` & `.geojson`
-                       products (including BIPAD official snapshot, 5-type
-                       landslide inventory & review queue, Sentinel-1/2 EO,
-                       road-cut hospital isolation, multi-hazard cascades,
-                       Tsho Rolpa 2D pilot benchmark, SHA-256 manifest, and
+                       and builds all TRĀYA 2.0 `data/*.json`, `.geojson`, &
+                       `.xml` products (including BIPAD official snapshot,
+                       5-type landslide inventory & review queue, Sentinel-1/2
+                       EO, road-cut hospital isolation, multi-hazard cascades,
+                       Tsho Rolpa 2D inertial shallow-water simulation & pilot
+                       benchmark, community moderation sandbox queue, 6-language
+                       OASIS CAP v1.2 Exercise drafts, SHA-256 manifest, and
                        KPI baseline).
   * live (default)   : refreshes official NDRRMA BIPAD v1 feeds, GloFAS
                        10-basin forecasts (with 3x3 mainstem snapping),
@@ -1506,8 +1508,10 @@ def build_validation(
             "id": "screening_not_probabilistic",
             "title": "Screening tool, not probabilistic forecast or statutory warning",
             "detail": (
-                "No probability of failure is computed, no 2D hydrodynamic inundation is modelled, and subsurface moraine ice "
-                "cannot be ruled out from DEMs. Consult DHM (hydrology.gov.np), DMG/NEMRC (seismonepal.gov.np), and NDRRMA/BIPAD (bipadportal.gov.np)."
+                "No probability of failure is computed, national 1,429-lake screening uses 1D corridors "
+                "(only the Tsho Rolpa pilot includes a screening-resolution ~90 m 2D inertial run, awaiting <=5 m LiDAR DEM "
+                "for design-grade mapping), and subsurface moraine ice cannot be ruled out from DEMs. "
+                "Consult DHM (hydrology.gov.np), DMG/NEMRC (seismonepal.gov.np), and NDRRMA/BIPAD (bipadportal.gov.np)."
             ),
         },
     ]
@@ -1585,6 +1589,9 @@ def build_provenance_envelopes(
     tsho_rolpa_data: dict[str, Any],
     build_utc: str,
     offline: bool,
+    tsho_rolpa_2d_data: dict[str, Any] | None = None,
+    moderation_data: dict[str, Any] | None = None,
+    cap_data: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Collect canonical 6-state ProvenanceEnvelopes for every TRĀYA 2.0 data feed."""
     envelopes: list[dict[str, Any]] = []
@@ -1832,7 +1839,36 @@ def build_provenance_envelopes(
         )
     )
 
-    # 16-18. Documented Government of Nepal institutional adapter stubs (MOU required)
+    # 16. Tsho Rolpa 2D inertial shallow-water screening simulation (Bates et al., 2010)
+    if isinstance(tsho_rolpa_2d_data, dict) and isinstance(tsho_rolpa_2d_data.get("provenance"), dict):
+        envelopes.append(dict(tsho_rolpa_2d_data["provenance"]))
+    else:
+        envelopes.append(
+            PROV.make_envelope(
+                source="Nepal TRĀYA 2.0 2D Inertial Shallow-Water Solver (Bates et al., 2010) on ESA Copernicus DEM GLO-30",
+                dataset="traya_tsho_rolpa_2d_inundation_v1",
+                data_class="unavailable",
+                retrieved_at_utc=build_utc,
+                observation_time_utc=None,
+                valid_until_utc=None,
+                status="unavailable",
+                fallback_used=True,
+                license_ref="CC-BY-4.0 (TRĀYA 2D screening outputs); Copernicus DEM Open Data License (ESA/Airbus)",
+                sla_hours=8760,
+                record_count=0,
+                notes="cache/tsho_rolpa_dem_90m.json not present; 2D inertial simulation skipped.",
+            )
+        )
+
+    # 17. Community Landslide Reporting Moderation Queue (Pre-MOU Sandbox)
+    if isinstance(moderation_data, dict) and isinstance(moderation_data.get("provenance"), dict):
+        envelopes.append(dict(moderation_data["provenance"]))
+
+    # 18. 6-Language OASIS CAP v1.2 & SMS/IVR Exercise Relay Drafts (Pre-MOU Sandbox)
+    if isinstance(cap_data, dict) and isinstance(cap_data.get("provenance"), dict):
+        envelopes.append(dict(cap_data["provenance"]))
+
+    # 19-21. Documented Government of Nepal institutional adapter stubs (MOU required)
     envelopes.append(DHM.get_provenance(retrieved_at_utc=build_utc))
     envelopes.append(NEMRC.get_provenance(retrieved_at_utc=build_utc))
     envelopes.append(DOR.get_provenance(retrieved_at_utc=build_utc))
@@ -1861,6 +1897,9 @@ def build_summary(
     exposure_isolation_data: dict[str, Any] | None = None,
     cascades_data: dict[str, Any] | None = None,
     tsho_rolpa_data: dict[str, Any] | None = None,
+    tsho_rolpa_2d_data: dict[str, Any] | None = None,
+    moderation_data: dict[str, Any] | None = None,
+    cap_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build lean `data/summary.json` with next Monday 03:15 UTC schedule & TRĀYA 2.0 counts."""
     legacy_sum = read_js_or_json(
@@ -1893,6 +1932,18 @@ def build_summary(
     cas_sum = cas_doc.get("summary") or {}
     tr_doc = tsho_rolpa_data or {}
     tr_id = tr_doc.get("lake_identification") or {}
+    tr2d_doc = tsho_rolpa_2d_data or {}
+    tr2d_scns = tr2d_doc.get("scenarios") or []
+    tr2d_dm = tr2d_doc.get("dem_metadata") or {}
+    tr2d_max_mb = max(
+        (float((s.get("mass_balance") or {}).get("mass_balance_error_pct") or 0.0) for s in tr2d_scns),
+        default=None,
+    )
+    mod_doc = moderation_data or {}
+    mod_sum = mod_doc.get("queue_summary") or {}
+    cap_doc = cap_data or {}
+    cap_gov = cap_doc.get("relay_governance") or {}
+    cap_sum = cap_doc.get("summary") or {}
 
     return {
         "build": build_utc,
@@ -2000,10 +2051,48 @@ def build_summary(
             "generated_utc": tr_doc.get("generated_utc"),
             "data_class": tr_doc.get("data_class"),
             "is_2d_inundation_map": bool(tr_doc.get("is_2d_inundation_map", False)),
+            "is_design_grade_2d_map": bool(tr_doc.get("is_design_grade_2d_map", False)),
+            "has_screening_2d_simulation": bool(tr_doc.get("has_screening_2d_simulation", False)),
+            "simulation_2d_path": tr_doc.get("simulation_2d_path"),
+            "footprints_geojson_path": tr_doc.get("footprints_geojson_path"),
             "matched_inventory_id": tr_id.get("matched_inventory_id"),
             "n_valley_checkpoints": len(tr_doc.get("valley_checkpoints") or []),
             "n_breach_scenarios": len(tr_doc.get("breach_scenario_framework") or []),
             "status_note": tr_doc.get("status_note"),
+        },
+        "tsho_rolpa_2d": {
+            "schema_version": tr2d_doc.get("schema_version"),
+            "generated_utc": tr2d_doc.get("generated_utc"),
+            "data_class": tr2d_doc.get("data_class", "unavailable" if not tr2d_scns else "static_assessment"),
+            "available": bool(tr2d_scns),
+            "is_design_grade_engineering_map": bool(tr2d_doc.get("is_design_grade_engineering_map", False)),
+            "n_scenarios": len(tr2d_scns),
+            "active_cells": tr2d_dm.get("active_cells"),
+            "max_mass_balance_error_pct": round(tr2d_max_mb, 6) if tr2d_max_mb is not None else None,
+            "footprints_geojson_path": "data/tsho_rolpa_2d_footprints.geojson" if tr2d_scns else None,
+            "methodology_notice": tr2d_doc.get("methodology_notice"),
+        },
+        "moderation_queue": {
+            "schema_version": mod_doc.get("schema_version"),
+            "generated_utc": mod_doc.get("generated_utc"),
+            "governance_mode": mod_doc.get("governance_mode"),
+            "public_live_endpoint_enabled": bool(mod_doc.get("public_live_endpoint_enabled", False)),
+            "requires_authenticated_moderation": bool(mod_doc.get("requires_authenticated_moderation", True)),
+            "n_uat_fixtures": int(mod_sum.get("n_uat_fixtures") or 0),
+            "n_pending_agency_review": int(mod_sum.get("n_pending_agency_review") or 0),
+            "n_live_public_submissions": int(mod_sum.get("n_live_public_submissions") or 0),
+        },
+        "cap_relay": {
+            "schema_version": cap_doc.get("schema_version"),
+            "generated_utc": cap_doc.get("generated_utc"),
+            "cap_namespace": cap_doc.get("cap_namespace"),
+            "cap_status": cap_gov.get("cap_status", "Exercise"),
+            "relay_enabled": bool(cap_gov.get("relay_enabled", False)),
+            "requires_signed_mou": bool(cap_gov.get("requires_signed_mou", True)),
+            "statutory_warning": bool(cap_gov.get("statutory_warning", False)),
+            "n_advisories": int(cap_sum.get("n_advisories") or 0),
+            "n_languages": int(cap_sum.get("n_languages") or 0),
+            "latest_xml_path": cap_doc.get("latest_xml_path"),
         },
         "hydromet_summary": {
             "updated_utc": hydromet["updated_utc"],
@@ -2030,10 +2119,59 @@ def build_summary(
 # ---------------------------------------------------------------------------
 # Main orchestrator
 # ---------------------------------------------------------------------------
+def _format_wave_cd_step_summary_markdown(
+    summary_data: dict[str, Any],
+    manifest_data: dict[str, Any],
+) -> str:
+    """Format concise Wave C/D 2D simulation, moderation & CAP relay summary for $GITHUB_STEP_SUMMARY."""
+    tr2d = summary_data.get("tsho_rolpa_2d") or {}
+    mod = summary_data.get("moderation_queue") or {}
+    cap = summary_data.get("cap_relay") or {}
+    checksums = manifest_data.get("input_checksums") or {}
+
+    def _short_sha(rel: str) -> str:
+        val = checksums.get(rel)
+        return f"`{val[:12]}…`" if isinstance(val, str) and len(val) >= 12 else "—"
+
+    lines = [
+        "### Wave C / Wave D Products & Governance Locks",
+        "",
+        "| Module | Status / Framing | Key Metrics | Artifact SHA-256 |",
+        "| --- | --- | --- | --- |",
+        (
+            f"| Tsho Rolpa 2D Screening (`tsho_rolpa_2d_sim.py`) | "
+            f"`design_grade={tr2d.get('is_design_grade_engineering_map', False)}` | "
+            f"{tr2d.get('n_scenarios', 0)} scenarios, {tr2d.get('active_cells') or 0} cells, "
+            f"max mass-balance err `{tr2d.get('max_mass_balance_error_pct')}%` | "
+            f"JSON {_short_sha('data/tsho_rolpa_2d_inundation.json')} · "
+            f"GeoJSON {_short_sha('data/tsho_rolpa_2d_footprints.geojson')} |"
+        ),
+        (
+            f"| Community Moderation Sandbox (`moderation.py`) | "
+            f"`public_live_endpoint_enabled={mod.get('public_live_endpoint_enabled', False)}` | "
+            f"{mod.get('n_uat_fixtures', 0)} UAT fixtures, "
+            f"{mod.get('n_pending_agency_review', 0)} pending agency review | "
+            f"{_short_sha('data/moderation_queue.json')} |"
+        ),
+        (
+            f"| 6-Language CAP v1.2 Exercise Relay (`cap_relay.py`) | "
+            f"`status={cap.get('cap_status', 'Exercise')}`, `relay_enabled={cap.get('relay_enabled', False)}` | "
+            f"{cap.get('n_advisories', 0)} advisories × {cap.get('n_languages', 0)} languages | "
+            f"JSON {_short_sha('data/cap_drafts.json')} · "
+            f"XML {_short_sha('data/cap_exercise_latest.xml')} |"
+        ),
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, int]:
     # Deferred imports avoid circular import cycles with modules referencing RW helpers
+    import cap_relay as CAP
     import cascades as CAS
     import exposure_isolation as EI
+    import moderation as MOD
+    import tsho_rolpa_2d_sim as TR2D
     import tsho_rolpa_pilot as TRP
 
     t0 = time.perf_counter()
@@ -2047,31 +2185,31 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
     # 1. Active faults (filters out 4 non-fault folds)
     faults_data = FA.build_faults(offline=offline)
     sizes["faults.json"] = os.path.getsize(FA.OUT_JSON)
-    print(f"  [1/16] faults.json             {sizes['faults.json']/1024:6.1f} KB  ({faults_data['n_traces']} traces, {faults_data['n_folds_excluded']} folds excluded)")
+    print(f"  [1/19] faults.json             {sizes['faults.json']/1024:6.1f} KB  ({faults_data['n_traces']} traces, {faults_data['n_folds_excluded']} folds excluded)")
 
     # 2. Fluvial floods via Open-Meteo provenance wrapper (10 basins, Gumbel EV1, 3x3 snap)
     glofas_res = OM.fetch_glofas_floods(offline=offline, write_output=True)
     rivers_watch = glofas_res["data"]
     sizes["rivers_watch.json"] = os.path.getsize(FL.OUT_JSON)
-    print(f"  [2/16] rivers_watch.json       {sizes['rivers_watch.json']/1024:6.1f} KB  ({rivers_watch['n_basins']} basins, snap_warnings={rivers_watch['n_grid_snap_warnings']})")
+    print(f"  [2/19] rivers_watch.json       {sizes['rivers_watch.json']/1024:6.1f} KB  ({rivers_watch['n_basins']} basins, snap_warnings={rivers_watch['n_grid_snap_warnings']})")
 
     # 3. Alerts (GDACS + USGS Nepal bbox + STAC cache)
     alerts_data = AL.build_alerts(offline=offline)
     sizes["gdacs_alerts.json"] = os.path.getsize(AL.OUT_JSON)
-    print(f"  [3/16] gdacs_alerts.json       {sizes['gdacs_alerts.json']/1024:6.1f} KB  (gdacs={alerts_data['n_events']}, stac={alerts_data['stac_summary']['n_priority_scenes']})")
+    print(f"  [3/19] gdacs_alerts.json       {sizes['gdacs_alerts.json']/1024:6.1f} KB  (gdacs={alerts_data['n_events']}, stac={alerts_data['stac_summary']['n_priority_scenes']})")
 
     # 4. Hydromet via Open-Meteo provenance wrapper (24 Dahal-Hasegawa nodes + 20 priority lakes)
     hm_res = OM.fetch_hydromet_watch(offline=offline, write_output=True)
     hydromet_data = hm_res["data"]
     sizes["hydromet_weekly.json"] = os.path.getsize(HM.OUT_JSON)
-    print(f"  [4/16] hydromet_weekly.json    {sizes['hydromet_weekly.json']/1024:6.1f} KB  (nodes={hydromet_data['n_nodes']}, lakes={hydromet_data['n_priority_lakes']}, expires={hydromet_data['forecast_expires_utc']})")
+    print(f"  [4/19] hydromet_weekly.json    {sizes['hydromet_weekly.json']/1024:6.1f} KB  (nodes={hydromet_data['n_nodes']}, lakes={hydromet_data['n_priority_lakes']}, expires={hydromet_data['forecast_expires_utc']})")
 
     # 5. Official Government of Nepal NDRRMA BIPAD Portal snapshot
     bipad_data = BIPAD.fetch_bipad_snapshot(offline=offline)
     sizes["bipad_official.json"] = atomic_write_json(os.path.join(C.DATA, "bipad_official.json"), bipad_data)
     bipad_prov = bipad_data["provenance"]
     print(
-        f"  [5/16] bipad_official.json     {sizes['bipad_official.json']/1024:6.1f} KB  "
+        f"  [5/19] bipad_official.json     {sizes['bipad_official.json']/1024:6.1f} KB  "
         f"(class={bipad_prov['data_class']}, alerts={len(bipad_data['alerts'])}, "
         f"landslides={len(bipad_data['landslide_incidents'])}, rain={len(bipad_data['dhm_rain'])})"
     )
@@ -2091,7 +2229,7 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
     sizes["landslide_inventory.geojson"] = os.path.getsize(LS.OUT_GEOJSON)
     sizes["landslide_review_queue.json"] = os.path.getsize(LS.OUT_REVIEW_QUEUE)
     print(
-        f"  [6/16] landslides.json         {sizes['landslides.json']/1024:6.1f} KB  "
+        f"  [6/19] landslides.json         {sizes['landslides.json']/1024:6.1f} KB  "
         f"(total={landslides_data['n_total']}, bipad={landslides_data['n_bipad']}, "
         f"coolr={landslides_data['n_nasa_coolr']}, osm={landslides_data['n_osm']}, "
         f"dups={landslides_data['duplicate_candidates_count']}) | "
@@ -2103,7 +2241,7 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
     sizes["eo_sar.json"] = atomic_write_json(os.path.join(C.DATA, "eo_sar.json"), eo_sar_data)
     eo_prov = eo_sar_data["provenance"]
     print(
-        f"  [7/16] eo_sar.json             {sizes['eo_sar.json']/1024:6.1f} KB  "
+        f"  [7/19] eo_sar.json             {sizes['eo_sar.json']/1024:6.1f} KB  "
         f"(class={eo_prov['data_class']}, lakes={eo_sar_data['n_priority_lakes']}, "
         f"s1={eo_sar_data['n_s1_covered']}, s2={eo_sar_data['n_s2_covered']})"
     )
@@ -2113,7 +2251,7 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
     sizes["eq_history_m6.json"] = atomic_write_json(os.path.join(C.DATA, "eq_history_m6.json"), eq_m6)
     glof_hist = build_glof_history()
     sizes["glof_history.json"] = atomic_write_json(os.path.join(C.DATA, "glof_history.json"), glof_hist)
-    print(f"  [8/16] eq_history_m6.json      {sizes['eq_history_m6.json']/1024:6.1f} KB  ({len(eq_m6)} M>=6 events) | glof_history.json {sizes['glof_history.json']/1024:5.1f} KB ({len(glof_hist)} records)")
+    print(f"  [8/19] eq_history_m6.json      {sizes['eq_history_m6.json']/1024:6.1f} KB  ({len(eq_m6)} M>=6 events) | glof_history.json {sizes['glof_history.json']/1024:5.1f} KB ({len(glof_hist)} records)")
 
     # 9. Recompute true perpendicular point-to-segment downstream exposure + slim routes & lakes_core
     raw_routes = read_js_or_json(os.path.join(C.DATA, "routes.json"), os.path.join(C.DATA, "routes.js"))
@@ -2133,7 +2271,7 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
     sizes["lakes_core.json"] = atomic_write_json(os.path.join(C.DATA, "lakes_core.json"), lakes_core_packed)
     sizes["lakes.json"] = atomic_write_json(os.path.join(C.DATA, "lakes.json"), lakes_core)
     print(
-        f"  [9/16] lakes_core.json         {sizes['lakes_core.json']/1024:6.1f} KB "
+        f"  [9/19] lakes_core.json         {sizes['lakes_core.json']/1024:6.1f} KB "
         f"(compact; lakes.json {sizes['lakes.json']/1024:.1f} KB) | "
         f"routes.json {sizes['routes.json']/1024:6.1f} KB | "
         f"exposure.json {sizes['exposure.json']/1024:6.1f} KB  "
@@ -2145,14 +2283,14 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
         adm, lakes_core, slim_routes, rivers_watch, hydromet_data, landslides_data, build_utc
     )
     sizes["districts.json"] = atomic_write_json(os.path.join(C.DATA, "districts.json"), districts_data)
-    print(f" [10/16] districts.json          {sizes['districts.json']/1024:6.1f} KB  ({districts_data['n_provinces']} provinces, {districts_data['n_districts']} districts)")
+    print(f" [10/19] districts.json          {sizes['districts.json']/1024:6.1f} KB  ({districts_data['n_provinces']} provinces, {districts_data['n_districts']} districts)")
 
     # 11. Downstream exposure breakdown & road-cut hospital isolation screening
     exposure_isolation_data = EI.build_exposure_isolation()
     sizes["exposure_isolation.json"] = os.path.getsize(EI.OUT_JSON)
     iso_sum = exposure_isolation_data["summary"]
     print(
-        f" [11/16] exposure_isolation.json {sizes['exposure_isolation.json']/1024:6.1f} KB  "
+        f" [11/19] exposure_isolation.json {sizes['exposure_isolation.json']/1024:6.1f} KB  "
         f"(lakes={iso_sum['n_routed_lakes_analyzed']}, isolated_settlements={iso_sum['total_unique_settlements_potentially_isolated']}, "
         f"bridges={iso_sum['total_unique_bridges_at_crossings']})"
     )
@@ -2162,7 +2300,7 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
     sizes["cascades.json"] = os.path.getsize(CAS.OUT_JSON)
     cas_sum = cascades_data["summary"]
     print(
-        f" [12/16] cascades.json           {sizes['cascades.json']/1024:6.1f} KB  "
+        f" [12/19] cascades.json           {sizes['cascades.json']/1024:6.1f} KB  "
         f"(chains={cas_sum['n_chains']}, active_edges={cas_sum['n_active_edges']}/{cas_sum['n_edges']}, "
         f"highest={cas_sum['highest_severity']})"
     )
@@ -2184,22 +2322,75 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
     )
     sizes["validation.json"] = atomic_write_json(os.path.join(C.DATA, "validation.json"), val_data)
     print(
-        f" [13/16] validation.json         {sizes['validation.json']/1024:6.1f} KB  "
+        f" [13/19] validation.json         {sizes['validation.json']/1024:6.1f} KB  "
         f"({val_data['n_checks_pass']}/{val_data['n_checks_total']} pass, {len(val_data['known_limitations'])} limitations) | "
         f"sensitivity.json {sizes['sensitivity.json']/1024:4.1f} KB"
     )
 
-    # 14. Tsho Rolpa 2D pre-simulation pilot benchmark
+    # 14. Tsho Rolpa 2D inertial shallow-water simulation (MUST run BEFORE tsho_rolpa_pilot.py!)
+    tsho_rolpa_2d_data: dict[str, Any] | None = None
+    if os.path.isfile(TR2D.DEM_PATH):
+        tsho_rolpa_2d_data = TR2D.run_tsho_rolpa_2d_simulation(
+            dem_path=TR2D.DEM_PATH,
+            routes_path=TR2D.ROUTES_PATH,
+            out_json=TR2D.OUT_JSON,
+            out_geojson=TR2D.OUT_GEOJSON,
+            parallel=True,
+        )
+        sizes["tsho_rolpa_2d_inundation.json"] = os.path.getsize(TR2D.OUT_JSON)
+        sizes["tsho_rolpa_2d_footprints.geojson"] = os.path.getsize(TR2D.OUT_GEOJSON)
+        tr2d_max_err = max(
+            (float((s.get("mass_balance") or {}).get("mass_balance_error_pct") or 0.0) for s in tsho_rolpa_2d_data["scenarios"]),
+            default=0.0,
+        )
+        tr2d_io = tsho_rolpa_2d_data.get("_io_summary") or {}
+        print(
+            f" [14/19] tsho_rolpa_2d_inundation.json {sizes['tsho_rolpa_2d_inundation.json']/1024:5.1f} KB  "
+            f"({len(tsho_rolpa_2d_data['scenarios'])} scenarios, max_mb_err={tr2d_max_err:.5f}%, "
+            f"{tr2d_io.get('wall_runtime_s', 0.0):.2f}s) | "
+            f"footprints.geojson {sizes['tsho_rolpa_2d_footprints.geojson']/1024:5.1f} KB"
+        )
+    else:
+        print(
+            f" [14/19] tsho_rolpa_2d_inundation.json SKIPPED ({TR2D.DEM_PATH} not found)"
+        )
+
+    # 15. Tsho Rolpa 2D pilot benchmark (picks up live 2D summary links written in step 14!)
     tsho_rolpa_data = TRP.build_tsho_rolpa_pilot()
     sizes["tsho_rolpa_pilot.json"] = os.path.getsize(TRP.OUT_JSON)
     print(
-        f" [14/16] tsho_rolpa_pilot.json   {sizes['tsho_rolpa_pilot.json']/1024:6.1f} KB  "
+        f" [15/19] tsho_rolpa_pilot.json   {sizes['tsho_rolpa_pilot.json']/1024:6.1f} KB  "
         f"(lake={tsho_rolpa_data['lake_identification']['matched_inventory_id']}, "
         f"checkpoints={len(tsho_rolpa_data['valley_checkpoints'])}, "
-        f"scenarios={len(tsho_rolpa_data['breach_scenario_framework'])})"
+        f"scenarios={len(tsho_rolpa_data['breach_scenario_framework'])}, "
+        f"2d_linked={tsho_rolpa_data.get('has_screening_2d_simulation')})"
     )
 
-    # 15. Master Summary (with TRĀYA 2.0 counts & next Monday 03:15 UTC schedule)
+    # 16. Community Landslide Reporting Moderation Queue (Pre-MOU Sandbox)
+    moderation_data = MOD.build_moderation_queue(C.ROOT, write=True)
+    mod_out = os.path.join(C.DATA, "moderation_queue.json")
+    sizes["moderation_queue.json"] = os.path.getsize(mod_out)
+    print(
+        f" [16/19] moderation_queue.json   {sizes['moderation_queue.json']/1024:6.1f} KB  "
+        f"(mode={moderation_data['governance_mode']}, live={moderation_data['public_live_endpoint_enabled']}, "
+        f"uat_fixtures={moderation_data['queue_summary']['n_uat_fixtures']})"
+    )
+
+    # 17. Governed 6-Language OASIS CAP v1.2 & SMS/IVR Exercise Relay Drafts
+    cap_data = CAP.build_cap_drafts(C.ROOT, write=True)
+    cap_json_out = os.path.join(C.DATA, "cap_drafts.json")
+    cap_xml_out = os.path.join(C.DATA, "cap_exercise_latest.xml")
+    sizes["cap_drafts.json"] = os.path.getsize(cap_json_out)
+    sizes["cap_exercise_latest.xml"] = os.path.getsize(cap_xml_out)
+    cap_s = cap_data["summary"]
+    print(
+        f" [17/19] cap_drafts.json         {sizes['cap_drafts.json']/1024:6.1f} KB  "
+        f"(advisories={cap_s['n_advisories']}, langs={cap_s['n_languages']}, "
+        f"relay={cap_data['relay_governance']['relay_enabled']}) | "
+        f"cap_exercise_latest.xml {sizes['cap_exercise_latest.xml']/1024:4.1f} KB"
+    )
+
+    # 18. Master Summary (with TRĀYA 2.0 counts & next Monday 03:15 UTC schedule)
     summary_data = build_summary(
         lakes_core,
         lake_counts,
@@ -2220,14 +2411,17 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
         exposure_isolation_data=exposure_isolation_data,
         cascades_data=cascades_data,
         tsho_rolpa_data=tsho_rolpa_data,
+        tsho_rolpa_2d_data=tsho_rolpa_2d_data,
+        moderation_data=moderation_data,
+        cap_data=cap_data,
     )
     sizes["summary.json"] = atomic_write_json(os.path.join(C.DATA, "summary.json"), summary_data)
     print(
-        f" [15/16] summary.json            {sizes['summary.json']/1024:6.1f} KB  "
+        f" [18/19] summary.json            {sizes['summary.json']/1024:6.1f} KB  "
         f"(next_refresh={summary_data['next_scheduled_refresh']})"
     )
 
-    # 16. Build provenance manifest (`data/manifest.json`) & KPI baseline (`data/kpi_baseline.json`)
+    # 19. Build provenance manifest (`data/manifest.json`) & KPI baseline (`data/kpi_baseline.json`)
     envelopes = build_provenance_envelopes(
         bipad_data=bipad_data,
         eo_sar_data=eo_sar_data,
@@ -2240,11 +2434,32 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
         exposure_isolation_data=exposure_isolation_data,
         cascades_data=cascades_data,
         tsho_rolpa_data=tsho_rolpa_data,
+        tsho_rolpa_2d_data=tsho_rolpa_2d_data,
+        moderation_data=moderation_data,
+        cap_data=cap_data,
         build_utc=build_utc,
         offline=offline,
     )
     git_sha = _detect_git_sha()
-    manifest_data = PROV.build_manifest(C.ROOT, envelopes, build_utc, git_sha=git_sha, write=True)
+    manifest_data = PROV.build_manifest(C.ROOT, envelopes, build_utc, git_sha=git_sha, write=False)
+    # Ensure non-.json Wave B/C/D outputs (.geojson, .xml) and DEM cache carry deterministic SHA-256 checksums
+    extra_checksum_relpaths = (
+        "cache/tsho_rolpa_dem_90m.json",
+        "data/landslide_inventory.geojson",
+        "data/tsho_rolpa_2d_inundation.json",
+        "data/tsho_rolpa_2d_footprints.geojson",
+        "data/moderation_queue.json",
+        "data/cap_drafts.json",
+        "data/cap_exercise_latest.xml",
+    )
+    checksums = dict(manifest_data.get("input_checksums") or {})
+    for rel in extra_checksum_relpaths:
+        full_p = os.path.join(C.ROOT, rel.replace("/", os.sep))
+        if os.path.isfile(full_p):
+            checksums[rel] = PROV.compute_file_sha256(full_p)
+    manifest_data["input_checksums"] = dict(sorted(checksums.items()))
+    PROV.atomic_write_json(os.path.join(C.DATA, "manifest.json"), manifest_data)
+
     kpi_data = PROV.build_kpi_baseline(
         C.ROOT,
         manifest_data,
@@ -2257,17 +2472,21 @@ def run_refresh(offline: bool = False, refresh_osm: bool = False) -> dict[str, i
     sizes["manifest.json"] = os.path.getsize(os.path.join(C.DATA, "manifest.json"))
     sizes["kpi_baseline.json"] = os.path.getsize(os.path.join(C.DATA, "kpi_baseline.json"))
     print(
-        f" [16/16] manifest.json           {sizes['manifest.json']/1024:6.1f} KB  "
+        f" [19/19] manifest.json           {sizes['manifest.json']/1024:6.1f} KB  "
         f"(health={manifest_data['overall_health']}, sources={manifest_data['source_counts']['total']}, "
         f"checksums={len(manifest_data['input_checksums'])}) | "
         f"kpi_baseline.json {sizes['kpi_baseline.json']/1024:4.1f} KB "
         f"(freshness={kpi_data['feed_freshness_pct']}%, provenance={kpi_data['provenance_completeness_pct']}%)"
     )
 
-    # Append build provenance & KPI Markdown table to GitHub Actions Step Summary when set
+    # Append build provenance, KPI & Wave C/D governance Markdown tables to $GITHUB_STEP_SUMMARY when set
     step_summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "").strip()
     if step_summary_path:
-        md = PROV.format_step_summary_markdown(manifest_data, kpi_data)
+        md = (
+            PROV.format_step_summary_markdown(manifest_data, kpi_data)
+            + "\n"
+            + _format_wave_cd_step_summary_markdown(summary_data, manifest_data)
+        )
         with open(step_summary_path, "a", encoding="utf-8") as fh:
             if not md.endswith("\n"):
                 md += "\n"

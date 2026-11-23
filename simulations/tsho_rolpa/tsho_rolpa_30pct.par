@@ -1,0 +1,28 @@
+# =============================================================================
+# LISFLOOD-FP v8.1 Parameter File — Nepal TRĀYA 2.0 Tsho Rolpa 2D GLOF Pilot
+# Scenario: TR-S2-MODERATE-30PCT (Primary Shrestha & Nakagawa 2014 Benchmark)
+# Target Volume: ~26.0 Mm3 | Peak Breach Inflow: ~5,800 m3/s | Window: 5.5 h
+# CRS: EPSG:32645 (WGS 84 / UTM Zone 45N)
+# Status: Screening / HPC Reproducibility Pack — NOT an operational EWS
+# =============================================================================
+DEMfile         tsho_rolpa_dem_5m_utm45n.asc
+resroot         tsho_rolpa_30pct
+dirroot         results_30pct
+sim_time        19800.0
+initial_tstep   1.0
+massint         300.0
+saveint         600.0
+bcifile         tsho_rolpa.bci
+bdyfile         tsho_rolpa_30pct.bdy
+manningfile     tsho_rolpa_manning_n.asc
+fpfric          0.060
+# Use first-order shock-capturing finite-volume solver (fv1) for steep 5-15%
+# supercritical Rolwaling Gorge reaches; swap to `acceleration` for local-inertial
+# Bates et al. (2010) parity comparison against src/tsho_rolpa_2d_sim.py.
+fv1
+cfl             0.45
+depthoff        0.001
+voutput
+hazard
+# Uncomment below on NVIDIA CUDA workstations for GPU acceleration:
+# cuda

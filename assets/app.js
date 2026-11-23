@@ -12,6 +12,9 @@
  */
 
 import {
+  SUPPORTED_LANGUAGES,
+  getLanguageMeta,
+  isDevanagariLang,
   initLang,
   getLang,
   setLang,
@@ -28,6 +31,16 @@ import {
   tDistrict,
   applyStaticTranslations,
 } from './i18n.js';
+
+import {
+  redactPii,
+  stripImageExif,
+  findLocalAndInventoryDuplicates,
+  saveOfflineReport,
+  listOfflineReports,
+  deleteOfflineReport,
+  buildRedactedModerationBundle,
+} from './pwa_reports.js';
 
 /* ==========================================================================
    1. Security, Formatting, NPT Time & Math Utilities
@@ -119,7 +132,7 @@ export function ageHours(isoOrMs) {
 export function fmtAge(isoOrMs) {
   const hrs = ageHours(isoOrMs);
   if (!Number.isFinite(hrs)) return '';
-  const isNe = getLang() === 'ne';
+  const isNe = isDevanagariLang();
   if (hrs < 1) {
     const mins = Math.max(1, Math.round(hrs * 60));
     return isNe ? `${mins} मि. अघि` : `${mins}m ago`;
@@ -303,6 +316,18 @@ const S = {
   cascades: null,
   eoSar: null,
   tshoRolpaPilot: null,
+  tsho2d: null,
+  tsho2dFootprints: null,
+  capDrafts: null,
+  moderationQueue: null,
+
+  tsho2dEnabled: false,
+  tsho2dScenario: 'TR-S2-MODERATE-30PCT',
+  tsho2dMetric: 'depth',
+  capAdvIdx: 0,
+  capLang: null,
+  localReports: [],
+  showLocalPins: true,
 
   sel: null,
   selKind: null,
@@ -355,11 +380,16 @@ const LAZY_PATHS = {
   cascades: 'data/cascades.json',
   eo_sar: 'data/eo_sar.json',
   tsho_rolpa_pilot: 'data/tsho_rolpa_pilot.json',
+  tsho_rolpa_2d: 'data/tsho_rolpa_2d_inundation.json',
+  tsho_rolpa_2d_footprints: 'data/tsho_rolpa_2d_footprints.geojson',
+  cap_drafts: 'data/cap_drafts.json',
+  moderation_queue: 'data/moderation_queue.json',
 };
 
 const REPO_DOC_BASE = 'https://github.com/prazg/Nepal_TRAYA/blob/main';
 const DATA_LICENSES_URL = `${REPO_DOC_BASE}/DATA_LICENSES.md`;
 const TSHO_ROLPA_PLAN_URL = `${REPO_DOC_BASE}/docs/TSHO_ROLPA_2D_STUDY_PLAN.md`;
+const TSHO_ROLPA_SIM_URL = 'https://github.com/prazg/Nepal_TRAYA/tree/main/simulations/tsho_rolpa';
 const MODEL_CARDS_URL = `${REPO_DOC_BASE}/docs/MODEL_CARDS.md`;
 const INST_SPEC_URL = `${REPO_DOC_BASE}/docs/INSTITUTIONAL_INTEGRATION_SPEC.md`;
 
@@ -440,6 +470,10 @@ async function ensureData(key) {
   if (key === 'cascades' && S.cascades) return S.cascades;
   if (key === 'eo_sar' && S.eoSar) return S.eoSar;
   if (key === 'tsho_rolpa_pilot' && S.tshoRolpaPilot) return S.tshoRolpaPilot;
+  if (key === 'tsho_rolpa_2d' && S.tsho2d) return S.tsho2d;
+  if (key === 'tsho_rolpa_2d_footprints' && S.tsho2dFootprints) return S.tsho2dFootprints;
+  if (key === 'cap_drafts' && S.capDrafts) return S.capDrafts;
+  if (key === 'moderation_queue' && S.moderationQueue) return S.moderationQueue;
 
   if (lazyPromises.has(key)) return lazyPromises.get(key);
   const path = LAZY_PATHS[key];
@@ -486,6 +520,14 @@ async function ensureData(key) {
         S.eoSar = data || null;
       } else if (key === 'tsho_rolpa_pilot') {
         S.tshoRolpaPilot = data || null;
+      } else if (key === 'tsho_rolpa_2d') {
+        S.tsho2d = data || null;
+      } else if (key === 'tsho_rolpa_2d_footprints') {
+        S.tsho2dFootprints = data || null;
+      } else if (key === 'cap_drafts') {
+        S.capDrafts = data || null;
+      } else if (key === 'moderation_queue') {
+        S.moderationQueue = data || null;
       }
       return data;
     })
@@ -782,44 +824,79 @@ map.on('mousemove', e => {
 
 const DATA_CREDIT = 'TRĀYA | Copernicus DEM GLO-30 | Nepal Cryosphere Inventory | GloFAS | GEM | USGS';
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const TILE_REFERRER_POLICY = 'strict-origin-when-cross-origin';
 
 const BASEMAPS = {
   'Dark grey': L.tileLayer(`${ESRI}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`, {
     maxZoom: 17,
     maxNativeZoom: 16,
+    referrerPolicy: TILE_REFERRER_POLICY,
     attribution: `Esri, HERE, Garmin, &copy; OpenStreetMap | ${DATA_CREDIT}`,
+  }),
+  'CARTO Voyager': L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    maxNativeZoom: 19,
+    subdomains: 'abcd',
+    referrerPolicy: TILE_REFERRER_POLICY,
+    attribution: `&copy; OpenStreetMap contributors &copy; CARTO | ${DATA_CREDIT}`,
+  }),
+  'Esri World Topo': L.tileLayer(`${ESRI}/World_Topo_Map/MapServer/tile/{z}/{y}/{x}`, {
+    maxZoom: 17,
+    maxNativeZoom: 17,
+    referrerPolicy: TILE_REFERRER_POLICY,
+    attribution: `Esri, HERE, Garmin, Intermap, USGS | ${DATA_CREDIT}`,
   }),
   'Sentinel-2 cloudless (10 m)': L.tileLayer(
     'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
     {
       maxZoom: 17,
       maxNativeZoom: 14,
+      referrerPolicy: TILE_REFERRER_POLICY,
       attribution: `<a href="https://s2maps.eu" target="_blank" rel="noopener noreferrer">Sentinel-2 cloudless</a> by EOX (CC-BY 4.0) | ${DATA_CREDIT}`,
     }
   ),
   'Satellite imagery': L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, {
     maxZoom: 17,
     maxNativeZoom: 17,
+    referrerPolicy: TILE_REFERRER_POLICY,
     attribution: `Esri, Maxar, Earthstar Geographics | ${DATA_CREDIT}`,
   }),
   'Terrain (hillshade)': L.tileLayer(`${ESRI}/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}`, {
     maxZoom: 17,
     maxNativeZoom: 15,
+    referrerPolicy: TILE_REFERRER_POLICY,
     attribution: `Esri, Airbus DS, USGS, NGA, NASA, CGIAR | ${DATA_CREDIT}`,
   }),
   OpenTopoMap: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
     maxZoom: 17,
     maxNativeZoom: 16,
     subdomains: 'abc',
+    referrerPolicy: TILE_REFERRER_POLICY,
     attribution: `&copy; OpenStreetMap, SRTM | <a href="https://opentopomap.org" target="_blank" rel="noopener noreferrer">OpenTopoMap</a> (CC-BY-SA) | ${DATA_CREDIT}`,
   }),
   OpenStreetMap: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 17,
     maxNativeZoom: 17,
+    referrerPolicy: TILE_REFERRER_POLICY,
     attribution: `&copy; OpenStreetMap contributors | ${DATA_CREDIT}`,
   }),
   'No basemap': L.layerGroup([]),
 };
+
+const BASEMAP_PROVIDERS = {
+  'Dark grey': 'esri',
+  'CARTO Voyager': 'carto',
+  'Esri World Topo': 'esri',
+  'Sentinel-2 cloudless (10 m)': 'eox',
+  'Satellite imagery': 'esri',
+  'Terrain (hillshade)': 'esri',
+  OpenTopoMap: 'opentopomap',
+  OpenStreetMap: 'osm',
+  'No basemap': 'none',
+};
+
+// Cross-provider fallback order across independent tile hosts (CARTO -> OSM -> Esri)
+const BASEMAP_FALLBACK_CHAIN = ['CARTO Voyager', 'OpenStreetMap', 'Dark grey'];
 
 let baseName = 'Dark grey';
 try {
@@ -832,35 +909,98 @@ BASEMAPS[baseName].addTo(map);
 L.control.layers(BASEMAPS, null, { position: 'topright', collapsed: true }).addTo(map);
 
 let basemapOk = true;
+let basemapFallbackActive = false;
+let isAutoFallbackSwitching = false;
 let tileErrors = 0;
+const failedBasemaps = new Set();
+const failedProviders = new Set();
 
-function setBasemapPill(msg) {
+function pickFallbackBasemap(currentName) {
+  const currentProvider = BASEMAP_PROVIDERS[currentName];
+  return BASEMAP_FALLBACK_CHAIN.find(cand => {
+    if (cand === currentName || !BASEMAPS[cand]) return false;
+    if (failedBasemaps.has(cand)) return false;
+    const candProvider = BASEMAP_PROVIDERS[cand];
+    if (candProvider && (candProvider === currentProvider || failedProviders.has(candProvider))) {
+      return false;
+    }
+    return true;
+  }) || null;
+}
+
+function setBasemapPill(msg, clsOverride = null) {
   const el = document.getElementById('pill-base');
   if (!el) return;
-  if (!msg) {
+  if (!msg && !basemapOk) {
+    el.className = 'pill err';
+    el.title = 'Map tiles unavailable — switch basemap in the top-right layer menu';
+    el.innerHTML = '<span class="dot"></span>tiles offline — switch basemap';
+  } else if (!msg && basemapFallbackActive) {
+    el.className = 'pill watch';
+    el.title = t('basemapFallbackNotice', { basemap: baseName });
+    el.innerHTML = `<span class="dot"></span>${esc(baseName.toLowerCase())} · fallback`;
+  } else if (!msg) {
     el.className = 'pill';
+    el.title = 'Active map basemap status';
     el.innerHTML = `<span class="dot"></span>${esc(baseName.toLowerCase())}`;
   } else {
-    el.className = 'pill err';
+    el.className = `pill ${clsOverride || 'err'}`;
+    el.title = basemapFallbackActive
+      ? t('basemapFallbackNotice', { basemap: baseName })
+      : String(msg);
     el.innerHTML = `<span class="dot"></span>${esc(msg)}`;
   }
 }
 
 map.on('baselayerchange', e => {
+  if (isAutoFallbackSwitching) return;
   baseName = e.name;
   try { localStorage.setItem('traya.basemap', e.name); } catch { /* ignore */ }
   basemapOk = true;
+  basemapFallbackActive = false;
   tileErrors = 0;
+  failedBasemaps.clear();
+  failedProviders.clear();
   setBasemapPill(null);
 });
 
-Object.values(BASEMAPS).forEach(l => {
-  if (!l.on) return;
-  l.on('tileload', () => { tileErrors = 0; });
+Object.entries(BASEMAPS).forEach(([name, l]) => {
+  if (!l || !l.on) return;
+  l.on('tileload', () => {
+    if (name !== baseName) return;
+    tileErrors = 0;
+    if (!basemapOk) {
+      basemapOk = true;
+      setBasemapPill(null);
+    }
+  });
   l.on('tileerror', () => {
-    if (!basemapOk || ++tileErrors < 8) return;
-    basemapOk = false;
-    setBasemapPill('tiles offline — switch basemap');
+    if (name !== baseName) return;
+    if (++tileErrors < 6) return;
+    failedBasemaps.add(baseName);
+    const failedProvider = BASEMAP_PROVIDERS[baseName];
+    if (failedProvider && failedProvider !== 'none') failedProviders.add(failedProvider);
+    const fallbackName = pickFallbackBasemap(baseName);
+    if (fallbackName) {
+      const oldLayer = BASEMAPS[baseName];
+      baseName = fallbackName;
+      tileErrors = 0;
+      basemapOk = true;
+      basemapFallbackActive = true;
+      isAutoFallbackSwitching = true;
+      try {
+        if (oldLayer && map.hasLayer(oldLayer)) map.removeLayer(oldLayer);
+        BASEMAPS[fallbackName].addTo(map);
+      } finally {
+        isAutoFallbackSwitching = false;
+      }
+      setBasemapPill(`${fallbackName.toLowerCase()} · fallback`, 'watch');
+      setToast(t('basemapFallbackNotice', { basemap: fallbackName }));
+    } else if (basemapOk) {
+      basemapOk = false;
+      basemapFallbackActive = false;
+      setBasemapPill('tiles offline — switch basemap', 'err');
+    }
   });
 });
 
@@ -868,12 +1008,14 @@ Object.values(BASEMAPS).forEach(l => {
 const gSat = L.layerGroup().addTo(map);
 const gDistrict = L.layerGroup().addTo(map);
 const gFaults = L.layerGroup();
+const gTsho2d = L.layerGroup();
 const gLakes = L.layerGroup().addTo(map);
 const gRoute = L.layerGroup().addTo(map);
 const gExp = L.layerGroup().addTo(map);
 const gRivers = L.layerGroup().addTo(map);
 const gNodes = L.layerGroup();
 const gLs = L.layerGroup();
+const gLocalReports = L.layerGroup().addTo(map);
 const gHydro = L.layerGroup();
 const gEqH = L.layerGroup();
 const gGlof = L.layerGroup();
@@ -924,6 +1066,7 @@ function updateSatOverlay() {
     maxZoom: 17,
     maxNativeZoom: prod.maxNative,
     opacity: op,
+    referrerPolicy: TILE_REFERRER_POLICY,
     attribution: 'NASA EOSDIS GIBS',
   }).addTo(gSat);
   bar.classList.add('on');
@@ -987,7 +1130,7 @@ function populateProvinceAndDistrictDropdowns() {
   provinces.forEach(pr => {
     const opt = document.createElement('option');
     opt.value = pr.name;
-    opt.textContent = getLang() === 'ne' ? `${pr.name_ne} (${pr.name.replace(' Province', '')})` : pr.name;
+    opt.textContent = isDevanagariLang() ? `${pr.name_ne} (${pr.name.replace(' Province', '')})` : pr.name;
     provSel.appendChild(opt);
   });
   provSel.value = currentProv;
@@ -1018,11 +1161,11 @@ function populateDistrictSelect(query = '') {
     const list = byProv.get(p.name) || [];
     if (!list.length) return;
     const og = document.createElement('optgroup');
-    og.label = getLang() === 'ne' ? `${p.name_ne} (${p.name})` : `${p.name} · ${p.name_ne || ''}`;
+    og.label = isDevanagariLang() ? `${p.name_ne} (${p.name})` : `${p.name} · ${p.name_ne || ''}`;
     list.sort((a, b) => a.name.localeCompare(b.name)).forEach(d => {
       const opt = document.createElement('option');
       opt.value = d.name;
-      opt.textContent = getLang() === 'ne'
+      opt.textContent = isDevanagariLang()
         ? `${d.name_ne || d.name} (${d.name})`
         : `${d.name} — ${d.name_ne || ''}`;
       og.appendChild(opt);
@@ -1129,7 +1272,7 @@ function updateLakeSelectionStyle(prevId, nextId) {
 function updateFilterCount() {
   const countEl = document.getElementById('filterCount');
   if (!countEl) return;
-  countEl.textContent = getLang() === 'ne'
+  countEl.textContent = isDevanagariLang()
     ? `${fmt(S.lakes.length)} मध्ये ${fmt(S.shown.length)} हिमताल देखाइएको`
     : `${fmt(S.shown.length)} of ${fmt(S.lakes.length)} glacial lakes shown`;
 }
@@ -1185,7 +1328,7 @@ function drawRiversLayer() {
   if (!document.getElementById('lRivers').checked) return;
   S.rivers.forEach(b => {
     const st = riverHeadlineStatus(b);
-    const bName = getLang() === 'ne' && b.name_ne ? b.name_ne : b.name;
+    const bName = isDevanagariLang() && b.name_ne ? b.name_ne : b.name;
     const snapTag = b.climatology_unmatched
       ? '<br><span class="text-warn">⚠ Live discharge shown; off-mainstem climatology withheld</span>'
       : b.grid_snap_warning
@@ -1268,7 +1411,7 @@ async function drawLandslidesLayer() {
     try { await ensureData('landslides'); } catch { return; }
   }
   if (!document.getElementById('lLandslides').checked) return;
-  const isNe = getLang() === 'ne';
+  const isNe = isDevanagariLang();
   S.landslides.forEach(ev => {
     const ft = ev.feature_type || 'landslide_scar';
     const col = ft === 'landslide_event'
@@ -1402,6 +1545,174 @@ async function drawGdacsLayer() {
   });
 }
 
+function tsho2dFeatureColor(props, metric) {
+  if (!props) return '#38bdf8';
+  if (metric === 'velocity') {
+    const v = Number(props.max_velocity_ms) || 0;
+    return v >= 9 ? '#b91c1c' : v >= 6 ? '#f59e0b' : v >= 3 ? '#0284c7' : '#38bdf8';
+  }
+  if (metric === 'arrival') {
+    const a = Number(props.arrival_time_min);
+    if (!Number.isFinite(a)) return '#0f766e';
+    return a <= 30 ? '#b91c1c' : a <= 60 ? '#c2410c' : a <= 120 ? '#eab308' : '#0f766e';
+  }
+  const cls = String(props.depth_class || '');
+  if (cls === '>8m') return '#b91c1c';
+  if (cls === '3-8m') return '#f59e0b';
+  if (cls === '1-3m') return '#0284c7';
+  return '#38bdf8';
+}
+
+function makeTsho2dCheckpointIcon(labelText) {
+  return L.divIcon({
+    className: 'traya-divicon',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    html: `<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><polygon points="9,1 17,9 9,17 1,9" fill="#0f172a" stroke="#facc15" stroke-width="2"/><circle cx="9" cy="9" r="3" fill="#56ccf2"><title>${esc(labelText)}</title></circle></svg>`,
+  });
+}
+
+async function drawTsho2dLayer() {
+  const cb = document.getElementById('lTsho2d');
+  if (cb) cb.checked = Boolean(S.tsho2dEnabled);
+  gTsho2d.clearLayers();
+  if (!S.tsho2dEnabled) {
+    if (map.hasLayer(gTsho2d)) map.removeLayer(gTsho2d);
+    return;
+  }
+  if (!S.tsho2d || !S.tsho2dFootprints) {
+    try {
+      await Promise.all([ensureData('tsho_rolpa_2d'), ensureData('tsho_rolpa_2d_footprints')]);
+    } catch {
+      return;
+    }
+  }
+  if (!S.tsho2dEnabled) return;
+  if (!map.hasLayer(gTsho2d)) gTsho2d.addTo(map);
+  gTsho2d.clearLayers();
+
+  const scnId = S.tsho2dScenario || 'TR-S2-MODERATE-30PCT';
+  const metric = S.tsho2dMetric || 'depth';
+  const scnObj = (S.tsho2d && Array.isArray(S.tsho2d.scenarios))
+    ? (S.tsho2d.scenarios.find(s => s.scenario_id === scnId) || S.tsho2d.scenarios[1] || S.tsho2d.scenarios[0])
+    : null;
+  const scnLabel = scnObj ? scnObj.label : scnId;
+
+  const allFeats = (S.tsho2dFootprints && Array.isArray(S.tsho2dFootprints.features))
+    ? S.tsho2dFootprints.features
+    : [];
+  const feats = allFeats.filter(f => f && f.properties && f.properties.scenario_id === scnId);
+
+  if (feats.length) {
+    L.geoJSON({ type: 'FeatureCollection', features: feats }, {
+      renderer: overlayRenderer,
+      style: f => {
+        const col = tsho2dFeatureColor(f.properties, metric);
+        return {
+          color: col,
+          weight: 0.7,
+          opacity: 0.92,
+          fillColor: col,
+          fillOpacity: 0.64,
+        };
+      },
+      onEachFeature: (f, l) => {
+        const pr = f.properties || {};
+        l.bindPopup(
+          `<b>▓ Tsho Rolpa 2D Screening Envelope</b>`
+          + `<br><span class="hbadge h-info">${esc(scnId)}</span>`
+          + `<br><span class="band">${esc(scnLabel)}</span>`
+          + `<br>Max depth: <b>${fmt(pr.max_depth_m, 2)} m</b> (${esc(pr.depth_class || '—')})`
+          + `<br>Peak velocity: <b>${fmt(pr.max_velocity_ms, 2)} m/s</b>`
+          + `<br>Depth × velocity (hv): <b>${fmt(pr.max_hv_m2s, 1)} m²/s</b>`
+          + `<br>Wave arrival time: <b>${fmt(pr.arrival_time_min, 1)} min</b>`
+          + `<br><span class="band">GLO-30 (~90 m) 2D screening simulation — NOT design-grade LiDAR zoning.</span>`
+        );
+      },
+    }).addTo(gTsho2d);
+  }
+
+  if (scnObj && Array.isArray(scnObj.checkpoints)) {
+    const isDeva = isDevanagariLang();
+    scnObj.checkpoints.forEach(cp => {
+      if (cp.lat == null || cp.lon == null) return;
+      const cpName = isDeva && cp.name_ne ? `${cp.name_ne} (${cp.name})` : cp.name;
+      L.marker([cp.lat, cp.lon], {
+        icon: makeTsho2dCheckpointIcon(cpName),
+        keyboard: true,
+        title: cpName,
+      })
+        .bindPopup(
+          `<b>◆ ${esc(cpName)}</b> (${fmt(cp.along_river_km, 1)} km)`
+          + `<br><span class="hbadge h-info">${esc(scnId)}</span>`
+          + `<br>Max depth: <b>${fmt(cp.max_depth_m, 2)} m</b> · Peak vel: <b>${fmt(cp.max_velocity_ms, 2)} m/s</b>`
+          + `<br>Peak hv: <b>${fmt(cp.max_hv_m2s, 1)} m²/s</b> · Peak Q: <b>${fmt(cp.peak_discharge_m3s, 0)} m³/s</b>`
+          + `<br>Wave arrival: <b>${fmt(cp.arrival_time_min, 1)} min</b> (peak @ ${fmt(cp.time_to_peak_min, 1)} min)`
+        )
+        .addTo(gTsho2d);
+    });
+  }
+}
+
+async function zoomToTshoRolpa2d() {
+  S.tsho2dEnabled = true;
+  await drawTsho2dLayer();
+  map.fitBounds([[27.72, 86.15], [27.91, 86.49]], { padding: [36, 36], maxZoom: 12 });
+  if (S.tab === 'cascades') renderTab();
+}
+
+function drawLocalReportsLayer() {
+  const cbSide = document.getElementById('lLocalReports');
+  const cbModal = document.getElementById('chkShowLocalPins');
+  if (cbSide) cbSide.checked = Boolean(S.showLocalPins);
+  if (cbModal) cbModal.checked = Boolean(S.showLocalPins);
+
+  gLocalReports.clearLayers();
+  if (!S.showLocalPins) {
+    if (map.hasLayer(gLocalReports)) map.removeLayer(gLocalReports);
+    return;
+  }
+  if (!map.hasLayer(gLocalReports)) gLocalReports.addTo(map);
+
+  (S.localReports || []).forEach(rep => {
+    const la = Number(rep.lat);
+    const lo = Number(rep.lon);
+    if (!Number.isFinite(la) || !Number.isFinite(lo)) return;
+    const roadStr = rep.road_blocked === true ? 'Yes' : rep.road_blocked === false ? 'No' : t('unknownVal');
+    L.circleMarker([la, lo], {
+      renderer: overlayRenderer,
+      radius: 7.5,
+      color: '#38bdf8',
+      weight: 2.2,
+      dashArray: '4 3',
+      fillColor: '#f59e0b',
+      fillOpacity: 0.84,
+    })
+      .bindPopup(
+        `<b>◌ ${esc(rep.title || 'Local Offline Landslide Report')}</b>`
+        + `<br><span class="dc-badge dc-forecast">UNVERIFIED OFFLINE PIN · hazard_report</span>`
+        + `<br>Location: <b>${esc(tDistrict(rep.district, S.districtsMeta))}</b>, ${esc(tProvince(rep.province, S.districtsMeta))}`
+        + `<br>Date: <b>${fmtNullDate(rep.event_date_utc)}</b> (${esc(rep.time_precision || 'unknown')})`
+        + `<br>Trigger: <b>${esc(rep.trigger || 'unknown')}</b> · Road blocked: <b>${esc(roadStr)}</b>`
+        + `<br>Fatalities: <b>${fmtNullCount(rep.fatalities)}</b> · Injuries: <b>${fmtNullCount(rep.injuries)}</b>`
+        + (rep.description_redacted ? `<br><span class="band">${esc(rep.description_redacted)}</span>` : '')
+        + `<br><span class="band">EXIF stripped ✓ · PII redacted ✓ · Status: ${esc(rep.moderation_status || 'pending_agency_review')}</span>`
+      )
+      .addTo(gLocalReports);
+  });
+}
+
+function updateNetworkPill() {
+  const el = document.getElementById('pill-net');
+  if (!el) return;
+  const online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+  const qCount = (S.localReports || []).length;
+  el.className = !online ? 'pill stale' : qCount > 0 ? 'pill info' : 'pill live';
+  const netTxt = online ? t('netOnline') : t('netOffline');
+  const qTxt = qCount > 0 ? ` · ${t('pwaQueueCount', { n: qCount })}` : '';
+  el.innerHTML = `<span class="dot"></span>${esc(netTxt)}${esc(qTxt)}`;
+}
+
 function drawEq() {
   gEq.clearLayers();
   if (!document.getElementById('lEq').checked) return;
@@ -1463,7 +1774,7 @@ function setToast(msg) {
 function updateEqPill() {
   const pill = document.getElementById('pill-eq');
   const keq = document.getElementById('k-eq');
-  const isNe = getLang() === 'ne';
+  const isNe = isDevanagariLang();
 
   if (S.liveStatus === 'live') {
     const maxM = S.live.length
@@ -1563,6 +1874,8 @@ function updateStatusPills() {
     document.getElementById('k-ls-sub').textContent = `${ageLbl} · D–H (2008)`;
   }
 
+  updateNetworkPill();
+  setBasemapPill(null);
   updateSourceHealthButton();
   updateStaleBanner();
   evaluateCompoundHazards();
@@ -2225,7 +2538,7 @@ function renderOfficialAuthorityPanel(opts = {}) {
   const dist = opts.dist || null;
   const cLon = opts.cLon ?? 84.2;
   const cLat = opts.cLat ?? 28.3;
-  const isNe = getLang() === 'ne';
+  const isNe = isDevanagariLang();
 
   const bp = S.bipad;
   const prov = (bp && bp.provenance) || {};
@@ -2501,10 +2814,10 @@ function renderDistrictByName(distName) {
     ? (isoDist.district_isolation_risk === 'high' ? 'h-vhigh' : isoDist.district_isolation_risk === 'moderate' ? 'h-mod' : isoDist.district_isolation_risk === 'low' ? 'h-low' : 'h-na')
     : 'h-na';
 
-  const distLabel = getLang() === 'ne'
+  const distLabel = isDevanagariLang()
     ? `${dist.name_ne || dist.name} (${dist.name})`
     : `${dist.name} (${dist.name_ne || ''})`;
-  const provLabel = getLang() === 'ne'
+  const provLabel = isDevanagariLang()
     ? `${dist.prov_ne || dist.prov}`
     : `${dist.prov} · ${dist.prov_ne || ''}`;
 
@@ -2533,7 +2846,7 @@ function renderDistrictByName(distName) {
       </div>
       ${basin ? `
         <div class="kv">
-          <span>${esc(getLang() === 'ne' && basin.name_ne ? basin.name_ne : basin.name)} (${fmt(dist.nearest_river_km, 1)} km)</span>
+          <span>${esc(isDevanagariLang() && basin.name_ne ? basin.name_ne : basin.name)} (${fmt(dist.nearest_river_km, 1)} km)</span>
           <b>${fmt(basin.current_m3s, 1)} m³/s</b>
           <span>14d median / p75 peak</span>
           <b>${fmt(basin.peak_14d_median_m3s, 1)} / ${fmt(basin.peak_14d_p75_m3s, 1)} m³/s</b>
@@ -3239,7 +3552,7 @@ function selectRiver(id, fly) {
   if (fly) map.setView([b.lat, b.lon], 9);
 
   const c = b.climatology || {};
-  const bName = getLang() === 'ne' && b.name_ne ? `${b.name_ne} (${b.name})` : b.name;
+  const bName = isDevanagariLang() && b.name_ne ? `${b.name_ne} (${b.name})` : b.name;
   const years = c.years || (S.riversMeta && S.riversMeta.climatology_years) || 21;
   const el = document.getElementById('detailBody');
 
@@ -3413,8 +3726,8 @@ async function renderTab() {
   // Lazy-fetch tab-specific JSONs before rendering
   const needMap = {
     landslides: ['landslides', 'landslide_review_queue'],
-    cascades: ['cascades', 'exposure_isolation', 'tsho_rolpa_pilot'],
-    live: ['bipad_official', 'faults', 'eq_history_m6'],
+    cascades: ['cascades', 'exposure_isolation', 'tsho_rolpa_pilot', 'tsho_rolpa_2d'],
+    live: ['bipad_official', 'cap_drafts', 'faults', 'eq_history_m6'],
     sat: ['eo_sar'],
     glof: ['glof_history'],
     valid: ['validation', 'sensitivity'],
@@ -3425,7 +3738,9 @@ async function renderTab() {
     if (k === 'cascades') return !S.cascades;
     if (k === 'exposure_isolation') return !S.exposureIso;
     if (k === 'tsho_rolpa_pilot') return !S.tshoRolpaPilot;
+    if (k === 'tsho_rolpa_2d') return !S.tsho2d;
     if (k === 'bipad_official') return !S.bipad;
+    if (k === 'cap_drafts') return !S.capDrafts;
     if (k === 'eo_sar') return !S.eoSar;
     if (k === 'faults') return !S.faults;
     if (k === 'eq_history_m6') return !S.eqHist;
@@ -3556,6 +3871,81 @@ function wireTabInteractions(b) {
   if (dlCsv) dlCsv.addEventListener('click', downloadCsv);
   const dlGeo = b.querySelector('#dlGeo');
   if (dlGeo) dlGeo.addEventListener('click', downloadGeoJson);
+
+  // Offline PWA Landslide Report modal triggers inside tabs
+  b.querySelectorAll('[data-open-report-modal]').forEach(btn => {
+    btn.addEventListener('click', openReportModal);
+  });
+
+  // Jump from Cascades tab directly to Governed Multilingual CAP v1.2 panel in Official Alerts tab
+  b.querySelectorAll('[data-open-cap]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await switchTab('live');
+      setTimeout(() => {
+        const capEl = document.getElementById('capDraftsPanel');
+        if (capEl && typeof capEl.scrollIntoView === 'function') {
+          capEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 120);
+    });
+  });
+
+  // Governed Multilingual CAP v1.2 & SMS/IVR switcher controls
+  b.querySelectorAll('button[data-cap-adv]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.capAdv);
+      if (Number.isFinite(idx) && idx >= 0) {
+        S.capAdvIdx = idx;
+        renderTab();
+      }
+    });
+  });
+  b.querySelectorAll('button[data-cap-lang]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      S.capLang = btn.dataset.capLang || 'en';
+      renderTab();
+    });
+  });
+  const copySmsBtn = b.querySelector('#btnCopyCapSms');
+  if (copySmsBtn) {
+    copySmsBtn.addEventListener('click', () => {
+      const txtEl = b.querySelector('#capSmsPreviewText');
+      if (txtEl && navigator.clipboard) {
+        navigator.clipboard.writeText(txtEl.textContent || '').catch(() => {});
+        copySmsBtn.textContent = '✓ Copied';
+      }
+    });
+  }
+
+  // Interactive Tsho Rolpa 2D Hydrodynamic Case Study controls
+  const tshoToggle = b.querySelector('#btnTsho2dToggle');
+  if (tshoToggle) {
+    tshoToggle.addEventListener('click', async () => {
+      S.tsho2dEnabled = !S.tsho2dEnabled;
+      await drawTsho2dLayer();
+      renderTab();
+    });
+  }
+  const tshoZoom = b.querySelector('#btnTsho2dZoom');
+  if (tshoZoom) {
+    tshoZoom.addEventListener('click', zoomToTshoRolpa2d);
+  }
+  const tshoScnSel = b.querySelector('#selTsho2dScenario');
+  if (tshoScnSel) {
+    tshoScnSel.addEventListener('change', async () => {
+      S.tsho2dScenario = tshoScnSel.value || 'TR-S2-MODERATE-30PCT';
+      if (S.tsho2dEnabled) await drawTsho2dLayer();
+      renderTab();
+    });
+  }
+  const tshoMetricSel = b.querySelector('#selTsho2dMetric');
+  if (tshoMetricSel) {
+    tshoMetricSel.addEventListener('change', async () => {
+      S.tsho2dMetric = tshoMetricSel.value || 'depth';
+      if (S.tsho2dEnabled) await drawTsho2dLayer();
+      renderTab();
+    });
+  }
 }
 
 function tabWatch() {
@@ -3629,7 +4019,7 @@ function tabFloods() {
     ${S.rivers.map(b => {
       const c = b.climatology || {};
       const st = riverHeadlineStatus(b);
-      const bName = getLang() === 'ne' && b.name_ne ? `${b.name_ne} (${b.name})` : b.name;
+      const bName = isDevanagariLang() && b.name_ne ? `${b.name_ne} (${b.name})` : b.name;
       const unm = Boolean(b.climatology_unmatched);
       return `<tr tabindex="0" data-river="${esc(b.id)}" class="${b.id === S.sel && S.selKind === 'river' ? 'sel' : ''}">
         <td><b>${esc(bName)}</b> ${b.grid_snap_warning ? '<span class="hbadge h-mod" title="Cached cell off-mainstem">⚠ snap</span>' : ''}</td>
@@ -3689,7 +4079,7 @@ function idCurveSvg(nodes) {
 }
 
 function renderLandslideReviewQueue(rq) {
-  const isNe = getLang() === 'ne';
+  const isNe = isDevanagariLang();
   const nScanned = (rq && rq.n_records_scanned) || (S.landslides || []).length;
   const cands = (rq && Array.isArray(rq.candidates)) ? rq.candidates : [];
   const params = (rq && rq.parameters) || { max_km: 1.5, max_days: 3, undated_cross_source_max_km: 0.35 };
@@ -3727,7 +4117,7 @@ function renderLandslideReviewQueue(rq) {
 }
 
 function tabLandslides() {
-  const isNe = getLang() === 'ne';
+  const isNe = isDevanagariLang();
   const nodes = (S.hydromet && S.hydromet.nodes) || [];
   const allEvs = S.landslides || [];
   const meta = S.lsMeta || {};
@@ -3780,7 +4170,8 @@ function tabLandslides() {
 
         <div class="tbl-toolbar field-gap">
           <h4>5-Type Landslide Inventory (${fmt(allEvs.length)} total · BIPAD: ${fmt(nBipad)} · COOLR: ${fmt(nCoolr)} · OSM: ${fmt(nOsm)})</h4>
-          <a class="btn sm pri" href="data/landslide_inventory.geojson" download="landslide_inventory.geojson">${esc(t('lsDownloadGeojson'))}</a>
+          <button type="button" class="btn sm pri" id="btnReportLandslide" data-open-report-modal="1" aria-haspopup="dialog" aria-controls="reportModal">${esc(t('btnReportLandslide'))} (Offline PWA)</button>
+          <a class="btn sm" href="data/landslide_inventory.geojson" download="landslide_inventory.geojson">${esc(t('lsDownloadGeojson'))}</a>
         </div>
 
         <div class="ls-type-bar" role="group" aria-label="Filter landslide inventory by 5 canonical feature types">
@@ -3857,7 +4248,7 @@ const CASCADE_NODE_POS = {
 };
 
 function buildCascadeGraphSvg(cas) {
-  const isNe = getLang() === 'ne';
+  const isNe = isDevanagariLang();
   const nodes = (cas && Array.isArray(cas.nodes)) ? cas.nodes : [];
   const edges = (cas && Array.isArray(cas.edges)) ? cas.edges : [];
   const nodeW = 232;
@@ -3958,7 +4349,7 @@ function cascadeCardSeverityClass(sev) {
 }
 
 function renderCascadeInspector(cas) {
-  const isNe = getLang() === 'ne';
+  const isNe = isDevanagariLang();
   const nodes = (cas && Array.isArray(cas.nodes)) ? cas.nodes : [];
   const edges = (cas && Array.isArray(cas.edges)) ? cas.edges : [];
   const nodeById = new Map(nodes.map(n => [n.id, n]));
@@ -4113,23 +4504,193 @@ function renderExposureIsolationSection(ei) {
     </section>`;
 }
 
-function renderTshoRolpaPilotSection(trp) {
-  if (!trp) return '';
-  const isNe = getLang() === 'ne';
-  const lid = trp.lake_identification || {};
-  const inv = trp.traya_inventory_parameters || {};
-  const pub = trp.published_peer_reviewed_benchmarks || {};
+function buildTsho2dLongitudinalSvg(scn) {
+  const prof = (scn && Array.isArray(scn.longitudinal_profile)) ? scn.longitudinal_profile : [];
+  if (!prof.length) return '<p class="muted">Longitudinal profile unavailable.</p>';
+
+  const W = 440;
+  const H = 215;
+  const pL = 42;
+  const pR = 44;
+  const pT = 20;
+  const pB = 34;
+  const cW = W - pL - pR;
+  const cH = H - pT - pB;
+
+  const maxKm = Math.max(10, ...prof.map(p => Number(p.along_km) || 0));
+  const maxD = Math.max(5, Math.ceil(Math.max(...prof.map(p => Number(p.max_depth_m) || 0)) / 5) * 5);
+  const maxA = Math.max(60, Math.ceil(Math.max(...prof.map(p => Number(p.arrival_time_min) || 0)) / 30) * 30);
+
+  const xOf = km => pL + (Math.max(0, Number(km) || 0) / maxKm) * cW;
+  const yDepth = d => pT + cH - (Math.max(0, Number(d) || 0) / maxD) * cH;
+  const yArr = m => pT + cH - (Math.max(0, Number(m) || 0) / maxA) * cH;
+
+  const depthPts = prof.map(p => `${xOf(p.along_km).toFixed(1)},${yDepth(p.max_depth_m).toFixed(1)}`).join(' ');
+  const depthArea = `M${xOf(prof[0].along_km).toFixed(1)},${(pT + cH).toFixed(1)} `
+    + prof.map(p => `L${xOf(p.along_km).toFixed(1)},${yDepth(p.max_depth_m).toFixed(1)}`).join(' ')
+    + ` L${xOf(prof[prof.length - 1].along_km).toFixed(1)},${(pT + cH).toFixed(1)} Z`;
+  const arrPts = prof.map(p => `${xOf(p.along_km).toFixed(1)},${yArr(p.arrival_time_min).toFixed(1)}`).join(' ');
+
+  const cpMarkers = [
+    { km: 6.3, lbl: 'Na' },
+    { km: 12.2, lbl: 'Beding' },
+    { km: 31.6, lbl: 'Gongar/HPP' },
+    { km: 46.3, lbl: 'Singati' },
+  ];
+
+  return `<svg class="tsho2d-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tsho Rolpa 2D longitudinal depth attenuation and wave arrival time chart">
+    ${[0, 0.25, 0.5, 0.75, 1].map(f => {
+      const y = (pT + cH * (1 - f)).toFixed(1);
+      const dVal = (maxD * f).toFixed(0);
+      const aVal = (maxA * f).toFixed(0);
+      return `<line x1="${pL}" y1="${y}" x2="${W - pR}" y2="${y}" stroke="var(--chart-grid)" stroke-dasharray="2 2"/>
+        <text x="${pL - 5}" y="${(Number(y) + 3).toFixed(1)}" fill="var(--chart-sim)" font-size="8.5" text-anchor="end" font-family="monospace">${dVal}m</text>
+        <text x="${W - pR + 5}" y="${(Number(y) + 3).toFixed(1)}" fill="var(--chart-max)" font-size="8.5" text-anchor="start" font-family="monospace">${aVal}m</text>`;
+    }).join('')}
+    ${[0, 10, 20, 30, 40].map(k => {
+      const x = xOf(k).toFixed(1);
+      return `<line x1="${x}" y1="${pT}" x2="${x}" y2="${pT + cH}" stroke="var(--chart-grid)" stroke-opacity="0.55"/>
+        <text x="${x}" y="${H - 12}" fill="var(--chart-text)" font-size="8.5" text-anchor="middle" font-family="monospace">${k} km</text>`;
+    }).join('')}
+    ${cpMarkers.map(cp => {
+      const x = xOf(cp.km).toFixed(1);
+      const anchor = cp.km > 40 ? 'end' : 'middle';
+      return `<line x1="${x}" y1="${pT}" x2="${x}" y2="${pT + cH}" stroke="var(--chart-axis)" stroke-dasharray="2 3"/>
+        <text x="${x}" y="${pT - 5}" fill="var(--ink)" font-size="8.2" font-weight="700" text-anchor="${anchor}">${esc(cp.lbl)}</text>`;
+    }).join('')}
+    <path d="${depthArea}" fill="var(--chart-sim)" fill-opacity="0.16"/>
+    <polyline points="${depthPts}" fill="none" stroke="var(--chart-sim)" stroke-width="2.2"/>
+    <polyline points="${arrPts}" fill="none" stroke="var(--chart-max)" stroke-width="2" stroke-dasharray="5 3"/>
+    ${prof.map(p => `<circle cx="${xOf(p.along_km).toFixed(1)}" cy="${yDepth(p.max_depth_m).toFixed(1)}" r="2.7" fill="var(--chart-sim)">
+      <title>${fmt(p.along_km, 1)} km · Depth ${fmt(p.max_depth_m, 2)} m · Vel ${fmt(p.max_velocity_ms, 2)} m/s · Arrival ${fmt(p.arrival_time_min, 1)} min</title></circle>`).join('')}
+    <text x="${W / 2}" y="${H - 1}" fill="var(--chart-text)" font-size="8.5" text-anchor="middle">Distance below Tsho Rolpa moraine outlet (km) · Blue = Max Depth (m), Dashed Orange = Arrival Time (min)</text>
+  </svg>`;
+}
+
+function buildTsho2dHydrographSvg(scn, timeMin) {
+  const times = Array.isArray(timeMin) && timeMin.length ? timeMin : [];
+  const cps = (scn && Array.isArray(scn.checkpoints)) ? scn.checkpoints : [];
+  const qIn = (scn && scn.inflow_hydrograph && Array.isArray(scn.inflow_hydrograph.q_in_10min_m3s))
+    ? scn.inflow_hydrograph.q_in_10min_m3s
+    : [];
+  if (!times.length || !cps.length) return '<p class="muted">Checkpoint hydrographs unavailable.</p>';
+
+  const W = 440;
+  const H = 215;
+  const pL = 50;
+  const pR = 14;
+  const pT = 22;
+  const pB = 34;
+  const cW = W - pL - pR;
+  const cH = H - pT - pB;
+
+  const series = [
+    { lbl: 'Outlet Inflow', vals: qIn, col: 'var(--chart-axis)', dash: '4 3' },
+    { lbl: 'Na (6.3 km)', vals: (cps.find(c => c.id === 'cp_na') || {}).hydrograph_q_m3s || [], col: 'var(--chart-sim)', dash: '' },
+    { lbl: 'Beding (12.2 km)', vals: (cps.find(c => c.id === 'cp_beding') || {}).hydrograph_q_m3s || [], col: 'var(--chart-med)', dash: '' },
+    { lbl: 'Gongar / HPP (31.6 km)', vals: (cps.find(c => c.id === 'cp_gongar') || {}).hydrograph_q_m3s || [], col: 'var(--chart-q2)', dash: '' },
+    { lbl: 'Singati (46.3 km)', vals: (cps.find(c => c.id === 'cp_singati') || {}).hydrograph_q_m3s || [], col: 'var(--chart-q5)', dash: '' },
+  ].filter(s => Array.isArray(s.vals) && s.vals.length);
+
+  const maxT = Math.max(60, ...times.map(v => Number(v) || 0));
+  const rawMaxQ = Math.max(500, ...series.flatMap(s => s.vals.map(v => Number(v) || 0)));
+  const maxQ = Math.ceil((rawMaxQ * 1.08) / 500) * 500;
+
+  const xOf = tm => pL + (Math.max(0, Number(tm) || 0) / maxT) * cW;
+  const yOf = q => pT + cH - (Math.max(0, Number(q) || 0) / maxQ) * cH;
+
+  return `<svg class="tsho2d-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tsho Rolpa 2D downstream checkpoint discharge hydrographs">
+    ${[0, 0.25, 0.5, 0.75, 1].map(f => {
+      const y = (pT + cH * (1 - f)).toFixed(1);
+      const qVal = Math.round(maxQ * f);
+      return `<line x1="${pL}" y1="${y}" x2="${W - pR}" y2="${y}" stroke="var(--chart-grid)" stroke-dasharray="2 2"/>
+        <text x="${pL - 5}" y="${(Number(y) + 3).toFixed(1)}" fill="var(--chart-text)" font-size="8.5" text-anchor="end" font-family="monospace">${fmt(qVal)}</text>`;
+    }).join('')}
+    ${[0, 60, 120, 180, 240, 300].filter(tm => tm <= maxT).map(tm => {
+      const x = xOf(tm).toFixed(1);
+      return `<line x1="${x}" y1="${pT}" x2="${x}" y2="${pT + cH}" stroke="var(--chart-grid)" stroke-opacity="0.55"/>
+        <text x="${x}" y="${H - 12}" fill="var(--chart-text)" font-size="8.5" text-anchor="middle" font-family="monospace">${tm}m</text>`;
+    }).join('')}
+    ${series.map(s => {
+      const pts = s.vals.map((v, i) => `${xOf(times[i] ?? (i * 10)).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ');
+      return `<polyline points="${pts}" fill="none" stroke="${s.col}" stroke-width="${s.dash ? 1.6 : 2.1}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''}><title>${esc(s.lbl)}</title></polyline>`;
+    }).join('')}
+    <text x="${pL + 4}" y="12" fill="var(--chart-axis)" font-size="8" font-weight="700">--- Outlet</text>
+    <text x="${pL + 60}" y="12" fill="var(--chart-sim)" font-size="8" font-weight="700">━ Na</text>
+    <text x="${pL + 98}" y="12" fill="var(--chart-med)" font-size="8" font-weight="700">━ Beding</text>
+    <text x="${pL + 154}" y="12" fill="var(--chart-q2)" font-size="8" font-weight="700">━ Gongar/HPP</text>
+    <text x="${pL + 236}" y="12" fill="var(--chart-q5)" font-size="8" font-weight="700">━ Singati</text>
+    <text x="${W / 2}" y="${H - 1}" fill="var(--chart-text)" font-size="8.5" text-anchor="middle">Time after breach onset (min) · Discharge Q (m³/s)</text>
+  </svg>`;
+}
+
+function buildTsho2dLegendHtml(metric) {
+  if (metric === 'velocity') {
+    return `<div class="tsho2d-legend-items">
+      <b>${esc(t('tr2dVelocity'))}:</b>
+      <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-1" aria-hidden="true"></span>&lt; 3 m/s</span>
+      <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-2" aria-hidden="true"></span>3–6 m/s</span>
+      <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-3" aria-hidden="true"></span>6–9 m/s</span>
+      <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-4" aria-hidden="true"></span>≥ 9 m/s</span>
+    </div>`;
+  }
+  if (metric === 'arrival') {
+    return `<div class="tsho2d-legend-items">
+      <b>${esc(t('tr2dArrival'))}:</b>
+      <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-a1" aria-hidden="true"></span>≤ 30 min</span>
+      <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-a2" aria-hidden="true"></span>30–60 min</span>
+      <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-a3" aria-hidden="true"></span>60–120 min</span>
+      <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-a4" aria-hidden="true"></span>&gt; 120 min</span>
+    </div>`;
+  }
+  return `<div class="tsho2d-legend-items">
+    <b>${esc(t('tr2dDepth'))}:</b>
+    <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-1" aria-hidden="true"></span>0.15–1 m</span>
+    <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-2" aria-hidden="true"></span>1–3 m</span>
+    <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-3" aria-hidden="true"></span>3–8 m</span>
+    <span class="tsho2d-leg-item"><span class="tsho2d-sw tr2d-sw-4" aria-hidden="true"></span>&gt; 8 m</span>
+  </div>`;
+}
+
+function renderTshoRolpaPilotSection(trp, sim2d) {
+  if (!trp && !sim2d) return '';
+  const isDeva = isDevanagariLang();
+  const lid = (trp && trp.lake_identification) || {};
+  const inv = (trp && trp.traya_inventory_parameters) || {};
+  const pub = (trp && trp.published_peer_reviewed_benchmarks) || {};
   const bathy = pub.bathymetry_and_geometry || {};
   const eng = pub.engineering_mitigation_2000 || {};
-  const reqs = trp.pre_simulation_2d_requirements || {};
-  const cps = Array.isArray(trp.valley_checkpoints) ? trp.valley_checkpoints : [];
-  const scns = Array.isArray(trp.breach_scenario_framework) ? trp.breach_scenario_framework : [];
   const volRange = Array.isArray(bathy.surveyed_volume_Mm3_range) ? bathy.surveyed_volume_Mm3_range : [];
 
+  const scns2d = (sim2d && Array.isArray(sim2d.scenarios)) ? sim2d.scenarios : [];
+  const activeScnId = S.tsho2dScenario || 'TR-S2-MODERATE-30PCT';
+  const activeScn = scns2d.find(s => s.scenario_id === activeScnId) || scns2d[1] || scns2d[0] || null;
+  const metric = S.tsho2dMetric || 'depth';
+  const dm = activeScn && activeScn.domain_summary ? activeScn.domain_summary : {};
+  const mb = activeScn && activeScn.mass_balance ? activeScn.mass_balance : {};
+  const infl = activeScn && activeScn.inflow_hydrograph ? activeScn.inflow_hydrograph : {};
+  const solver = (sim2d && sim2d.solver_config) || {};
+  const demMeta = (sim2d && sim2d.dem_metadata) || {};
+  const shrestha = (sim2d && sim2d.shrestha_nakagawa_2014_comparison) || {};
+  const shresthaCps = Array.isArray(shrestha.checkpoints) ? shrestha.checkpoints : [];
+  const activeCps = (activeScn && Array.isArray(activeScn.checkpoints)) ? activeScn.checkpoints : [];
+  const timeMin = (sim2d && Array.isArray(sim2d.hydrograph_time_min)) ? sim2d.hydrograph_time_min : [];
+
+  const scenarioShortName = id => {
+    if (id === 'TR-S1-PARTIAL-10PCT') return '10% Partial (8 Mm³ · Qp 1,100 m³/s)';
+    if (id === 'TR-S2-MODERATE-30PCT') return '30% Moderate — Shrestha & Nakagawa Benchmark (26 Mm³ · Qp 5,800 m³/s)';
+    if (id === 'TR-S3-SEVERE-50PCT') return '50% Severe (43 Mm³ · Qp 9,800 m³/s)';
+    if (id === 'TR-S4-EXTREME-100PCT') return '100% Bounding Ceiling (78 Mm³ · Qp 13,500 m³/s)';
+    return id;
+  };
+
   return `
-    <section class="v2-section">
+    <section class="v2-section" id="tshoRolpa2dSection">
       <div class="v2-section-head">
-        <h4><span>🏔 ${esc(t('pilotTitle'))}</span> <span class="dc-badge dc-static">${esc(t('pilotBadge'))}</span></h4>
+        <h4>
+          <span>🏔 ${esc(t('tr2dTitle'))}</span>
+          <span class="dc-badge dc-static">Copernicus DEM GLO-30 2D Inertial Shallow-Water Screening Simulation — NOT design-grade LiDAR zoning</span>
+        </h4>
         <div class="btn-row">
           <button type="button" class="btn sm pri" data-open-lake="${esc(lid.matched_inventory_id || 'GL_27.86029_86.47725')}">${esc(t('pilotFlyLake'))}</button>
           <a class="btn sm" href="${esc(TSHO_ROLPA_PLAN_URL)}" target="_blank" rel="noopener noreferrer">${esc(t('pilotStudyPlanLink'))}</a>
@@ -4137,84 +4698,150 @@ function renderTshoRolpaPilotSection(trp) {
       </div>
 
       <div class="pilot-card">
-        <div class="badge-row">
-          <span class="hbadge h-vhigh">Hazard: ${esc(tTier(inv.hazard_published || 'very high'))}</span>
-          <span class="hbadge h-info">Target Solvers: ${esc((trp.target_solvers || ['LISFLOOD-FP', 'BASEMENT']).join(' · '))}</span>
-          <span class="hbadge h-mod">Ice-Cored Moraine · SLA ${fmt(inv.sla_max_angle_deg, 1)}°</span>
-          <span class="band">${esc(lid.river_basin || 'Rolwaling Khola → Tama Koshi → Sun Koshi')}</span>
-        </div>
-        <p class="muted field-gap">${esc(trp.status_note || '')}</p>
-
-        <div class="pilot-grid">
-          <div class="pilot-box">
-            <h5>Published Rolwaling Bathymetry &amp; Parameters</h5>
-            <div class="kv">
-              <span>Elevation / Area</span><b>${fmt(lid.elevation_m, 0)} m · ${fmt(inv.area_km2, 2)} km²</b>
-              <span>Surveyed Volume (Yamada/ICIMOD)</span><b>${volRange.length === 2 ? `${fmt(volRange[0], 1)}–${fmt(volRange[1], 1)} Mm³` : '76.6–85.9 Mm³'}</b>
-              <span>Surveyed Max / Mean Depth</span><b>${fmt(bathy.surveyed_max_depth_m, 0)} / ${fmt(bathy.surveyed_mean_depth_m, 1)} m</b>
-              <span>TRĀYA PFV (Fujita 2013)</span><b>${fmt(inv.pfv_Mm3, 2)} Mm³ (Hp ${fmt(inv.hp_m, 1)} m)</b>
-              <span>Veh Median Qp (95% CI)</span><b>${fmt(inv.veh_qp_median_m3s, 0)} m³/s</b>
-            </div>
-            <p class="band field-gap">${esc((bathy.comparison_with_traya_empirical_scaling && bathy.comparison_with_traya_empirical_scaling.volume_bias_note) || '')}</p>
-          </div>
-
-          <div class="pilot-box">
-            <h5>2000 Engineering Spillway Lowering History</h5>
-            <div class="kv">
-              <span>Intervention</span><b>${esc(eng.intervention || '3.0 m open gated spillway')}</b>
-              <span>Completed</span><b>${fmt(eng.completion_year, 0)}</b>
-              <span>Agencies</span><b>${esc(eng.implementing_agencies || 'Nepal DHM / WECS')}</b>
-            </div>
-            <p class="muted field-gap">${esc(eng.residual_risk_note || '')}</p>
-          </div>
-
-          <div class="pilot-box">
-            <h5>2D Hydrodynamic Prerequisites (Pre-Simulation)</h5>
-            <ul class="trig-list">
-              ${(reqs.required_inputs_for_lisflood_basement || []).slice(0, 4).map(item => `<li>${esc(item)}</li>`).join('')}
-            </ul>
-          </div>
+        <div class="callout">
+          <b>Screening-resolution caveat (<code>is_design_grade_engineering_map: false</code>):</b>
+          ${esc(t('tr2dCaveat'))}
+          ${sim2d && sim2d.methodology_notice ? `<div class="band field-gap">${esc(sim2d.methodology_notice)}</div>` : ''}
         </div>
 
-        <h5 class="field-gap">4-Tier Breach Scenario Framework (Pre-Simulation Boundary Hydrographs)</h5>
-        <div class="tbl-scroll"><table><thead><tr>
-          <th scope="col">Scenario</th><th scope="col">Breach Fraction</th><th scope="col">Approx Depth</th>
-          <th scope="col">TRĀYA Qp (m³/s)</th><th scope="col">Published Analog</th><th scope="col">2D Solver Role</th>
-        </tr></thead><tbody>
-        ${scns.map(sc => `<tr>
-          <td><b>${esc(sc.scenario_id)}</b><div class="band">${esc(sc.label)}</div></td>
-          <td class="num">${fmt((sc.breach_fraction || 0) * 100, 0)}%</td>
-          <td class="num">${fmt(sc.approx_breach_depth_m, 1)} m</td>
-          <td class="num"><b>${fmt(sc.traya_empirical_qp_m3s, 0)}</b></td>
-          <td class="wrap-cell">${esc(sc.published_analog || '')}</td>
-          <td class="wrap-cell">${esc(sc.target_2d_solver_role || '')}</td>
-        </tr>`).join('')}
-        </tbody></table></div>
+        ${activeScn ? `
+        <div class="tsho2d-controls" role="region" aria-label="Tsho Rolpa 2D flood map and scenario controls">
+          <button type="button" class="btn ${S.tsho2dEnabled ? 'pri' : ''}" id="btnTsho2dToggle" aria-pressed="${S.tsho2dEnabled ? 'true' : 'false'}">
+            ${S.tsho2dEnabled ? '✓ 2D Flood Footprint ON' : '▓ ' + esc(t('tr2dToggleLayer'))}
+          </button>
+          <button type="button" class="btn pri" id="btnTsho2dZoom">◎ ${esc(t('tr2dZoomBtn'))}</button>
+          <label class="tsho2d-ctrl-group">
+            <span>${esc(t('tr2dScenario'))}</span>
+            <select id="selTsho2dScenario" aria-label="Select Tsho Rolpa 2D breach scenario">
+              ${scns2d.map(sc => `<option value="${esc(sc.scenario_id)}"${sc.scenario_id === activeScn.scenario_id ? ' selected' : ''}>${esc(scenarioShortName(sc.scenario_id))}</option>`).join('')}
+            </select>
+          </label>
+          <label class="tsho2d-ctrl-group">
+            <span>${esc(t('tr2dMetric'))}</span>
+            <select id="selTsho2dMetric" aria-label="Select 2D flood map colour metric">
+              <option value="depth"${metric === 'depth' ? ' selected' : ''}>${esc(t('tr2dDepth'))}</option>
+              <option value="velocity"${metric === 'velocity' ? ' selected' : ''}>${esc(t('tr2dVelocity'))}</option>
+              <option value="arrival"${metric === 'arrival' ? ' selected' : ''}>${esc(t('tr2dArrival'))}</option>
+            </select>
+          </label>
+        </div>
 
-        <h5 class="field-gap">Rolwaling–Tama Koshi Downstream Checkpoints (${fmt(cps.length)} benchmarks — click row to fly)</h5>
+        <div class="tsho2d-legend-bar">
+          ${buildTsho2dLegendHtml(metric)}
+          <div>
+            <span class="sla-badge ${mb.conserved_under_2pct ? 'sla-available' : 'sla-unavailable'}">
+              ${esc(t('tr2dMassBalance'))}: ${fmt(mb.mass_balance_error_pct, 3)}% error ${mb.conserved_under_2pct ? '(<2% conserved ✓)' : '⚠'}
+            </span>
+            <span class="band mono"> · CFL α=${fmt(solver.cfl_alpha, 2)} · dt_min=${fmt(activeScn.min_dt_s, 2)}s · ${fmt(activeScn.n_timesteps)} steps · grid ${fmt(demMeta.dx_m, 0)}×${fmt(demMeta.dy_m, 0)} m</span>
+          </div>
+        </div>
+
+        <div class="mini-kpis">
+          <div class="mini-kpi"><div class="mini-kpi-lbl">Drained Vol / Peak Qp</div><div class="mini-kpi-val">${fmt(infl.target_volume_Mm3, 1)} Mm³ · ${fmt(infl.effective_peak_q_m3s, 0)} m³/s</div></div>
+          <div class="mini-kpi"><div class="mini-kpi-lbl">Inundated Area (≥0.15 m)</div><div class="mini-kpi-val">${fmt(dm.inundated_area_km2, 2)} km² (${fmt(dm.inundated_cells)} cells)</div></div>
+          <div class="mini-kpi"><div class="mini-kpi-lbl">Peak Flow Depth</div><div class="mini-kpi-val text-bad">${fmt(dm.max_depth_m, 2)} m</div></div>
+          <div class="mini-kpi"><div class="mini-kpi-lbl">Peak Velocity</div><div class="mini-kpi-val text-warn">${fmt(dm.max_velocity_ms, 2)} m/s</div></div>
+          <div class="mini-kpi"><div class="mini-kpi-lbl">Max Momentum (hv)</div><div class="mini-kpi-val">${fmt(dm.max_hv_m2s, 1)} m²/s</div></div>
+          <div class="mini-kpi"><div class="mini-kpi-lbl">Mass Balance (In / Out)</div><div class="mini-kpi-val text-ok">${fmt(mb.volume_in_Mm3, 2)} / ${fmt(mb.volume_out_Mm3, 2)} Mm³</div></div>
+        </div>
+
+        <div class="tsho2d-charts-grid">
+          <div class="tsho2d-chart-box">
+            <h5>Longitudinal Attenuation &amp; Wave Arrival Profile (${esc(activeScn.scenario_id)})</h5>
+            ${buildTsho2dLongitudinalSvg(activeScn)}
+          </div>
+          <div class="tsho2d-chart-box">
+            <h5>${esc(t('tr2dHydrographTitle'))} (${esc(activeScn.scenario_id)})</h5>
+            ${buildTsho2dHydrographSvg(activeScn, timeMin)}
+          </div>
+        </div>
+
+        <h5 class="field-gap">Rolwaling–Tama Koshi 2D Checkpoint Metrics (${esc(activeScn.scenario_id)} — click row to fly)</h5>
         <div class="tbl-scroll"><table><thead><tr>
-          <th scope="col">Checkpoint</th><th scope="col">District</th><th scope="col">River km</th>
-          <th scope="col">Elev m</th><th scope="col">Arrival (10 / 5 / 2 m/s)</th><th scope="col">Operational Significance</th>
+          <th scope="col">Checkpoint</th><th scope="col">River km</th><th scope="col">Bed Elev m</th>
+          <th scope="col">Max Depth m</th><th scope="col">Peak Vel m/s</th><th scope="col">Peak hv m²/s</th>
+          <th scope="col">Peak Q m³/s</th><th scope="col">Arrival min</th><th scope="col">Peak Time min</th>
         </tr></thead><tbody>
-        ${cps.map(cp => {
-          const arr = cp.first_order_arrival_bracket || {};
-          const cpName = isNe && cp.name_ne ? `${cp.name_ne} (${cp.name})` : cp.name;
-          return `<tr tabindex="0" data-fly="${safeFlyAttr(cp.lat, cp.lon, 12)}">
-            <td><b>${esc(cpName)}</b>${cp.capacity_mw ? ` <span class="hbadge h-high">${fmt(cp.capacity_mw, 0)} MW</span>` : ''}</td>
-            <td>${esc(tDistrict(cp.district, S.districtsMeta))}</td>
-            <td class="num"><b>${fmt(cp.along_river_km, 1)}</b></td>
-            <td class="num">${cp.approx_elev_m != null ? fmt(cp.approx_elev_m, 0) : '—'}</td>
-            <td class="num mono">${fmt(arr.fast_10ms_min, 0)}m / <b>${fmt(arr.observed_ref_5ms_min, 0)}m</b> / ${fmt(arr.slow_2ms_min, 0)}m</td>
-            <td class="wrap-cell">${esc(cp.significance || '')}</td>
+        ${activeCps.map(cp => {
+          const cpName = isDeva && cp.name_ne ? `${cp.name_ne} (${cp.name})` : cp.name;
+          return `<tr tabindex="0" data-fly="${safeFlyAttr(cp.lat, cp.lon, 13)}">
+            <td><b>${esc(cpName)}</b></td>
+            <td class="num">${fmt(cp.along_river_km, 1)}</td>
+            <td class="num">${fmt(cp.bed_elev_m, 0)}</td>
+            <td class="num"><b>${fmt(cp.max_depth_m, 2)}</b></td>
+            <td class="num">${fmt(cp.max_velocity_ms, 2)}</td>
+            <td class="num">${fmt(cp.max_hv_m2s, 1)}</td>
+            <td class="num"><b>${fmt(cp.peak_discharge_m3s, 0)}</b></td>
+            <td class="num"><b>${fmt(cp.arrival_time_min, 1)}</b></td>
+            <td class="num">${fmt(cp.time_to_peak_min, 1)}</td>
           </tr>`;
         }).join('')}
         </tbody></table></div>
+
+        ${shresthaCps.length ? `
+        <h5 class="field-gap">${esc(t('tr2dShresthaCompare'))}</h5>
+        <p class="muted">${esc(shrestha.comparison_notes || '')} <span class="band">(${esc(shrestha.citation || '')})</span></p>
+        <div class="tbl-scroll"><table><thead><tr>
+          <th scope="col">Checkpoint</th><th scope="col">River km</th><th scope="col">TRĀYA 2D S2 Depth</th>
+          <th scope="col">TRĀYA 2D S2 Arrival</th><th scope="col">Front Speed m/s</th><th scope="col">Literature Arrival Range</th>
+          <th scope="col">Published Benchmark &amp; Resolution Note</th>
+        </tr></thead><tbody>
+        ${shresthaCps.map(cp => `<tr>
+          <td><b>${esc(cp.checkpoint_name)}</b></td>
+          <td class="num">${fmt(cp.along_river_km, 1)}</td>
+          <td class="num"><b>${fmt(cp.traya_2d_s2_depth_m, 2)} m</b></td>
+          <td class="num"><b>${fmt(cp.traya_2d_s2_arrival_min, 1)} min</b></td>
+          <td class="num">${fmt(cp.traya_2d_s2_mean_front_speed_ms, 2)}</td>
+          <td class="mono">${esc(cp.literature_arrival_min_range || '—')}</td>
+          <td class="wrap-cell">${esc(cp.literature_depth_and_dynamics_note || '')} <span class="band">(${esc(cp.reference || '')})</span></td>
+        </tr>`).join('')}
+        </tbody></table></div>` : ''}
+        ` : ''}
+
+        <details class="review-queue-panel field-gap">
+          <summary>
+            <span>▸ Published Bathymetry, 2000 Spillway History &amp; HPC Reproducibility Pack (LISFLOOD-FP &amp; BASEMENT v4)</span>
+            <span class="badge-screening">simulations/tsho_rolpa/</span>
+          </summary>
+          <div class="review-queue-body">
+            <div class="pilot-grid">
+              <div class="pilot-box">
+                <h5>Published Rolwaling Bathymetry &amp; Parameters</h5>
+                <div class="kv">
+                  <span>Elevation / Area</span><b>${fmt(lid.elevation_m, 0)} m · ${fmt(inv.area_km2, 2)} km²</b>
+                  <span>Surveyed Volume (Yamada/ICIMOD)</span><b>${volRange.length === 2 ? `${fmt(volRange[0], 1)}–${fmt(volRange[1], 1)} Mm³` : '76.6–85.9 Mm³'}</b>
+                  <span>Surveyed Max / Mean Depth</span><b>${fmt(bathy.surveyed_max_depth_m, 0)} / ${fmt(bathy.surveyed_mean_depth_m, 1)} m</b>
+                  <span>TRĀYA PFV (Fujita 2013)</span><b>${fmt(inv.pfv_Mm3, 2)} Mm³ (Hp ${fmt(inv.hp_m, 1)} m)</b>
+                  <span>Veh Median Qp (95% CI)</span><b>${fmt(inv.veh_qp_median_m3s, 0)} m³/s</b>
+                </div>
+              </div>
+              <div class="pilot-box">
+                <h5>2000 Engineering Spillway Lowering History</h5>
+                <div class="kv">
+                  <span>Intervention</span><b>${esc(eng.intervention || '3.0 m open gated spillway')}</b>
+                  <span>Completed</span><b>${fmt(eng.completion_year, 0)}</b>
+                  <span>Agencies</span><b>${esc(eng.implementing_agencies || 'Nepal DHM / WECS')}</b>
+                </div>
+                <p class="muted field-gap">${esc(eng.residual_risk_note || '')}</p>
+              </div>
+              <div class="pilot-box">
+                <h5>HPC Reproducibility Pack (≤5 m LiDAR Ready)</h5>
+                <p class="muted">Drop-in <code>LISFLOOD-FP</code> (<code>.par/.bci/.bdy</code>) and <code>BASEMENT v4</code> JSON configs prepared for ≤5 m bare-earth DEM refinement.</p>
+                <div class="btn-row">
+                  <a class="btn sm" href="${esc(TSHO_ROLPA_SIM_URL)}" target="_blank" rel="noopener noreferrer">simulations/tsho_rolpa/ ↗</a>
+                  <a class="btn sm" href="data/tsho_rolpa_2d_inundation.json" download="tsho_rolpa_2d_inundation.json">⬇ 2D JSON</a>
+                  <a class="btn sm" href="data/tsho_rolpa_2d_footprints.geojson" download="tsho_rolpa_2d_footprints.geojson">⬇ 2D GeoJSON</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
     </section>`;
 }
 
 function tabCascades() {
-  const isNe = getLang() === 'ne';
+  const isNe = isDevanagariLang();
   const cas = S.cascades;
   if (!cas) return '<p class="muted">Cascade dataset unavailable.</p>';
 
@@ -4228,8 +4855,9 @@ function tabCascades() {
     <section class="v2-section">
       <div class="v2-section-head">
         <h4><span>⇶ ${esc(t('cascGraphTitle'))}</span> <span class="hbadge ${headSevCls}">${esc(sum.highest_severity || 'baseline')}</span></h4>
-        <div class="badge-row">
+        <div class="btn-row">
           <span class="band mono">${fmt(sum.n_chains)} chains · ${fmt(sum.n_nodes)} nodes · ${fmt(sum.n_edges)} rules (${fmt(sum.n_active_edges)} active / ${fmt(sum.n_active_dynamic_edges)} dynamic)</span>
+          <button type="button" class="btn sm pri" data-open-cap="1">📡 ${esc(t('capTitle'))} →</button>
         </div>
       </div>
 
@@ -4283,7 +4911,130 @@ function tabCascades() {
     </section>
 
     ${renderExposureIsolationSection(S.exposureIso)}
-    ${renderTshoRolpaPilotSection(S.tshoRolpaPilot)}`;
+    ${renderTshoRolpaPilotSection(S.tshoRolpaPilot, S.tsho2d)}`;
+}
+
+function renderCapDraftsPanel(cap) {
+  const gov = (cap && cap.relay_governance) || {};
+  const agencies = Array.isArray(gov.authorizing_agencies_required)
+    ? gov.authorizing_agencies_required
+    : ['NDRRMA', 'DHM', 'DMG/NEMRC', 'DoR'];
+  const advs = (cap && Array.isArray(cap.advisories)) ? cap.advisories : [];
+
+  if (!cap || !advs.length) {
+    return `<section class="cap-panel" id="capDraftsPanel" aria-label="${esc(t('capTitle'))}">
+      <div class="v2-section-head">
+        <h4><span>📡 ${esc(t('capTitle'))}</span> <span class="hbadge h-mod">EXERCISE DRAFT · RELAY DISABLED PENDING MOU</span></h4>
+      </div>
+      <p class="muted">${esc(t('capNoActive'))}</p>
+    </section>`;
+  }
+
+  const advIdx = Math.max(0, Math.min(advs.length - 1, Number(S.capAdvIdx) || 0));
+  const adv = advs[advIdx] || advs[0];
+  const activeLang = S.capLang || getLang() || 'en';
+  const infos = Array.isArray(adv.info) ? adv.info : [];
+  const info = infos.find(i => i.language === activeLang) || infos[0] || {};
+  const sms = info.sms_draft || {};
+  const ivr = info.ivr_voice_script || {};
+  const areaDesc = (Array.isArray(info.area) && info.area[0] && info.area[0].areaDesc) || 'Nepal';
+  const isDraftLang = info.linguistic_review_status && info.linguistic_review_status !== 'reviewed_baseline';
+
+  return `
+    <section class="cap-panel" id="capDraftsPanel" aria-label="${esc(t('capTitle'))}">
+      <div class="v2-section-head">
+        <h4>
+          <span>📡 ${esc(t('capTitle'))}</span>
+          <span class="dc-badge dc-cached">CAP v1.2 · ${esc(adv.status || 'Exercise')}</span>
+        </h4>
+        <div class="btn-row">
+          <a class="btn sm pri" href="data/cap_exercise_latest.xml" download="cap_exercise_latest.xml">${esc(t('capXmlDownload'))}</a>
+          <a class="btn sm" href="data/cap_drafts.json" download="cap_drafts.json">${esc(t('capJsonDownload'))}</a>
+        </div>
+      </div>
+
+      <div class="cap-gov-lock" role="note">
+        <div class="cap-lock-head">
+          <span class="hbadge h-mod">EXERCISE DRAFT · RELAY DISABLED PENDING MOU</span>
+          <span class="fb-tag is-mou">relay_enabled: false</span>
+          <span class="fb-tag">status: ${esc(gov.cap_status || 'Exercise')}</span>
+          <span class="band">Required sign-off: <b>${esc(agencies.join(' · '))}</b></span>
+        </div>
+        <div>${esc(t('capGovLock'))}</div>
+      </div>
+
+      <div class="muted">${esc(t('capSub'))}</div>
+
+      <div class="cap-adv-tabs" role="group" aria-label="Select CAP v1.2 exercise advisory">
+        ${advs.map((a, idx) => {
+          const sref = a.scenario_ref || {};
+          const lbl = sref.scenario_id || a.identifier || `Advisory ${idx + 1}`;
+          const dists = Array.isArray(sref.affected_districts) ? sref.affected_districts.slice(0, 2).join(', ') : '';
+          return `<button type="button" class="cap-lang-btn${idx === advIdx ? ' on' : ''}" data-cap-adv="${idx}">
+            <span>${esc(lbl)}</span>
+            ${dists ? `<span class="band">(${esc(dists)})</span>` : ''}
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div class="cap-lang-bar" role="group" aria-label="${esc(t('capLangTab'))}">
+        <span class="band">${esc(t('capLangTab'))}:</span>
+        ${SUPPORTED_LANGUAGES.map(l => {
+          const isDraft = l.reviewStatus !== 'reviewed_baseline';
+          return `<button type="button" class="cap-lang-btn${l.code === activeLang ? ' on' : ''}" data-cap-lang="${esc(l.code)}">
+            <span>${esc(l.native)}</span>
+            ${isDraft ? '<span class="cap-draft-dot">draft</span>' : ''}
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div class="cap-meta-card">
+        <h5>${esc(info.headline || adv.identifier || '')}</h5>
+        <div class="badge-row">
+          <span class="hbadge h-info">${esc(info.event || '')}</span>
+          <span class="hbadge h-mod">Urgency: ${esc(info.urgency || '—')}</span>
+          <span class="hbadge h-high">Severity: ${esc(info.severity || '—')}</span>
+          <span class="hbadge h-na">Certainty: ${esc(info.certainty || '—')}</span>
+          ${isDraftLang ? '<span class="fb-tag is-fallback">Pending native municipal linguistic review</span>' : '<span class="sla-badge sla-available">Reviewed baseline</span>'}
+        </div>
+        <div class="kv">
+          <span>Target area</span><b>${esc(areaDesc)}</b>
+          <span>Effective / Expires (NPT)</span><b>${esc(info.effective || adv.sent || '—')} → ${esc(info.expires || '—')}</b>
+          <span>CAP Identifier</span><b class="mono">${esc(adv.identifier || '—')}</b>
+        </div>
+        <p class="muted field-gap">${esc(info.description || '')}</p>
+        <div class="callout info"><b>Instruction &amp; Statutory Hotlines:</b> ${esc(info.instruction || '')}</div>
+      </div>
+
+      <div class="cap-channels-grid">
+        <div class="cap-channel-card">
+          <div class="cap-channel-head">
+            <span>📱 ${esc(t('capSmsLabel'))}</span>
+            <div class="badge-row">
+              <span class="orbit-chip">${esc(sms.encoding || 'UCS-2')}</span>
+              <span class="orbit-chip">${fmt(sms.char_count)}/${fmt(sms.max_chars_budget)} chars</span>
+              <span class="sla-badge ${sms.within_budget ? 'sla-available' : 'sla-unavailable'}">${fmt(sms.sms_segments)} seg ${sms.within_budget ? '✓' : '⚠'}</span>
+            </div>
+          </div>
+          <div id="capSmsPreviewText" class="cap-sms-bubble">${esc(sms.text || '')}</div>
+          <div class="btn-row">
+            <button type="button" class="btn sm" id="btnCopyCapSms">📋 Copy SMS draft</button>
+          </div>
+        </div>
+
+        <div class="cap-channel-card">
+          <div class="cap-channel-head">
+            <span>🎙 ${esc(t('capIvrLabel'))}</span>
+            <div class="badge-row">
+              <span class="orbit-chip">${fmt(ivr.word_count)} words</span>
+              <span class="orbit-chip">~${fmt(ivr.estimated_duration_sec, 1)} s @ ${fmt(ivr.speaking_rate_wpm)} wpm</span>
+            </div>
+          </div>
+          <div class="cap-ivr-script">${esc(ivr.text || '')}</div>
+          ${ivr.repeat_key_instruction ? `<div class="band"><b>Keypad prompt:</b> ${esc(ivr.repeat_key_instruction)}</div>` : ''}
+        </div>
+      </div>
+    </section>`;
 }
 
 function tabLive() {
@@ -4326,6 +5077,7 @@ function tabLive() {
   const m6 = S.eqHist || [];
 
   return `${renderOfficialAuthorityPanel({ compact: false })}
+    ${renderCapDraftsPanel(S.capDrafts)}
     <div class="screening-lane-head">
       <b>${esc(t('openDataSeismicHead'))}</b>
       <div class="badge-row">
@@ -4891,6 +5643,547 @@ function renderSourceHealthModal() {
     </div>`;
 }
 
+/* ==========================================================================
+   15b. Offline-First PWA Community Landslide Reporting Modal (TRAYA-008)
+   ========================================================================== */
+let repPendingPhoto = null;
+let repLocationSource = 'manual_pin';
+let repLocationAccuracyM = null;
+let repMapPickActive = false;
+let repPendingDuplicates = [];
+
+function resolveNearestDistrict(lat, lon) {
+  const la = Number(lat);
+  const lo = Number(lon);
+  if (!Number.isFinite(la) || !Number.isFinite(lo) || !S.districts.length) return null;
+  let best = null;
+  let bestKm = Infinity;
+  S.districts.forEach(d => {
+    if (!Array.isArray(d.centroid) || d.centroid.length < 2) return;
+    const km = hav(lo, la, d.centroid[0], d.centroid[1]);
+    if (km < bestKm) {
+      bestKm = km;
+      best = d;
+    }
+  });
+  return best ? { dist: best, km: bestKm } : null;
+}
+
+function populateReportDistrictSelect() {
+  const sel = document.getElementById('repDistrict');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Auto-resolve or select district…</option>';
+  const provinces = (S.districtsMeta && S.districtsMeta.provinces) || [];
+  const byProv = new Map();
+  provinces.forEach(p => byProv.set(p.name, []));
+  S.districts.forEach(d => {
+    if (!byProv.has(d.prov)) byProv.set(d.prov, []);
+    byProv.get(d.prov).push(d);
+  });
+  const isDeva = isDevanagariLang();
+  provinces.forEach(p => {
+    const list = byProv.get(p.name) || [];
+    if (!list.length) return;
+    const og = document.createElement('optgroup');
+    og.label = isDeva ? `${p.name_ne} (${p.name})` : `${p.name} · ${p.name_ne || ''}`;
+    list.sort((a, b) => a.name.localeCompare(b.name)).forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.name;
+      opt.textContent = isDeva
+        ? `${d.name_ne || d.name} (${d.name})`
+        : `${d.name} — ${d.name_ne || ''}`;
+      og.appendChild(opt);
+    });
+    sel.appendChild(og);
+  });
+  if (prev && S.districts.some(d => d.name === prev)) {
+    sel.value = prev;
+  }
+}
+
+function syncReportProvinceFromDistrict() {
+  const distSel = document.getElementById('repDistrict');
+  const provInp = document.getElementById('repProvince');
+  if (!distSel || !provInp) return;
+  const match = S.districts.find(d => d.name === distSel.value);
+  provInp.value = match ? (match.prov || '') : '';
+}
+
+function syncReportDateInputs() {
+  const precSel = document.getElementById('repTimePrecision');
+  const dateInp = document.getElementById('repEventDate');
+  const timeInp = document.getElementById('repEventTime');
+  if (!precSel || !dateInp || !timeInp) return;
+  const prec = precSel.value;
+  if (prec === 'unknown') {
+    dateInp.value = '';
+    dateInp.disabled = true;
+    timeInp.value = '';
+    timeInp.disabled = true;
+  } else {
+    dateInp.disabled = false;
+    timeInp.disabled = prec !== 'exact_hour';
+    if (prec !== 'exact_hour') timeInp.value = '';
+  }
+}
+
+function buildReportEventDateIso() {
+  const prec = (document.getElementById('repTimePrecision') || {}).value || 'day';
+  const dtStr = String((document.getElementById('repEventDate') || {}).value || '').trim();
+  const tmStr = String((document.getElementById('repEventTime') || {}).value || '').trim();
+  if (prec === 'unknown' || !dtStr) return null;
+  if (prec === 'exact_hour' && tmStr) return `${dtStr}T${tmStr}:00Z`;
+  return `${dtStr}T00:00:00Z`;
+}
+
+function updateReportPiiPreview() {
+  const notesEl = document.getElementById('repNotes');
+  const box = document.getElementById('repPiiPreview');
+  if (!notesEl || !box) return;
+  const raw = notesEl.value || '';
+  if (!raw.trim()) {
+    box.className = 'pii-preview-box';
+    box.innerHTML = `<span class="muted">${esc(t('repPiiNotice'))}</span>`;
+    return;
+  }
+  const res = redactPii(raw);
+  if (res.piiRedacted) {
+    box.className = 'pii-preview-box has-pii';
+    const tags = res.redactions.map(tg => `<span class="pii-tag-chip">${esc(tg)} redacted</span>`).join('');
+    box.innerHTML = `<div><b>Live PII Redaction Preview (${fmt(res.redactionCounts.total)} scrubbed):</b> ${tags}</div>
+      <div class="field-gap">${esc(res.text)}</div>`;
+  } else {
+    box.className = 'pii-preview-box';
+    box.innerHTML = `<div><span class="sla-badge sla-available">No PII detected ✓</span> <span class="band">${esc(t('repPiiNotice'))}</span></div>
+      <div class="field-gap">${esc(res.text)}</div>`;
+  }
+}
+
+function clearPendingReportPhoto() {
+  repPendingPhoto = null;
+  const fileInp = document.getElementById('repPhoto');
+  const box = document.getElementById('repPhotoStatus');
+  const img = document.getElementById('repPhotoPreview');
+  const meta = document.getElementById('repPhotoMetaText');
+  if (fileInp) fileInp.value = '';
+  if (img) {
+    img.removeAttribute('src');
+    img.classList.add('is-hidden');
+  }
+  if (meta) meta.textContent = '';
+  if (box) box.classList.add('is-hidden');
+}
+
+async function handleReportPhotoChange(e) {
+  const file = e && e.target && e.target.files && e.target.files[0];
+  const box = document.getElementById('repPhotoStatus');
+  const img = document.getElementById('repPhotoPreview');
+  const meta = document.getElementById('repPhotoMetaText');
+  if (!file) {
+    clearPendingReportPhoto();
+    return;
+  }
+  if (box) box.classList.remove('is-hidden');
+  if (meta) meta.textContent = 'Stripping EXIF/GPS metadata on-device via offscreen canvas…';
+  try {
+    const stripped = await stripImageExif(file, 1024, 0.78);
+    repPendingPhoto = stripped;
+    if (img && stripped.dataUrl && stripped.dataUrl.startsWith('data:image/jpeg;base64,')) {
+      img.src = stripped.dataUrl;
+      img.classList.remove('is-hidden');
+    }
+    if (meta) {
+      const kb = (stripped.bytes / 1024).toFixed(1);
+      const shaShort = stripped.sha256 ? stripped.sha256.slice(0, 12) : '—';
+      meta.innerHTML = `<span class="sla-badge sla-available">✓ ${esc(t('repExifStripped'))}</span>`
+        + `<div class="band mono field-gap">${fmt(stripped.width)}×${fmt(stripped.height)} px · ${esc(kb)} KB JPEG · sha256:${esc(shaShort)}…</div>`;
+    }
+  } catch (err) {
+    repPendingPhoto = null;
+    if (img) img.classList.add('is-hidden');
+    if (meta) meta.innerHTML = `<span class="text-bad">Photo stripping failed: ${esc(err && err.message ? err.message : 'invalid image')}</span>`;
+  }
+}
+
+function runReportDuplicateCheck() {
+  const warnBox = document.getElementById('repDupWarn');
+  const latVal = Number((document.getElementById('repLat') || {}).value);
+  const lonVal = Number((document.getElementById('repLon') || {}).value);
+  if (!warnBox || !Number.isFinite(latVal) || !Number.isFinite(lonVal) || !latVal || !lonVal) {
+    repPendingDuplicates = [];
+    if (warnBox) warnBox.classList.add('is-hidden');
+    return [];
+  }
+  const cand = {
+    lat: latVal,
+    lon: lonVal,
+    event_date_utc: buildReportEventDateIso(),
+    time_precision: (document.getElementById('repTimePrecision') || {}).value || 'day',
+    trigger: (document.getElementById('repTrigger') || {}).value || 'unknown',
+  };
+  const matches = findLocalAndInventoryDuplicates(cand, S.localReports || [], S.landslides || []);
+  repPendingDuplicates = matches;
+  if (!matches.length) {
+    warnBox.classList.add('is-hidden');
+    warnBox.innerHTML = '';
+    return [];
+  }
+  warnBox.classList.remove('is-hidden');
+  warnBox.innerHTML = `<b>⚠ ${esc(t('repDupWarn', { n: matches.length }))}</b>
+    <ul class="trig-list">
+      ${matches.slice(0, 4).map(m => `<li><b>${esc(m.inventory_title || m.inventory_event_id)}</b> (${esc(m.inventory_source || m.sourceScope)}) — <b>${fmt(m.distance_km, 2)} km</b>${m.days_apart != null ? ` · ${fmt(m.days_apart, 1)} d apart` : ' · undated'} · <code>auto_merged: false</code></li>`).join('')}
+    </ul>`;
+  return matches;
+}
+
+function setReportCoordinates(lat, lon, source, accuracyM = null) {
+  const latInp = document.getElementById('repLat');
+  const lonInp = document.getElementById('repLon');
+  const distSel = document.getElementById('repDistrict');
+  const locStatus = document.getElementById('repLocStatus');
+  if (latInp) latInp.value = Number(lat).toFixed(5);
+  if (lonInp) lonInp.value = Number(lon).toFixed(5);
+  repLocationSource = source === 'gps' ? 'gps' : 'manual_pin';
+  repLocationAccuracyM = accuracyM != null && Number.isFinite(Number(accuracyM)) ? Number(accuracyM) : null;
+
+  const nearest = resolveNearestDistrict(lat, lon);
+  if (nearest && nearest.dist && distSel) {
+    distSel.value = nearest.dist.name;
+    syncReportProvinceFromDistrict();
+    if (locStatus) {
+      const accTxt = repLocationAccuracyM != null ? ` (±${fmt(repLocationAccuracyM, 0)} m)` : '';
+      locStatus.textContent = `${repLocationSource === 'gps' ? 'GPS' : 'Map pin'}${accTxt} → ${tDistrict(nearest.dist.name, S.districtsMeta)}, ${tProvince(nearest.dist.prov, S.districtsMeta)} (~${fmt(nearest.km, 1)} km from centroid)`;
+    }
+  } else if (locStatus) {
+    locStatus.textContent = `Coordinates set: ${Number(lat).toFixed(5)}°N, ${Number(lon).toFixed(5)}°E`;
+  }
+  runReportDuplicateCheck();
+}
+
+function useReportGps() {
+  const btn = document.getElementById('btnRepGps');
+  const locStatus = document.getElementById('repLocStatus');
+  if (!navigator.geolocation) {
+    if (locStatus) locStatus.textContent = t('triageGeoUnsupported');
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t('triageNearMeBusy');
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = t('repUseGps');
+      }
+      setReportCoordinates(pos.coords.latitude, pos.coords.longitude, 'gps', pos.coords.accuracy);
+    },
+    () => {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = t('repUseGps');
+      }
+      if (locStatus) locStatus.textContent = t('triageGeoDenied');
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+  );
+}
+
+function handleMapPickClick(e) {
+  if (!repMapPickActive) return;
+  const { lat, lng } = e.latlng;
+  cancelMapPickMode(false);
+  openReportModal(false);
+  setReportCoordinates(lat, lng, 'manual_pin', null);
+}
+
+function startMapPickMode() {
+  const modal = document.getElementById('reportModal');
+  const banner = document.getElementById('mapPickBanner');
+  const mapEl = document.getElementById('map');
+  if (modal) modal.hidden = true;
+  if (banner) banner.classList.remove('is-hidden');
+  if (mapEl) mapEl.classList.add('is-picking-map');
+  repMapPickActive = true;
+  map.off('click', handleMapPickClick);
+  map.once('click', handleMapPickClick);
+}
+
+function cancelMapPickMode(reopenModal = true) {
+  repMapPickActive = false;
+  map.off('click', handleMapPickClick);
+  const banner = document.getElementById('mapPickBanner');
+  const mapEl = document.getElementById('map');
+  if (banner) banner.classList.add('is-hidden');
+  if (mapEl) mapEl.classList.remove('is-picking-map');
+  if (reopenModal) openReportModal(false);
+}
+
+function resetReportForm() {
+  const form = document.getElementById('reportForm');
+  if (form) form.reset();
+  repLocationSource = 'manual_pin';
+  repLocationAccuracyM = null;
+  repPendingDuplicates = [];
+  clearPendingReportPhoto();
+  syncReportDateInputs();
+  syncReportProvinceFromDistrict();
+  updateReportPiiPreview();
+  const locStatus = document.getElementById('repLocStatus');
+  if (locStatus) locStatus.textContent = '';
+  const dupWarn = document.getElementById('repDupWarn');
+  if (dupWarn) {
+    dupWarn.classList.add('is-hidden');
+    dupWarn.innerHTML = '';
+  }
+  const formStatus = document.getElementById('repFormStatus');
+  if (formStatus) formStatus.textContent = '';
+}
+
+function renderReportQueue() {
+  const listEl = document.getElementById('repQueueList');
+  const badgeEl = document.getElementById('repQueueBadge');
+  const exportBtn = document.getElementById('btnExportModerationBundle');
+  const items = S.localReports || [];
+  if (badgeEl) badgeEl.textContent = `(${fmt(items.length)})`;
+  if (exportBtn) exportBtn.disabled = items.length === 0;
+  if (!listEl) return;
+
+  if (!items.length) {
+    listEl.innerHTML = `<p class="muted">${esc(t('repEmptyQueue'))}</p>`;
+    return;
+  }
+
+  listEl.innerHTML = items.map(rep => {
+    const roadTxt = rep.road_blocked === true ? 'Road blocked' : rep.road_blocked === false ? 'Road clear' : 'Road status unknown';
+    const dupCount = Array.isArray(rep.duplicate_candidates) ? rep.duplicate_candidates.length : 0;
+    const piiTags = Array.isArray(rep.pii_redaction_tags) ? rep.pii_redaction_tags : [];
+    const fly = safeFlyAttr(rep.lat, rep.lon, 13);
+    return `<article class="rep-queue-card" data-report-card="${esc(rep.report_id)}">
+      <div class="rep-queue-card-head">
+        <div>
+          <b>${esc(rep.title || rep.report_id)}</b>
+          <div class="band mono">${esc(rep.report_id)} · ${esc(fmtNpt(rep.captured_at_utc))}</div>
+        </div>
+        <span class="dc-badge dc-forecast">hazard_report</span>
+      </div>
+      <div class="band">
+        ${esc(tDistrict(rep.district, S.districtsMeta))}, ${esc(tProvince(rep.province, S.districtsMeta))}
+        · ${fmt(rep.lat, 4)}°N, ${fmt(rep.lon, 4)}°E (${esc(rep.location_source || 'manual_pin')})
+      </div>
+      <div class="badge-row">
+        <span class="orbit-chip">${esc(rep.trigger || 'unknown')}</span>
+        <span class="orbit-chip">${esc(roadTxt)}</span>
+        <span class="orbit-chip">Date: ${fmtNullDate(rep.event_date_utc)} (${esc(rep.time_precision || 'unknown')})</span>
+        <span class="orbit-chip">Fat: ${fmtNullCount(rep.fatalities)} · Inj: ${fmtNullCount(rep.injuries)}</span>
+        ${rep.photo_attached ? '<span class="sla-badge sla-available">EXIF-stripped photo ✓</span>' : ''}
+        ${piiTags.length ? `<span class="fb-tag is-fallback">PII scrubbed: ${esc(piiTags.join(', '))}</span>` : ''}
+        ${dupCount > 0 ? `<span class="hbadge h-mod">${fmt(dupCount)} nearby dup flag(s)</span>` : ''}
+      </div>
+      ${rep.description_redacted ? `<div class="muted">${esc(rep.description_redacted)}</div>` : ''}
+      <div class="rep-queue-thumb-slot" data-photo-slot="${esc(rep.report_id)}"></div>
+      <div class="btn-row">
+        ${fly ? `<button type="button" class="btn sm" data-fly-report="${fly}">◎ Fly to pin</button>` : ''}
+        <button type="button" class="btn sm" data-delete-report="${esc(rep.report_id)}">✕ ${esc(t('repDelete'))}</button>
+      </div>
+    </article>`;
+  }).join('');
+
+  // Attach verified local EXIF-stripped JPEG thumbnails via DOM API (CSP & XSS safe)
+  const photoSlots = new Map();
+  listEl.querySelectorAll('[data-photo-slot]').forEach(slot => {
+    photoSlots.set(slot.dataset.photoSlot, slot);
+  });
+  items.forEach(rep => {
+    const dataUrl = rep && rep.photo && rep.photo.data_url;
+    if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/jpeg;base64,')) {
+      const slot = photoSlots.get(rep.report_id);
+      if (slot) {
+        const img = document.createElement('img');
+        img.className = 'rep-queue-thumb';
+        img.alt = 'EXIF-stripped field observation thumbnail';
+        img.src = dataUrl;
+        slot.appendChild(img);
+      }
+    }
+  });
+
+  listEl.querySelectorAll('button[data-fly-report]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const parts = String(btn.dataset.flyReport || '').split(',').map(Number);
+      if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+        S.showLocalPins = true;
+        drawLocalReportsLayer();
+        closeReportModal();
+        map.setView([parts[0], parts[1]], Number.isFinite(parts[2]) ? parts[2] : 13);
+      }
+    });
+  });
+
+  listEl.querySelectorAll('button[data-delete-report]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const rid = btn.dataset.deleteReport;
+      if (!rid) return;
+      await deleteOfflineReport(rid);
+      S.localReports = await listOfflineReports();
+      updateNetworkPill();
+      drawLocalReportsLayer();
+      renderReportQueue();
+      runReportDuplicateCheck();
+    });
+  });
+}
+
+function renderUatSandboxFixtures() {
+  const body = document.getElementById('repUatSandboxBody');
+  if (!body) return;
+  const mq = S.moderationQueue;
+  if (!mq) {
+    body.innerHTML = '<p class="muted">Moderation sandbox metadata unavailable.</p>';
+    return;
+  }
+  const fixtures = Array.isArray(mq.sample_redacted_uat_fixtures) ? mq.sample_redacted_uat_fixtures : [];
+  const roles = Array.isArray(mq.authorized_moderator_roles) ? mq.authorized_moderator_roles.join(', ') : 'deoc_officer, ndrrma_verifier, dhm_verifier';
+  body.innerHTML = `
+    <div class="muted">${esc(mq.non_operational_notice || '')}</div>
+    <div class="band field-gap">Governance: <code>${esc(mq.governance_mode || 'pilot_sandbox_post_mou')}</code> · Moderators: <code>${esc(roles)}</code> · Dedup: <code>${esc((mq.dedup_policy && mq.dedup_policy.mode) || 'flag_only_never_auto_merge')}</code></div>
+    ${fixtures.length ? `<div class="tbl-scroll field-gap"><table><thead><tr>
+      <th scope="col">Fixture ID</th><th scope="col">District</th><th scope="col">Trigger</th>
+      <th scope="col">PII Redacted</th><th scope="col">Fatalities / Injuries</th><th scope="col">Status</th>
+    </tr></thead><tbody>
+    ${fixtures.map(fx => `<tr>
+      <td class="mono">${esc(fx.report_id)}</td>
+      <td>${esc(tDistrict(fx.district, S.districtsMeta))}</td>
+      <td>${esc(fx.trigger || '—')}</td>
+      <td>${esc((fx.pii_redaction_tags || []).join(', ') || 'clean')}</td>
+      <td class="num">${fmtNullCount(fx.fatalities)} / ${fmtNullCount(fx.injuries)}</td>
+      <td><span class="hbadge h-mod">${esc(fx.moderation_status || 'pending_agency_review')}</span></td>
+    </tr>`).join('')}
+    </tbody></table></div>` : ''}`;
+}
+
+async function handleReportSubmit(e) {
+  e.preventDefault();
+  const statusEl = document.getElementById('repFormStatus');
+  const latVal = Number((document.getElementById('repLat') || {}).value);
+  const lonVal = Number((document.getElementById('repLon') || {}).value);
+  if (!Number.isFinite(latVal) || !Number.isFinite(lonVal) || latVal < 26.0 || latVal > 31.0 || lonVal < 79.5 || lonVal > 88.8) {
+    if (statusEl) statusEl.innerHTML = '<span class="text-bad">Please provide valid Nepal coordinates (Latitude 26.0–31.0°N, Longitude 79.5–88.8°E) via GPS, Map Pick, or manual entry.</span>';
+    return;
+  }
+
+  let distName = String((document.getElementById('repDistrict') || {}).value || '').trim();
+  let provName = String((document.getElementById('repProvince') || {}).value || '').trim();
+  if (!distName) {
+    const nearest = resolveNearestDistrict(latVal, lonVal);
+    if (nearest && nearest.dist) {
+      distName = nearest.dist.name;
+      provName = nearest.dist.prov;
+    }
+  }
+
+  const rawFat = String((document.getElementById('repFatalities') || {}).value || '').trim();
+  const rawInj = String((document.getElementById('repInjuries') || {}).value || '').trim();
+  // Strictly enforce null-not-0 for unverified field observations
+  const fatalities = rawFat === '' ? null : (Number.isFinite(Number(rawFat)) && Number(rawFat) > 0 ? Math.round(Number(rawFat)) : null);
+  const injuries = rawInj === '' ? null : (Number.isFinite(Number(rawInj)) && Number(rawInj) > 0 ? Math.round(Number(rawInj)) : null);
+
+  const timePrecision = String((document.getElementById('repTimePrecision') || {}).value || 'day');
+  const eventDateIso = buildReportEventDateIso();
+  const trigger = String((document.getElementById('repTrigger') || {}).value || 'unknown');
+  const roadBlockedRaw = String((document.getElementById('repRoadBlocked') || {}).value || '');
+  const notesRaw = String((document.getElementById('repNotes') || {}).value || '');
+  const muniWard = String((document.getElementById('repMuniWard') || {}).value || '').trim();
+
+  const dups = runReportDuplicateCheck();
+  const saveBtn = document.getElementById('btnRepSave');
+  if (saveBtn) saveBtn.disabled = true;
+
+  try {
+    const saved = await saveOfflineReport({
+      lat: latVal,
+      lon: lonVal,
+      district: distName || null,
+      province: provName || null,
+      municipality_ward: muniWard || null,
+      location_source: repLocationSource,
+      location_accuracy_m: repLocationAccuracyM,
+      time_precision: timePrecision,
+      event_date_utc: eventDateIso,
+      trigger,
+      road_blocked: roadBlockedRaw === '' ? null : roadBlockedRaw,
+      fatalities,
+      injuries,
+      notes: notesRaw,
+      photo: repPendingPhoto,
+      duplicate_candidates: dups,
+      offline_captured: typeof navigator !== 'undefined' ? navigator.onLine === false : false,
+    });
+    S.localReports = await listOfflineReports();
+    updateNetworkPill();
+    drawLocalReportsLayer();
+    resetReportForm();
+    renderReportQueue();
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-ok">✓ Saved offline (${esc(saved.report_id)}) — EXIF stripped &amp; PII redacted on-device. Pending DEOC/NDRRMA review.</span>`;
+    }
+    setToast(`Offline landslide report ${saved.report_id} queued locally (${S.localReports.length} pending export).`);
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-bad">Could not save offline report: ${esc(err && err.message ? err.message : 'storage error')}</span>`;
+    }
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+function exportModerationBundle() {
+  const bundle = buildRedactedModerationBundle(S.localReports || []);
+  const dateTag = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  triggerBlobDownload(
+    new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }),
+    `traya_redacted_moderation_bundle_${dateTag}.json`
+  );
+  setToast(`Exported redacted moderation bundle (${bundle.report_count} report(s), EXIF stripped, PII redacted).`);
+}
+
+async function openReportModal(saveFocus = true) {
+  const modal = document.getElementById('reportModal');
+  if (!modal) return;
+  if (saveFocus) lastFocusedBeforeModal = document.activeElement;
+  populateReportDistrictSelect();
+  syncReportDateInputs();
+  updateReportPiiPreview();
+  modal.hidden = false;
+  const closeBtn = document.getElementById('btnCloseReportModal');
+  if (closeBtn) closeBtn.focus();
+
+  S.localReports = await listOfflineReports();
+  updateNetworkPill();
+  renderReportQueue();
+
+  // Lazy-load landslide inventory (for proximity duplicate flagging) & UAT sandbox queue
+  const bgLoads = [];
+  if (!S.landslides) bgLoads.push(ensureData('landslides').catch(() => null));
+  if (!S.moderationQueue) bgLoads.push(ensureData('moderation_queue').catch(() => null));
+  if (bgLoads.length) {
+    await Promise.allSettled(bgLoads);
+  }
+  renderUatSandboxFixtures();
+  runReportDuplicateCheck();
+}
+
+function closeReportModal() {
+  const modal = document.getElementById('reportModal');
+  if (!modal || modal.hidden) return;
+  modal.hidden = true;
+  if (lastFocusedBeforeModal && typeof lastFocusedBeforeModal.focus === 'function') {
+    lastFocusedBeforeModal.focus();
+  }
+}
+
 function switchTab(tabKey, focusTab = false) {
   S.tab = tabKey;
   document.querySelectorAll('#tabs button[role="tab"]').forEach(btn => {
@@ -4905,8 +6198,9 @@ function switchTab(tabKey, focusTab = false) {
   if (window.matchMedia('(max-width: 760px)').matches) {
     setMobilePane('bottom');
   }
-  renderTab();
+  const renderPromise = renderTab();
   setTimeout(() => map.invalidateSize(), 180);
+  return renderPromise;
 }
 
 function refresh() {
@@ -4988,6 +6282,25 @@ function wireEvents() {
       }
     });
   });
+
+  // Tsho Rolpa 2D flood envelope sidebar toggle
+  const lTsho2dEl = document.getElementById('lTsho2d');
+  if (lTsho2dEl) {
+    lTsho2dEl.addEventListener('change', async () => {
+      S.tsho2dEnabled = lTsho2dEl.checked;
+      await drawTsho2dLayer();
+      if (S.tab === 'cascades') renderTab();
+    });
+  }
+
+  // Offline local landslide report pins sidebar toggle
+  const lLocalRepEl = document.getElementById('lLocalReports');
+  if (lLocalRepEl) {
+    lLocalRepEl.addEventListener('change', () => {
+      S.showLocalPins = lLocalRepEl.checked;
+      drawLocalReportsLayer();
+    });
+  }
 
   document.getElementById('eqWindow').addEventListener('change', () => loadEq(true));
 
@@ -5081,30 +6394,125 @@ function wireEvents() {
     renderTab();
   });
 
-  // Bilingual EN | नेपाली toggle
-  document.getElementById('btnLang').addEventListener('click', () => {
-    setLang(getLang() === 'en' ? 'ne' : 'en');
-    applyStaticTranslations();
-    populateProvinceAndDistrictDropdowns();
-    drawLegend();
-    updateFilterCount();
-    updateStatusPills();
-    drawRiversLayer();
-    if (document.getElementById('lNodes').checked) drawNodesLayer();
-    if (document.getElementById('lLandslides').checked) drawLandslidesLayer();
-    if (S.selKind === 'district' && S.selDistrict) renderDistrictByName(S.selDistrict);
-    else if (S.selKind === 'river' && S.sel) selectRiver(S.sel, false);
-    else if (S.selKind === 'node' && S.sel) selectNode(S.sel, false);
-    else if (S.selKind === 'lake' && S.sel) {
-      const f = S.lakeById.get(S.sel);
-      if (f) renderLakeDetail(f.properties, S.routes ? S.routes[S.sel] : null, f, false);
-    } else {
-      renderDefaultInspector();
+  // 6-Language Switcher (EN, नेपाली, मैथिली, भोजपुरी, थारू, तामाङ)
+  const langSelect = document.getElementById('langSelect');
+  if (langSelect) {
+    const syncLangTitle = () => {
+      const lm = getLanguageMeta();
+      langSelect.title = `${lm.native} (${lm.label} · ${lm.region})`;
+    };
+    langSelect.innerHTML = SUPPORTED_LANGUAGES
+      .map(l => `<option value="${esc(l.code)}">${esc(l.native)}</option>`)
+      .join('');
+    langSelect.value = getLang();
+    syncLangTitle();
+    langSelect.addEventListener('change', () => {
+      const nextLang = setLang(langSelect.value);
+      S.capLang = nextLang;
+      syncLangTitle();
+      applyStaticTranslations();
+      populateProvinceAndDistrictDropdowns();
+      populateReportDistrictSelect();
+      drawLegend();
+      updateFilterCount();
+      updateStatusPills();
+      drawRiversLayer();
+      if (document.getElementById('lNodes').checked) drawNodesLayer();
+      if (document.getElementById('lLandslides').checked) drawLandslidesLayer();
+      if (S.tsho2dEnabled) drawTsho2dLayer();
+      if (S.showLocalPins) drawLocalReportsLayer();
+      if (S.selKind === 'district' && S.selDistrict) renderDistrictByName(S.selDistrict);
+      else if (S.selKind === 'river' && S.sel) selectRiver(S.sel, false);
+      else if (S.selKind === 'node' && S.sel) selectNode(S.sel, false);
+      else if (S.selKind === 'lake' && S.sel) {
+        const f = S.lakeById.get(S.sel);
+        if (f) renderLakeDetail(f.properties, S.routes ? S.routes[S.sel] : null, f, false);
+      } else {
+        renderDefaultInspector();
+      }
+      const shModal = document.getElementById('sourceHealthModal');
+      if (shModal && !shModal.hidden) renderSourceHealthModal();
+      const repModal = document.getElementById('reportModal');
+      if (repModal && !repModal.hidden) {
+        updateReportPiiPreview();
+        renderReportQueue();
+      }
+      renderTab();
+    });
+  }
+
+  // Offline PWA Community Landslide Reporting modal wiring
+  const btnRepHdr = document.getElementById('btnReportHeader');
+  if (btnRepHdr) btnRepHdr.addEventListener('click', () => openReportModal(true));
+  const btnCloseRep = document.getElementById('btnCloseReportModal');
+  if (btnCloseRep) btnCloseRep.addEventListener('click', closeReportModal);
+  const repModalEl = document.getElementById('reportModal');
+  if (repModalEl) {
+    repModalEl.addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeReportModal();
+    });
+  }
+  const btnRepGps = document.getElementById('btnRepGps');
+  if (btnRepGps) btnRepGps.addEventListener('click', useReportGps);
+  const btnRepPickMap = document.getElementById('btnRepPickMap');
+  if (btnRepPickMap) btnRepPickMap.addEventListener('click', startMapPickMode);
+  const btnCancelMapPick = document.getElementById('btnCancelMapPick');
+  if (btnCancelMapPick) btnCancelMapPick.addEventListener('click', () => cancelMapPickMode(true));
+
+  const repDistrictEl = document.getElementById('repDistrict');
+  if (repDistrictEl) repDistrictEl.addEventListener('change', syncReportProvinceFromDistrict);
+  const repTimePrecEl = document.getElementById('repTimePrecision');
+  if (repTimePrecEl) {
+    repTimePrecEl.addEventListener('change', () => {
+      syncReportDateInputs();
+      runReportDuplicateCheck();
+    });
+  }
+  ['repLat', 'repLon'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', () => {
+        const la = Number((document.getElementById('repLat') || {}).value);
+        const lo = Number((document.getElementById('repLon') || {}).value);
+        const distSel = document.getElementById('repDistrict');
+        if (Number.isFinite(la) && Number.isFinite(lo) && la >= 26.0 && la <= 31.0 && lo >= 79.5 && lo <= 88.8 && distSel && !distSel.value) {
+          const nearest = resolveNearestDistrict(la, lo);
+          if (nearest && nearest.dist) {
+            distSel.value = nearest.dist.name;
+            syncReportProvinceFromDistrict();
+          }
+        }
+        runReportDuplicateCheck();
+      });
     }
-    const shModal = document.getElementById('sourceHealthModal');
-    if (shModal && !shModal.hidden) renderSourceHealthModal();
-    renderTab();
   });
+  ['repEventDate', 'repTrigger'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', runReportDuplicateCheck);
+  });
+  const repNotesEl = document.getElementById('repNotes');
+  if (repNotesEl) repNotesEl.addEventListener('input', updateReportPiiPreview);
+  const repPhotoEl = document.getElementById('repPhoto');
+  if (repPhotoEl) repPhotoEl.addEventListener('change', handleReportPhotoChange);
+  const btnRepClearPhoto = document.getElementById('btnRepClearPhoto');
+  if (btnRepClearPhoto) btnRepClearPhoto.addEventListener('click', clearPendingReportPhoto);
+  const repFormEl = document.getElementById('reportForm');
+  if (repFormEl) repFormEl.addEventListener('submit', handleReportSubmit);
+  const btnRepReset = document.getElementById('btnRepReset');
+  if (btnRepReset) btnRepReset.addEventListener('click', resetReportForm);
+  const btnExportBundle = document.getElementById('btnExportModerationBundle');
+  if (btnExportBundle) btnExportBundle.addEventListener('click', exportModerationBundle);
+  const chkShowLocalPins = document.getElementById('chkShowLocalPins');
+  if (chkShowLocalPins) {
+    chkShowLocalPins.addEventListener('change', () => {
+      S.showLocalPins = chkShowLocalPins.checked;
+      drawLocalReportsLayer();
+    });
+  }
+
+  // Online / Offline PWA network status listeners
+  window.addEventListener('online', updateNetworkPill);
+  window.addEventListener('offline', updateNetworkPill);
 
   // Live refresh & alert buttons
   document.getElementById('btnRefreshLive').addEventListener('click', refreshAllLiveInBrowser);
@@ -5139,8 +6547,10 @@ function wireEvents() {
   // Global keyboard shortcuts ('/' search, 'Escape' dismiss modal/popups)
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
+      if (repMapPickActive) cancelMapPickMode(true);
       closeEmergencyModal();
       closeSourceHealthModal();
+      closeReportModal();
       map.closePopup();
       return;
     }
@@ -5161,10 +6571,39 @@ function wireEvents() {
 /* ==========================================================================
    16. Fast Startup Bootstrap (Only 5 Core JSONs Loaded Initially)
    ========================================================================== */
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    const okProto = location.protocol === 'https:'
+      || location.hostname === 'localhost'
+      || location.hostname === '127.0.0.1';
+    if (okProto) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {
+          // Non-fatal if browser blocks service worker registration
+        });
+      });
+    }
+  }
+}
+
 async function init() {
   applyStaticTranslations();
   wireEvents();
+  registerServiceWorker();
   setBasemapPill(null);
+  updateNetworkPill();
+
+  // Hydrate offline IndexedDB community landslide report queue immediately
+  listOfflineReports()
+    .then(items => {
+      S.localReports = Array.isArray(items) ? items : [];
+      updateNetworkPill();
+      drawLocalReportsLayer();
+    })
+    .catch(() => {
+      S.localReports = [];
+      updateNetworkPill();
+    });
 
   try {
     const [summary, districtsMeta, lakesCore, riversWatch, hydrometWeekly] = await Promise.all([
@@ -5213,6 +6652,7 @@ async function init() {
     }
 
     populateProvinceAndDistrictDropdowns();
+    populateReportDistrictSelect();
     updateStatusPills();
     renderDefaultInspector();
     refresh();

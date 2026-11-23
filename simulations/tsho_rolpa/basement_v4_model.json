@@ -1,0 +1,152 @@
+{
+  "_comment": "Nepal TRĀYA 2.0 — BASEMENT v4 (ETH Zurich) 2D Shallow-Water HPC Model Template for Tsho Rolpa GLOF Pilot (TRAYA-011). Screening / research reproducibility pack — NOT an operational EWS or design-grade map until executed on <=5 m bare-earth LiDAR/UAV DEM with DHM/NDRRMA technical review.",
+  "SETUP": {
+    "PROJECT": {
+      "name": "Tsho_Rolpa_GLOF_TR_S2_30PCT",
+      "author": "Nepal TRAYA 2.0 Computational Hydraulics Reproducibility Pack",
+      "crs_epsg": 32645,
+      "scenario_id": "TR-S2-MODERATE-30PCT",
+      "target_volume_Mm3": 26.0,
+      "peak_inflow_m3s": 5800.0,
+      "surveyed_bathymetry_midpoint_Mm3": 80.0
+    },
+    "DOMAIN": {
+      "multiregion": "Tsho_Rolpa_Rolwaling_Tamakoshi",
+      "BASEPLANE_2D": {
+        "region_name": "rolwaling_tamakoshi_corridor",
+        "GEOMETRY": {
+          "mesh_file": "tsho_rolpa_2m_5m_mesh_utm45n.2dm",
+          "STRINGDEF": [
+            {
+              "name": "inflow_tsho_rolpa_moraine",
+              "upstream_direction": "left",
+              "description": "Breach spillway outflow transect immediately below Tsho Rolpa terminal moraine (WGS84 27.8696 N, 86.4621 E; EPSG:32645 E=447048.3, N=3082873.6)",
+              "reference_utm45n_xy": [[447030.0, 3082895.0], [447066.0, 3082852.0]]
+            },
+            {
+              "name": "inflow_tamakoshi_mainstem",
+              "upstream_direction": "left",
+              "description": "Tama Koshi mainstem lateral baseflow above Chetchet confluence (WGS84 27.8820 N, 86.2235 E; EPSG:32645 E=423568.2, N=3084373.2)",
+              "reference_utm45n_xy": [[423520.0, 3084385.0], [423615.0, 3084360.0]]
+            },
+            {
+              "name": "outflow_singati_south",
+              "upstream_direction": "left",
+              "description": "Open zero-gradient outflow south of Singati (WGS84 lat <= 27.725 N; EPSG:32645 E=416951.3, N=3066891.0)",
+              "reference_utm45n_xy": [[416700.0, 3066891.0], [417200.0, 3066891.0]]
+            },
+            {
+              "name": "cp_na_6p3km",
+              "upstream_direction": "left",
+              "description": "Checkpoint CP-02 Na Village (6.3 km, 27.8815 N, 86.4268 E)",
+              "reference_utm45n_xy": [[443540.0, 3084350.0], [443620.0, 3084050.0]]
+            },
+            {
+              "name": "cp_beding_12p2km",
+              "upstream_direction": "left",
+              "description": "Checkpoint CP-03 Beding Village (12.2 km, 27.9028 N, 86.3755 E)",
+              "reference_utm45n_xy": [[438500.0, 3086750.0], [438580.0, 3086430.0]]
+            },
+            {
+              "name": "cp_gongar_utk_31p6km",
+              "upstream_direction": "left",
+              "description": "Checkpoint CP-06 Gongar & Upper Tamakoshi HPP (456 MW) Tailrace (31.6 km, 27.8459 N, 86.2178 E)",
+              "reference_utm45n_xy": [[422780.0, 3080400.0], [423180.0, 3080360.0]]
+            },
+            {
+              "name": "cp_singati_46p3km",
+              "upstream_direction": "left",
+              "description": "Checkpoint CP-08 Singati Bridge & Community Hospital (46.3 km, 27.7362 N, 86.1639 E)",
+              "reference_utm45n_xy": [[417350.0, 3068320.0], [417850.0, 3068200.0]]
+            }
+          ]
+        },
+        "HYDRAULICS": {
+          "PARAMETER": {
+            "minimum_water_depth": 0.005,
+            "riemann_solver": "hllc",
+            "safe_mode": "on",
+            "fluid_density": 1000.0,
+            "sediment_bulking_note": "Set fluid_density=1350-1500 kg/m3 or enable BASEmorph mobile-bed coupling for hyperconcentrated B1.3-B1.6 sensitivity runs."
+          },
+          "INITIAL": {
+            "type": "dry"
+          },
+          "FRICTION": {
+            "type": "strickler",
+            "default_friction": 12.5,
+            "input_type": "index_table",
+            "index": [1, 2, 3],
+            "friction": [16.67, 22.22, 12.5],
+            "mapping_note": {
+              "index_1_rolwaling_alpine_gorge_gt_2200m": "Strickler k_st = 16.67 m^(1/3)/s (Manning n = 0.060)",
+              "index_2_tamakoshi_mainstem_channel": "Strickler k_st = 22.22 m^(1/3)/s (Manning n = 0.045)",
+              "index_3_valley_banks_and_terraces": "Strickler k_st = 12.50 m^(1/3)/s (Manning n = 0.080)"
+            }
+          },
+          "BOUNDARY": {
+            "STANDARD": [
+              {
+                "name": "glof_moraine_breach_inflow",
+                "string_name": "inflow_tsho_rolpa_moraine",
+                "type": "uniform_in",
+                "hydrograph_file": "tsho_rolpa_30pct_basement_inflow.txt",
+                "slope": 0.08,
+                "note": "Use two-column (time_s, discharge_m3s) table matching tsho_rolpa_30pct.bdy (26.0 Mm3, Q_peak = 5,800 m3/s)."
+              },
+              {
+                "name": "tamakoshi_dry_baseflow",
+                "string_name": "inflow_tamakoshi_mainstem",
+                "type": "uniform_in",
+                "discharge": 60.0,
+                "slope": 0.025,
+                "note": "Pre-monsoon baseflow 60 m3/s (swap to 350 m3/s for monsoon sensitivity)."
+              },
+              {
+                "name": "singati_free_outflow",
+                "string_name": "outflow_singati_south",
+                "type": "zero_gradient"
+              }
+            ]
+          }
+        },
+        "TIMESTEP": {
+          "start": 0.0,
+          "end": 19800.0,
+          "CFL": 0.45,
+          "minimum_time_step": 0.01,
+          "maximum_time_step": 3.0
+        },
+        "OUTPUT": {
+          "console_time_step": 600.0,
+          "restart_time_step": 3600.0,
+          "SPECIAL_OUTPUT": [
+            {
+              "type": "BASEviz",
+              "output_time_step": 600.0,
+              "values": ["depth", "velocity", "wse", "specific_discharge"]
+            },
+            {
+              "type": "stringdef_history",
+              "output_time_step": 60.0,
+              "stringdefs": [
+                "inflow_tsho_rolpa_moraine",
+                "cp_na_6p3km",
+                "cp_beding_12p2km",
+                "cp_gongar_utk_31p6km",
+                "cp_singati_46p3km",
+                "outflow_singati_south"
+              ],
+              "values": ["Q", "wse", "depth", "velocity"]
+            },
+            {
+              "type": "node_centered_envelope",
+              "format": "xdmf",
+              "values": ["max_depth", "max_velocity", "max_hv", "arrival_time"]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

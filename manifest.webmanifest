@@ -1,0 +1,23 @@
+{
+  "id": "./",
+  "name": "Nepal TRĀYA (त्राय) — Multi-Hazard Risk Observatory",
+  "short_name": "Nepal TRĀYA",
+  "description": "7-day open-data multi-hazard risk observatory and screening platform for Nepal (GLOFs, river floods, earthquakes, landslides, cascades, SAR EO). Not an official early warning system.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "en",
+  "dir": "ltr",
+  "background_color": "#0a0f16",
+  "theme_color": "#0a0f16",
+  "categories": ["education", "utilities", "weather"],
+  "icons": [
+    {
+      "src": "assets/icon-traya.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
