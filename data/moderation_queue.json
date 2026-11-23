@@ -1,6 +1,6 @@
 {
   "schema_version": "moderation_queue.v1",
-  "generated_utc": "2026-11-23T23:03:51Z",
+  "generated_utc": "2026-11-23T23:09:30Z",
   "governance_mode": "pilot_sandbox_post_mou",
   "public_live_endpoint_enabled": false,
   "requires_authenticated_moderation": true,
@@ -118,8 +118,8 @@
     "dataset": "community_report_moderation_queue",
     "data_class": "static_assessment",
     "status": "available",
-    "retrieved_at_utc": "2026-11-23T23:03:51Z",
-    "observation_time_utc": "2026-11-23T23:03:51Z",
+    "retrieved_at_utc": "2026-11-23T23:09:30Z",
+    "observation_time_utc": "2026-11-23T23:09:30Z",
     "valid_until_utc": null,
     "fallback_used": false,
     "license_ref": "MIT (TRĀYA schema & moderation engine); synthetic UAT exercise fixtures (non-operational)",
