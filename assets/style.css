@@ -54,6 +54,39 @@
   --emerg-fg: #ffffff;
   --purple: #c4b5fd;
 
+  /* TRĀYA 2.0 Epistemic 6-State, Official Lane & Cascade Graph tokens (dark AA >=4.5:1) */
+  --dc-live-bg: #14532d;
+  --dc-live-fg: #dcfce7;
+  --dc-live-bd: #22c55e;
+  --dc-fc-bg: #0c4a6e;
+  --dc-fc-fg: #e0f2fe;
+  --dc-fc-bd: #38bdf8;
+  --dc-hist-bg: #134e4a;
+  --dc-hist-fg: #ccfbf1;
+  --dc-hist-bd: #2dd4bf;
+  --dc-stat-bg: #3b0764;
+  --dc-stat-fg: #f3e8ff;
+  --dc-stat-bd: #a855f7;
+  --dc-cache-bg: #713f12;
+  --dc-cache-fg: #fef08a;
+  --dc-cache-bd: #eab308;
+  --dc-unavail-bg: #7f1d1d;
+  --dc-unavail-fg: #fee2e2;
+  --dc-unavail-bd: #f87171;
+  --official-bg: rgba(30, 58, 138, 0.18);
+  --official-bd: #60a5fa;
+  --official-accent: #dc2626;
+  --official-badge-bg: #1d4ed8;
+  --official-badge-fg: #ffffff;
+  --sar-bg: rgba(15, 118, 110, 0.16);
+  --sar-bd: #2dd4bf;
+  --cg-obs: #4ade80;
+  --cg-fc: #38bdf8;
+  --cg-mod: #c084fc;
+  --cg-node-bg: #162130;
+  --cg-node-active-bg: #1e293b;
+  --cg-node-bd: #4e6885;
+
   /* SVG Chart tokens (dark) */
   --chart-bg: #121b27;
   --chart-axis: #5b7492;
@@ -107,7 +140,7 @@ html[data-theme="light"] {
   --h-info-bg: #e0f2fe;
   --h-info-fg: #075985;
 
-  --ok: #15803d;
+  --ok: #166534;
   --ok-bg: rgba(21, 128, 61, 0.11);
   --ok-bd: rgba(21, 128, 61, 0.45);
   --warn: #92400e;
@@ -120,6 +153,39 @@ html[data-theme="light"] {
   --emerg-hover: #991b1b;
   --emerg-fg: #ffffff;
   --purple: #6d28d9;
+
+  /* TRĀYA 2.0 Epistemic 6-State, Official Lane & Cascade Graph tokens (light AA >=4.5:1) */
+  --dc-live-bg: #166534;
+  --dc-live-fg: #ffffff;
+  --dc-live-bd: #15803d;
+  --dc-fc-bg: #0369a1;
+  --dc-fc-fg: #ffffff;
+  --dc-fc-bd: #0284c7;
+  --dc-hist-bg: #0f766e;
+  --dc-hist-fg: #ffffff;
+  --dc-hist-bd: #0d9488;
+  --dc-stat-bg: #6b21a8;
+  --dc-stat-fg: #ffffff;
+  --dc-stat-bd: #7e22ce;
+  --dc-cache-bg: #92400e;
+  --dc-cache-fg: #ffffff;
+  --dc-cache-bd: #b45309;
+  --dc-unavail-bg: #991b1b;
+  --dc-unavail-fg: #ffffff;
+  --dc-unavail-bd: #b91c1c;
+  --official-bg: rgba(29, 78, 216, 0.07);
+  --official-bd: #1d4ed8;
+  --official-accent: #b91c1c;
+  --official-badge-bg: #1e3a8a;
+  --official-badge-fg: #ffffff;
+  --sar-bg: rgba(15, 118, 110, 0.08);
+  --sar-bd: #0f766e;
+  --cg-obs: #15803d;
+  --cg-fc: #0369a1;
+  --cg-mod: #6b21a8;
+  --cg-node-bg: #ffffff;
+  --cg-node-active-bg: #f0f9ff;
+  --cg-node-bd: #64748b;
 
   /* SVG Chart tokens (light — all >= 4.5:1 on white/#f4f7fb) */
   --chart-bg: #ffffff;
@@ -1332,6 +1398,7 @@ td.num {
 tbody tr[data-lake]:hover,
 tbody tr[data-river]:hover,
 tbody tr[data-node]:hover,
+tbody tr[data-dist]:hover,
 tbody tr[data-fly]:hover {
   background: var(--panel2);
   cursor: pointer;
@@ -1793,6 +1860,700 @@ html[data-theme="light"] .leaflet-container {
 
 .prep-list li {
   margin: 4px 0;
+}
+
+/* --------------------------------------------------------------------------
+   10b. TRĀYA 2.0: Source Health Modal, 6-State Badges, Official Authority
+        Lane, Cascades SVG Graph, Isolation Screening, 5-Type Landslides & SAR
+   -------------------------------------------------------------------------- */
+.health-btn .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink3);
+  flex: 0 0 auto;
+}
+
+.health-btn.healthy {
+  border-color: var(--ok-bd);
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.health-btn.healthy .dot {
+  background: var(--ok);
+}
+
+.health-btn.degraded {
+  border-color: var(--warn-bd);
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.health-btn.degraded .dot {
+  background: var(--warn);
+}
+
+.health-btn.stale {
+  border-color: var(--bad-bd);
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
+.health-btn.stale .dot {
+  background: var(--bad);
+}
+
+.modal-dialog.modal-wide {
+  width: min(1060px, 100%);
+}
+
+.tbl-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.tbl-wrap td.wrap-cell,
+td.wrap-cell {
+  white-space: normal;
+  min-width: 160px;
+  max-width: 320px;
+}
+
+/* 6-State Epistemic Data Classification Badges (WCAG 2.1 AA) */
+.dc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.35;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.dc-live { background: var(--dc-live-bg); color: var(--dc-live-fg); border-color: var(--dc-live-bd); }
+.dc-forecast { background: var(--dc-fc-bg); color: var(--dc-fc-fg); border-color: var(--dc-fc-bd); }
+.dc-hist { background: var(--dc-hist-bg); color: var(--dc-hist-fg); border-color: var(--dc-hist-bd); }
+.dc-static { background: var(--dc-stat-bg); color: var(--dc-stat-fg); border-color: var(--dc-stat-bd); }
+.dc-cached { background: var(--dc-cache-bg); color: var(--dc-cache-fg); border-color: var(--dc-cache-bd); }
+.dc-unavail { background: var(--dc-unavail-bg); color: var(--dc-unavail-fg); border-color: var(--dc-unavail-bd); }
+
+.sla-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 6px;
+  border-radius: 99px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.sla-available { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-bd); }
+.sla-stale { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-bd); }
+.sla-unavailable { background: var(--bad-bg); color: var(--bad); border-color: var(--bad-bd); }
+
+.fb-tag {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  color: var(--ink2);
+  background: var(--panel2);
+}
+
+.fb-tag.is-fallback {
+  border-color: var(--warn-bd);
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.fb-tag.is-mou {
+  border-color: var(--dc-stat-bd);
+  background: var(--dc-stat-bg);
+  color: var(--dc-stat-fg);
+}
+
+/* KPI Baseline Scorecard inside Source Health Modal */
+.scorecard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.score-card {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.score-lbl {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink3);
+}
+
+.score-val {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.score-sub {
+  font-size: 11.4px;
+  color: var(--ink2);
+  line-height: 1.4;
+}
+
+.sh-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.sh-meta-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Official Nepal Authority Separation Lane (BIPAD · DHM · NSC) */
+.official-lane {
+  background: var(--official-bg);
+  border: 1px solid var(--official-bd);
+  border-left: 4px solid var(--official-accent);
+  border-radius: 7px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.official-lane.official-lane-compact {
+  padding: 8px 10px;
+  margin: 7px 0;
+}
+
+.official-lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+}
+
+.official-lane-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.badge-official {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--official-badge-bg);
+  color: var(--official-badge-fg);
+}
+
+.badge-screening {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--dc-fc-bg);
+  color: var(--dc-fc-fg);
+  border: 1px solid var(--dc-fc-bd);
+}
+
+.official-offline-box {
+  background: var(--panel);
+  border: 1px dashed var(--line2);
+  border-radius: 6px;
+  padding: 9px 11px;
+  margin-top: 6px;
+  font-size: 12.2px;
+}
+
+.official-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.official-subcard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.official-subcard h5 {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.screening-lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 6px;
+  padding: 6px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 5px;
+}
+
+/* Cascades & Isolation Tab */
+.v2-section {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 13px;
+  margin-bottom: 13px;
+}
+
+.v2-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.v2-section-head h4 {
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.cascade-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(270px, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.cascade-svg-wrap {
+  background: var(--chart-bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px;
+  overflow-x: auto;
+}
+
+.cascade-svg {
+  width: 100%;
+  min-width: 640px;
+  height: auto;
+  display: block;
+}
+
+.cg-node {
+  cursor: pointer;
+}
+
+.cg-node rect.cg-box {
+  fill: var(--cg-node-bg);
+  stroke: var(--cg-node-bd);
+  stroke-width: 1.4;
+  transition: stroke 0.15s, stroke-width 0.15s;
+}
+
+.cg-node.is-active rect.cg-box {
+  fill: var(--cg-node-active-bg);
+  stroke: var(--warn);
+  stroke-width: 2.2;
+}
+
+.cg-node.is-selected rect.cg-box,
+.cg-node:hover rect.cg-box,
+.cg-node:focus-visible rect.cg-box {
+  stroke: var(--accent);
+  stroke-width: 2.6;
+}
+
+.cg-edge-hit {
+  cursor: pointer;
+}
+
+.cg-edge-hit:hover .cg-pill-rect,
+.cg-edge-hit.is-selected .cg-pill-rect {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.cascade-inspector {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 12.2px;
+}
+
+.cascade-inspector h5 {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.cascade-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 11.4px;
+  color: var(--ink2);
+}
+
+.cg-leg-swatch {
+  display: inline-block;
+  width: 20px;
+  height: 0;
+  border-top: 2.5px solid var(--cg-obs);
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.cg-leg-swatch.fc {
+  border-top-color: var(--cg-fc);
+  border-top-style: dashed;
+}
+
+.cg-leg-swatch.mod {
+  border-top-color: var(--cg-mod);
+  border-top-style: dotted;
+}
+
+.cascade-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cascade-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--line2);
+  border-radius: 7px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cascade-card.is-watch {
+  border-top-color: var(--warn);
+}
+
+.cascade-card.is-alert {
+  border-top-color: var(--bad);
+}
+
+.cascade-card h5 {
+  margin: 0;
+  font-size: 13.2px;
+  line-height: 1.3;
+}
+
+.district-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.district-chip {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.district-chip:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Corridor Screening Notice & Mini KPIs */
+.corridor-disclaimer {
+  border-left: 4px solid var(--warn);
+  background: var(--warn-bg);
+  border-top: 1px solid var(--warn-bd);
+  border-right: 1px solid var(--warn-bd);
+  border-bottom: 1px solid var(--warn-bd);
+  border-radius: 0 6px 6px 0;
+  padding: 7px 11px;
+  margin-bottom: 10px;
+  font-size: 12.2px;
+}
+
+.mini-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 7px;
+  margin: 8px 0 10px;
+}
+
+.mini-kpi {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+
+.mini-kpi-lbl {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink3);
+  font-weight: 700;
+}
+
+.mini-kpi-val {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 2px;
+}
+
+.seg-toggle {
+  display: inline-flex;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.seg-btn {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 4px 9px;
+  font-size: 11.8px;
+  font-weight: 600;
+  color: var(--ink2);
+  cursor: pointer;
+}
+
+.seg-btn.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Tsho Rolpa 2D Hydrodynamic Pilot Benchmark Card */
+.pilot-card {
+  background: var(--panel);
+  border: 1px solid var(--dc-stat-bd);
+  border-left: 4px solid var(--dc-stat-bd);
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+
+.pilot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.pilot-box {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.pilot-box h5 {
+  margin: 0 0 5px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+/* 5-Type Landslide Inventory Breakdown & Duplicate Review Queue */
+.ls-type-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
+.ls-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 11.8px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ls-type-chip:hover,
+.ls-type-chip.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ls-type-count {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.val-unknown {
+  color: var(--ink3);
+  font-style: italic;
+}
+
+.review-queue-panel {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.review-queue-panel summary {
+  cursor: pointer;
+  padding: 8px 11px;
+  font-weight: 700;
+  font-size: 12.6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  background: var(--panel2);
+}
+
+.review-queue-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.review-queue-body {
+  padding: 9px 11px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+/* Sentinel-1 SAR All-Weather Monsoon Radar Section */
+.sar-panel {
+  background: var(--sar-bg);
+  border: 1px solid var(--sar-bd);
+  border-left: 4px solid var(--sar-bd);
+  border-radius: 7px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.pol-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--dc-hist-bg);
+  color: var(--dc-hist-fg);
+  border: 1px solid var(--dc-hist-bd);
+  margin-right: 3px;
+}
+
+.orbit-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--ink2);
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 960px) {
+  .cascade-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* --------------------------------------------------------------------------

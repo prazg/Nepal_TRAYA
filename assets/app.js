@@ -19,6 +19,11 @@ import {
   tTier,
   tRiverStatus,
   tDhLevel,
+  tDataClass,
+  tSlaStatus,
+  tHealthState,
+  tEvidenceType,
+  tLandslideType,
   tProvince,
   tDistrict,
   applyStaticTranslations,
@@ -290,6 +295,14 @@ const S = {
   gdacsMeta: null,
   valid: null,
   sens: null,
+  manifest: null,
+  kpiBaseline: null,
+  bipad: null,
+  lsReviewQueue: null,
+  exposureIso: null,
+  cascades: null,
+  eoSar: null,
+  tshoRolpaPilot: null,
 
   sel: null,
   selKind: null,
@@ -318,6 +331,9 @@ const S = {
   shown: [],
   tab: 'watch',
   sort: { k: 'pfv_Mm3', dir: -1 },
+  lsTypeFilter: 'all',
+  isoView: 'lakes',
+  cascadeSel: { kind: 'edge', id: 'GII-01' },
   stacCache: {},
 };
 
@@ -325,13 +341,27 @@ const LAZY_PATHS = {
   routes: 'data/routes.json',
   exposure: 'data/exposure.json',
   landslides: 'data/landslides.json',
+  landslide_review_queue: 'data/landslide_review_queue.json',
   faults: 'data/faults.json',
   eq_history_m6: 'data/eq_history_m6.json',
   glof_history: 'data/glof_history.json',
   gdacs_alerts: 'data/gdacs_alerts.json',
   validation: 'data/validation.json',
   sensitivity: 'data/sensitivity.json',
+  manifest: 'data/manifest.json',
+  kpi_baseline: 'data/kpi_baseline.json',
+  bipad_official: 'data/bipad_official.json',
+  exposure_isolation: 'data/exposure_isolation.json',
+  cascades: 'data/cascades.json',
+  eo_sar: 'data/eo_sar.json',
+  tsho_rolpa_pilot: 'data/tsho_rolpa_pilot.json',
 };
+
+const REPO_DOC_BASE = 'https://github.com/prazg/Nepal_TRAYA/blob/main';
+const DATA_LICENSES_URL = `${REPO_DOC_BASE}/DATA_LICENSES.md`;
+const TSHO_ROLPA_PLAN_URL = `${REPO_DOC_BASE}/docs/TSHO_ROLPA_2D_STUDY_PLAN.md`;
+const MODEL_CARDS_URL = `${REPO_DOC_BASE}/docs/MODEL_CARDS.md`;
+const INST_SPEC_URL = `${REPO_DOC_BASE}/docs/INSTITUTIONAL_INTEGRATION_SPEC.md`;
 
 const lazyPromises = new Map();
 
@@ -396,12 +426,20 @@ async function ensureData(key) {
   if (key === 'routes' && S.routes) return S.routes;
   if (key === 'exposure' && S.expo) return S.expo;
   if (key === 'landslides' && S.landslides) return S.landslides;
+  if (key === 'landslide_review_queue' && S.lsReviewQueue) return S.lsReviewQueue;
   if (key === 'faults' && S.faults) return S.faults;
   if (key === 'eq_history_m6' && S.eqHist) return S.eqHist;
   if (key === 'glof_history' && S.glofHist) return S.glofHist;
   if (key === 'gdacs_alerts' && S.gdacs) return S.gdacs;
   if (key === 'validation' && S.valid) return S.valid;
   if (key === 'sensitivity' && S.sens) return S.sens;
+  if (key === 'manifest' && S.manifest) return S.manifest;
+  if (key === 'kpi_baseline' && S.kpiBaseline) return S.kpiBaseline;
+  if (key === 'bipad_official' && S.bipad) return S.bipad;
+  if (key === 'exposure_isolation' && S.exposureIso) return S.exposureIso;
+  if (key === 'cascades' && S.cascades) return S.cascades;
+  if (key === 'eo_sar' && S.eoSar) return S.eoSar;
+  if (key === 'tsho_rolpa_pilot' && S.tshoRolpaPilot) return S.tshoRolpaPilot;
 
   if (lazyPromises.has(key)) return lazyPromises.get(key);
   const path = LAZY_PATHS[key];
@@ -418,6 +456,8 @@ async function ensureData(key) {
       } else if (key === 'landslides') {
         S.lsMeta = data || {};
         S.landslides = (data && data.events) || [];
+      } else if (key === 'landslide_review_queue') {
+        S.lsReviewQueue = data || null;
       } else if (key === 'faults') {
         S.faultsMeta = data || {};
         S.faults = (data && data.features) || [];
@@ -432,6 +472,20 @@ async function ensureData(key) {
         S.valid = data || null;
       } else if (key === 'sensitivity') {
         S.sens = data || null;
+      } else if (key === 'manifest') {
+        S.manifest = data || null;
+      } else if (key === 'kpi_baseline') {
+        S.kpiBaseline = data || null;
+      } else if (key === 'bipad_official') {
+        S.bipad = data || null;
+      } else if (key === 'exposure_isolation') {
+        S.exposureIso = data || null;
+      } else if (key === 'cascades') {
+        S.cascades = data || null;
+      } else if (key === 'eo_sar') {
+        S.eoSar = data || null;
+      } else if (key === 'tsho_rolpa_pilot') {
+        S.tshoRolpaPilot = data || null;
       }
       return data;
     })
@@ -513,6 +567,74 @@ const DHCLASS = {
   elevated: 'h-mod',
   low: 'h-low',
 };
+
+const DC_CLASS = {
+  live_observation: 'dc-live',
+  forecast: 'dc-forecast',
+  historical: 'dc-hist',
+  static_assessment: 'dc-static',
+  cached: 'dc-cached',
+  unavailable: 'dc-unavail',
+};
+
+const SLA_CLASS = {
+  available: 'sla-available',
+  stale: 'sla-stale',
+  unavailable: 'sla-unavailable',
+};
+
+const LS_TYPE_ORDER = [
+  'landslide_event',
+  'landslide_scar',
+  'susceptibility_zone',
+  'hazard_report',
+  'coseismic_failure',
+];
+
+function badgeDataClass(dc) {
+  const k = String(dc || 'unavailable').toLowerCase();
+  return `<span class="dc-badge ${DC_CLASS[k] || 'dc-unavail'}">${esc(tDataClass(k))}</span>`;
+}
+
+function badgeSla(st) {
+  const k = String(st || 'unavailable').toLowerCase();
+  return `<span class="sla-badge ${SLA_CLASS[k] || 'sla-unavailable'}">${esc(tSlaStatus(k))}</span>`;
+}
+
+function badgeEvidence(ev) {
+  const k = String(ev || 'modelled_static').toLowerCase();
+  const cls = k === 'observed' ? 'dc-live' : k === 'forecast' ? 'dc-forecast' : 'dc-static';
+  return `<span class="dc-badge ${cls}">${esc(tEvidenceType(k))}</span>`;
+}
+
+function badgeLsType(ft) {
+  const k = String(ft || 'landslide_scar').toLowerCase();
+  const cls = k === 'landslide_event'
+    ? 'dc-live'
+    : k === 'coseismic_failure'
+      ? 'dc-unavail'
+      : k === 'hazard_report'
+        ? 'dc-forecast'
+        : k === 'susceptibility_zone'
+          ? 'dc-static'
+          : 'dc-cached';
+  return `<span class="dc-badge ${cls}">${esc(tLandslideType(k))}</span>`;
+}
+
+function fmtNullCount(v) {
+  if (v === null || v === undefined || v === '') {
+    return `<span class="val-unknown">${esc(t('unknownVal'))}</span>`;
+  }
+  return fmt(v);
+}
+
+function fmtNullDate(isoOrDate) {
+  if (!isoOrDate) {
+    return `<span class="val-unknown">${esc(t('unknownVal'))}</span>`;
+  }
+  const s = String(isoOrDate);
+  return s.length > 10 ? esc(fmtNpt(s, false)) : esc(s);
+}
 
 const SEQ = ['#1e4b66', '#1d6f8f', '#0284c7', '#eab308', '#c2410c', '#b91c1c'];
 const SCALES = {
@@ -1146,22 +1268,37 @@ async function drawLandslidesLayer() {
     try { await ensureData('landslides'); } catch { return; }
   }
   if (!document.getElementById('lLandslides').checked) return;
+  const isNe = getLang() === 'ne';
   S.landslides.forEach(ev => {
-    const isNasa = String(ev.source || '').includes('NASA');
-    const col = isNasa ? '#c2410c' : '#eab308';
-    const link = safeUrl(ev.url);
+    const ft = ev.feature_type || 'landslide_scar';
+    const col = ft === 'landslide_event'
+      ? '#c2410c'
+      : ft === 'coseismic_failure'
+        ? '#b91c1c'
+        : ft === 'hazard_report'
+          ? '#0284c7'
+          : ft === 'susceptibility_zone'
+            ? '#7c3aed'
+            : '#eab308';
+    const link = safeUrl(ev.evidence_url || ev.url);
+    const titleTxt = (isNe && ev.title_ne) ? ev.title_ne : (ev.title || 'Landslide record');
+    const dateVal = ev.event_date_utc || ev.date;
     L.circleMarker([ev.lat, ev.lon], {
       renderer: overlayRenderer,
-      radius: ev.fatalities ? Math.min(8, 3.8 + Math.log10(ev.fatalities + 1) * 2.2) : 3.6,
+      radius: (ev.fatalities != null && ev.fatalities > 0)
+        ? Math.min(8, 3.8 + Math.log10(ev.fatalities + 1) * 2.2)
+        : (ft === 'landslide_event' || ft === 'coseismic_failure' ? 4.8 : 3.6),
       color: '#0a0f16',
       weight: 1,
       fillColor: col,
       fillOpacity: 0.85,
     })
       .bindPopup(
-        `<b>◇ ${esc(ev.title)}</b><br>${esc(ev.date || 'undated')} · ${esc(ev.source)}`
+        `<b>◇ ${esc(titleTxt)}</b><br>${badgeLsType(ft)} · ${esc(ev.source || '')}`
+        + `<br>Date: <b>${fmtNullDate(dateVal)}</b>`
         + `<br>Trigger: <b>${esc(ev.trigger || 'mapped scar')}</b>`
-        + (ev.fatalities ? `<br>Fatalities: <b>${fmt(ev.fatalities)}</b>` : '')
+        + `<br>Fatalities: <b>${fmtNullCount(ev.fatalities)}</b>`
+        + (ev.verified === true ? ' <span class="hbadge h-low">Verified</span>' : '')
         + (link ? `<br><a href="${esc(link)}" target="_blank" rel="noopener noreferrer">Open source record ↗</a>` : '')
       )
       .addTo(gLs);
@@ -1426,8 +1563,36 @@ function updateStatusPills() {
     document.getElementById('k-ls-sub').textContent = `${ageLbl} · D–H (2008)`;
   }
 
+  updateSourceHealthButton();
   updateStaleBanner();
   evaluateCompoundHazards();
+}
+
+function updateSourceHealthButton() {
+  const btn = document.getElementById('btnSourceHealth');
+  const lbl = document.getElementById('sourceHealthBtnLbl');
+  if (!btn || !lbl) return;
+
+  let health = 'degraded';
+  let suffix = '';
+  if (S.manifest) {
+    health = S.manifest.overall_health || 'degraded';
+    const sc = S.manifest.source_counts || {};
+    const avail = sc.available ?? 0;
+    const oper = sc.operational ?? sc.total ?? 0;
+    suffix = oper ? ` · ${tHealthState(health)} (${avail}/${oper})` : ` · ${tHealthState(health)}`;
+  } else if (S.summary) {
+    const buildAge = ageHours(S.summary.build);
+    const bpStatus = S.summary.bipad_official && S.summary.bipad_official.status;
+    if (buildAge > 168) health = 'stale';
+    else if (bpStatus === 'unavailable' || S.summary.build_mode === 'offline') health = 'degraded';
+    else health = 'healthy';
+    suffix = ` · ${tHealthState(health)}`;
+  }
+
+  btn.classList.remove('healthy', 'degraded', 'stale');
+  btn.classList.add(health === 'healthy' ? 'healthy' : health === 'stale' ? 'stale' : 'degraded');
+  lbl.textContent = `${t('btnSourceHealth')}${suffix}`;
 }
 
 function updateStaleBanner() {
@@ -1582,7 +1747,7 @@ async function loadEq(force = false) {
     const keqSub = document.getElementById('k-eq-sub');
     if (keqSub) {
       const nFaults = (S.summary && S.summary.active_faults && S.summary.active_faults.n_traces) || 70;
-      keqSub.textContent = `USGS Nepal · ${fmt(nFaults)} GEM surface traces`;
+      keqSub.textContent = `NDRRMA BIPAD · USGS + ${fmt(nFaults)} GEM traces`;
     }
 
     drawEq();
@@ -2042,6 +2207,194 @@ function ensureRightVisible() {
 }
 
 /* ==========================================================================
+   11b. Official Nepal Authority Separation Panel (NDRRMA BIPAD · DHM · NSC)
+   ========================================================================== */
+function matchDistrictRecord(rec, dist, cLon, cLat) {
+  if (!dist || !rec) return true;
+  if (rec.lat != null && rec.lon != null && Number.isFinite(Number(rec.lat)) && Number.isFinite(Number(rec.lon))) {
+    if (hav(cLon, cLat, Number(rec.lon), Number(rec.lat)) <= 60) return true;
+  }
+  const hay = `${rec.title || ''} ${rec.titleNe || ''} ${rec.address || ''} ${rec.description || ''} ${rec.streetAddress || ''} ${typeof rec.district === 'string' ? rec.district : ''}`.toLowerCase();
+  const enMatch = dist.name && hay.includes(dist.name.toLowerCase());
+  const neMatch = dist.name_ne && hay.includes(dist.name_ne.toLowerCase());
+  return Boolean(enMatch || neMatch);
+}
+
+function renderOfficialAuthorityPanel(opts = {}) {
+  const compact = Boolean(opts.compact);
+  const dist = opts.dist || null;
+  const cLon = opts.cLon ?? 84.2;
+  const cLat = opts.cLat ?? 28.3;
+  const isNe = getLang() === 'ne';
+
+  const bp = S.bipad;
+  const prov = (bp && bp.provenance) || {};
+  const dClass = prov.data_class || (S.summary && S.summary.bipad_official && S.summary.bipad_official.data_class) || 'unavailable';
+  const status = prov.status || (S.summary && S.summary.bipad_official && S.summary.bipad_official.status) || 'unavailable';
+  const retrievedAt = prov.retrieved_at_utc || (S.summary && S.summary.bipad_official && S.summary.bipad_official.retrieved_at_utc) || null;
+  const obsAt = prov.observation_time_utc || null;
+
+  const allAlerts = (bp && Array.isArray(bp.alerts)) ? bp.alerts : [];
+  const allIncidents = (bp && Array.isArray(bp.landslide_incidents)) ? bp.landslide_incidents : [];
+  const allRivers = (bp && Array.isArray(bp.dhm_rivers)) ? bp.dhm_rivers : [];
+  const allRain = (bp && Array.isArray(bp.dhm_rain)) ? bp.dhm_rain : [];
+  const allQuakes = (bp && Array.isArray(bp.nsc_earthquakes)) ? bp.nsc_earthquakes : [];
+
+  const alerts = dist ? allAlerts.filter(r => matchDistrictRecord(r, dist, cLon, cLat)) : allAlerts;
+  const incidents = dist ? allIncidents.filter(r => matchDistrictRecord(r, dist, cLon, cLat)) : allIncidents;
+  const rivers = dist ? allRivers.filter(r => matchDistrictRecord(r, dist, cLon, cLat)) : allRivers;
+  const rain = dist ? allRain.filter(r => matchDistrictRecord(r, dist, cLon, cLat)) : allRain;
+  const quakes = dist ? allQuakes.filter(r => matchDistrictRecord(r, dist, cLon, cLat)) : allQuakes;
+
+  const totalNational = allAlerts.length + allIncidents.length + allRivers.length + allRain.length + allQuakes.length;
+  const isUnavailable = !bp || status === 'unavailable' || totalNational === 0;
+
+  let bodyHtml = '';
+  if (isUnavailable) {
+    bodyHtml = `
+      <div class="official-offline-box">
+        <div><b>${esc(t('bipadAwaitingRefresh'))}</b> ${badgeSla(status)}</div>
+        <div class="muted field-gap">${esc(prov.notes || (isNe ? 'प्रत्यक्ष BIPAD API स्न्यापसट उपलब्ध नभएकाले आधिकारिक पोर्टलहरू सिधै हेर्नुहोस्।' : 'No live cached BIPAD snapshot is bundled in this offline build. Always verify live statutory warnings directly on official portals:'))}</div>
+        <div class="btn-row">
+          <a class="btn sm" href="https://bipadportal.gov.np/" target="_blank" rel="noopener noreferrer">NDRRMA BIPAD ↗</a>
+          <a class="btn sm" href="https://hydrology.gov.np/" target="_blank" rel="noopener noreferrer">DHM Floods ↗</a>
+          <a class="btn sm" href="https://seismonepal.gov.np/" target="_blank" rel="noopener noreferrer">DMG / NEMRC ↗</a>
+        </div>
+      </div>`;
+  } else if (compact) {
+    const localCount = alerts.length + incidents.length + rivers.length + rain.length + quakes.length;
+    const summaryRow = localCount > 0
+      ? `<div class="kv">
+          <span>${esc(t('bipadAlertsHead'))}</span><b>${fmt(alerts.length)}</b>
+          <span>${esc(t('bipadRiversHead'))} / ${esc(t('bipadRainHead'))}</span><b>${fmt(rivers.length)} / ${fmt(rain.length)}</b>
+          <span>${esc(t('bipadEqHead'))}</span><b>${fmt(quakes.length)}</b>
+          <span>${esc(t('bipadLsHead'))}</span><b>${fmt(incidents.length)}</b>
+        </div>`
+      : `<p class="muted">${isNe ? `यस जिल्ला नजिक ० BIPAD अभिलेख (राष्ट्रिय कुल: ${fmt(totalNational)} अभिलेख)।` : `0 matched BIPAD records within 60 km of this district (${fmt(totalNational)} national records cached).`}</p>`;
+
+    const topAlertItems = alerts.slice(0, 3).map(a => {
+      const ttl = (isNe && a.titleNe) ? a.titleNe : (a.title || a.titleNe || 'BIPAD Alert');
+      return `<li><b>${esc(ttl)}</b>${a.source ? ` <span class="band">(${esc(String(a.source).toUpperCase())})</span>` : ''} — ${esc(fmtNpt(a.startedOn))}</li>`;
+    }).join('');
+    const topIncItems = incidents.slice(0, 3).map(inc => {
+      const ttl = (isNe && inc.titleNe) ? inc.titleNe : (inc.title || inc.titleNe || 'Landslide incident');
+      return `<li><b>${esc(ttl)}</b> — ${fmtNullDate(inc.incidentOn || inc.date)} · ${isNe ? 'मृत्यु' : 'Deaths'}: ${fmtNullCount(inc.peopleDeathCount)}</li>`;
+    }).join('');
+    bodyHtml = `
+      ${summaryRow}
+      ${topAlertItems ? `<ul class="trig-list">${topAlertItems}</ul>` : ''}
+      ${topIncItems ? `<ul class="trig-list">${topIncItems}</ul>` : ''}
+      <div class="btn-row">
+        <a class="btn sm" href="https://bipadportal.gov.np/" target="_blank" rel="noopener noreferrer">BIPAD Portal ↗</a>
+        <a class="btn sm" href="https://hydrology.gov.np/" target="_blank" rel="noopener noreferrer">DHM ↗</a>
+        <a class="btn sm" href="https://seismonepal.gov.np/" target="_blank" rel="noopener noreferrer">NSC ↗</a>
+      </div>`;
+  } else {
+    const alertRows = alerts.slice(0, 12).map(a => {
+      const ttl = (isNe && a.titleNe) ? a.titleNe : (a.title || a.titleNe || 'BIPAD Alert');
+      const fly = safeFlyAttr(a.lat, a.lon, 10);
+      return `<tr tabindex="0" ${fly ? `data-fly="${fly}"` : ''}>
+        <td class="wrap-cell"><b>${esc(ttl)}</b>${a.description ? `<div class="band">${esc(a.description)}</div>` : ''}</td>
+        <td>${esc(a.source ? String(a.source).toUpperCase() : 'BIPAD')}${a.verified === true ? ' <span class="hbadge h-low">✓</span>' : ''}</td>
+        <td class="mono">${esc(fmtNpt(a.startedOn))}</td>
+      </tr>`;
+    }).join('');
+
+    const riverRows = rivers.slice(0, 12).map(rv => {
+      const fly = safeFlyAttr(rv.lat, rv.lon, 10);
+      return `<tr tabindex="0" ${fly ? `data-fly="${fly}"` : ''}>
+        <td><b>${esc(rv.title || 'DHM station')}</b> <span class="band">${esc(rv.basin || '')}</span></td>
+        <td class="num"><b>${rv.waterLevel != null ? fmt(rv.waterLevel, 2) + ' m' : esc(t('unknownVal'))}</b></td>
+        <td class="num">${rv.warningLevel != null ? fmt(rv.warningLevel, 1) : '—'} / ${rv.dangerLevel != null ? fmt(rv.dangerLevel, 1) : '—'}</td>
+        <td>${esc(rv.status || '—')}</td>
+        <td class="mono">${esc(fmtNpt(rv.waterLevelOn))}</td>
+      </tr>`;
+    }).join('');
+
+    const rainRows = rain.slice(0, 12).map(rn => {
+      const fly = safeFlyAttr(rn.lat, rn.lon, 10);
+      return `<tr tabindex="0" ${fly ? `data-fly="${fly}"` : ''}>
+        <td><b>${esc(rn.title || 'DHM rain gauge')}</b> <span class="band">${esc(rn.basin || '')}</span></td>
+        <td class="num">${rn.rain_1h_mm != null ? fmt(rn.rain_1h_mm, 1) : '—'}</td>
+        <td class="num">${rn.rain_3h_mm != null ? fmt(rn.rain_3h_mm, 1) : '—'}</td>
+        <td class="num"><b>${rn.rain_24h_mm != null ? fmt(rn.rain_24h_mm, 1) : '—'}</b></td>
+        <td class="mono">${esc(fmtNpt(rn.measuredOn))}</td>
+      </tr>`;
+    }).join('');
+
+    const nscRows = quakes.slice(0, 12).map(q => {
+      const fly = safeFlyAttr(q.lat, q.lon, 9);
+      return `<tr tabindex="0" ${fly ? `data-fly="${fly}"` : ''}>
+        <td class="mono">${esc(fmtNpt(q.eventOn))}</td>
+        <td class="num"><b>ML ${q.magnitude != null ? fmt(q.magnitude, 1) : '—'}</b></td>
+        <td class="wrap-cell">${esc(q.address || q.description || 'Nepal')}</td>
+      </tr>`;
+    }).join('');
+
+    const lsRows = incidents.slice(0, 12).map(inc => {
+      const ttl = (isNe && inc.titleNe) ? inc.titleNe : (inc.title || inc.titleNe || 'BIPAD Landslide');
+      const fly = safeFlyAttr(inc.lat, inc.lon, 11);
+      return `<tr tabindex="0" ${fly ? `data-fly="${fly}"` : ''}>
+        <td class="mono">${fmtNullDate(inc.incidentOn || inc.date)}</td>
+        <td class="wrap-cell"><b>${esc(ttl)}</b>${inc.verified === true ? ' <span class="hbadge h-low">Verified</span>' : ''}</td>
+        <td class="num">${fmtNullCount(inc.peopleDeathCount)}</td>
+        <td class="num">${fmtNullCount(inc.peopleInjuredCount)}</td>
+      </tr>`;
+    }).join('');
+
+    bodyHtml = `
+      <div class="official-grid">
+        <div class="official-subcard">
+          <h5><span>${esc(t('bipadAlertsHead'))}</span><span class="mono">${fmt(alerts.length)}</span></h5>
+          ${alertRows
+            ? `<div class="tbl-scroll"><table><thead><tr><th scope="col">Alert</th><th scope="col">Agency</th><th scope="col">Started (NPT)</th></tr></thead><tbody>${alertRows}</tbody></table></div>`
+            : '<p class="muted">0 alerts in current BIPAD snapshot.</p>'}
+        </div>
+        <div class="official-subcard">
+          <h5><span>${esc(t('bipadEqHead'))}</span><span class="mono">${fmt(quakes.length)}</span></h5>
+          ${nscRows
+            ? `<div class="tbl-scroll"><table><thead><tr><th scope="col">Time (NPT)</th><th scope="col">ML</th><th scope="col">Epicentre</th></tr></thead><tbody>${nscRows}</tbody></table></div>`
+            : '<p class="muted">0 NSC earthquake bulletins in current BIPAD snapshot.</p>'}
+        </div>
+        <div class="official-subcard">
+          <h5><span>${esc(t('bipadRiversHead'))}</span><span class="mono">${fmt(rivers.length)}</span></h5>
+          ${riverRows
+            ? `<div class="tbl-scroll"><table><thead><tr><th scope="col">Station</th><th scope="col">Level</th><th scope="col">Warn/Dang</th><th scope="col">Status</th><th scope="col">NPT</th></tr></thead><tbody>${riverRows}</tbody></table></div>`
+            : '<p class="muted">0 active DHM river readings in current BIPAD snapshot.</p>'}
+        </div>
+        <div class="official-subcard">
+          <h5><span>${esc(t('bipadRainHead'))}</span><span class="mono">${fmt(rain.length)}</span></h5>
+          ${rainRows
+            ? `<div class="tbl-scroll"><table><thead><tr><th scope="col">Gauge</th><th scope="col">1h</th><th scope="col">3h</th><th scope="col">24h mm</th><th scope="col">NPT</th></tr></thead><tbody>${rainRows}</tbody></table></div>`
+            : '<p class="muted">0 DHM rain gauge readings in current BIPAD snapshot.</p>'}
+        </div>
+      </div>
+      <div class="official-subcard field-gap">
+        <h5><span>${esc(t('bipadLsHead'))}</span><span class="mono">${fmt(incidents.length)}</span></h5>
+        ${lsRows
+          ? `<div class="tbl-scroll"><table><thead><tr><th scope="col">Date</th><th scope="col">Incident</th><th scope="col">Deaths</th><th scope="col">Injured</th></tr></thead><tbody>${lsRows}</tbody></table></div>`
+          : '<p class="muted">0 dated BIPAD landslide incidents in current snapshot.</p>'}
+      </div>`;
+  }
+
+  return `
+    <section class="official-lane${compact ? ' official-lane-compact' : ''}" aria-label="${esc(t('officialLaneTitle'))}">
+      <div class="official-lane-head">
+        <div class="official-lane-title">
+          <span class="badge-official">${esc(t('officialBadge'))}</span>
+          <span>${esc(t('officialLaneTitle'))}</span>
+        </div>
+        <div class="badge-row">
+          ${badgeDataClass(dClass)}
+          <span class="band mono">${esc(obsAt ? fmtNpt(obsAt) : fmtNpt(retrievedAt))}</span>
+        </div>
+      </div>
+      <div class="muted">${esc(isNe ? t('officialNotice') : ((bp && bp.official_notice) || t('officialNotice')))}</div>
+      ${bodyHtml}
+    </section>`;
+}
+
+/* ==========================================================================
    12. 77-District & "Near Me" Cross-Hazard Triage
    ========================================================================== */
 function clearDistrictHighlight() {
@@ -2093,8 +2446,13 @@ async function selectDistrict(distName, fly = true, userCoords = null) {
     }).bindTooltip('Your location / तपाईँको स्थान').addTo(gDistrict);
   }
 
-  // Ensure lightweight GDACS and historical M>=6 data are ready for complete district briefing
-  await Promise.allSettled([ensureData('gdacs_alerts'), ensureData('eq_history_m6')]);
+  // Ensure lightweight GDACS, historical M>=6, official BIPAD & isolation screening data are ready
+  await Promise.allSettled([
+    ensureData('gdacs_alerts'),
+    ensureData('eq_history_m6'),
+    ensureData('bipad_official'),
+    ensureData('exposure_isolation'),
+  ]);
   if (S.selKind === 'district' && S.selDistrict === dist.name) {
     renderDistrictByName(dist.name, false);
   }
@@ -2136,6 +2494,12 @@ function renderDistrictByName(distName) {
 
   const gdacsList = S.gdacs || [];
   const gdacsNepal = gdacsList.filter(a => a.in_nepal);
+  const isoDist = (S.exposureIso && Array.isArray(S.exposureIso.districts))
+    ? S.exposureIso.districts.find(d => d.name === dist.name)
+    : null;
+  const isoRiskCls = isoDist
+    ? (isoDist.district_isolation_risk === 'high' ? 'h-vhigh' : isoDist.district_isolation_risk === 'moderate' ? 'h-mod' : isoDist.district_isolation_risk === 'low' ? 'h-low' : 'h-na')
+    : 'h-na';
 
   const distLabel = getLang() === 'ne'
     ? `${dist.name_ne || dist.name} (${dist.name})`
@@ -2157,11 +2521,14 @@ function renderDistrictByName(distName) {
       <span class="hbadge h-info">${esc(t('distBriefTitle'))}</span>
       <span class="hbadge ${FCLASS[bSt] || 'h-na'}">River: ${esc(tRiverStatus(bSt))}</span>
       <span class="hbadge ${DHCLASS[ndLv] || 'h-low'}">Rain-LS: ${esc(tDhLevel(ndLv))}</span>
+      ${isoDist ? `<span class="hbadge ${isoRiskCls}">Isolation: ${esc(isoDist.district_isolation_risk)}</span>` : ''}
     </div>
+
+    ${renderOfficialAuthorityPanel({ compact: true, dist, cLon, cLat })}
 
     <div class="district-section">
       <div class="district-section-head">
-        <span>■ ${esc(t('distRiverSec'))}</span>
+        <span>■ ${esc(t('distRiverSec'))} <span class="badge-screening">${esc(t('modelledBadge'))}</span></span>
         ${basin ? `<span class="hbadge ${FCLASS[bSt] || 'h-na'}">${esc(tRiverStatus(bSt))}</span>` : ''}
       </div>
       ${basin ? `
@@ -2235,6 +2602,22 @@ function renderDistrictByName(distName) {
       ${dist.n_lakes > 0 ? `<div class="btn-row"><button type="button" class="btn sm" id="btnFilterToDistrict">${esc(t('distFilterLakes'))}</button></div>` : ''}
     </div>
 
+    ${isoDist ? `
+    <div class="district-section">
+      <div class="district-section-head">
+        <span>⛓ ${esc(t('isoSectionTitle'))} <span class="badge-screening">${esc(t('screeningBadge'))}</span></span>
+        <span class="hbadge ${isoRiskCls}">${esc(isoDist.district_isolation_risk)}</span>
+      </div>
+      <div class="band">${esc(t('isoCorridorBadge'))}</div>
+      <div class="kv field-gap">
+        <span>Bridges at corridor crossings (vehicular)</span><b>${fmt(isoDist.unique_bridges_at_crossings)} (${fmt(isoDist.unique_vehicular_bridges_at_crossings)})</b>
+        <span>Settlements potentially isolated</span><b>${fmt(isoDist.unique_settlements_potentially_isolated)} / ${fmt(isoDist.unique_settlements_in_1km_corridors)}</b>
+        <span>Nearest hospital (median / max)</span><b>${isoDist.nearest_hospital_km != null ? `${fmt(isoDist.nearest_hospital_km, 1)} / ${fmt(isoDist.nearest_hospital_max_km, 1)} km` : '—'}</b>
+        <span>Hydropower MW in 1 km corridors</span><b>${fmt(isoDist.hydropower_mw_exposed, 1)} MW</b>
+      </div>
+      <div class="btn-row"><button type="button" class="btn sm pri" id="btnOpenCascadesFromDist">${esc(t('tabCascades'))} →</button></div>
+    </div>` : ''}
+
     <div class="district-section">
       <div class="district-section-head">
         <span>⬡ ${esc(t('distGdacsSec'))}</span>
@@ -2263,6 +2646,9 @@ function renderDistrictByName(distName) {
 
   const emBtn = el.querySelector('#btnDistrictEmerg');
   if (emBtn) emBtn.addEventListener('click', openEmergencyModal);
+
+  const cascDistBtn = el.querySelector('#btnOpenCascadesFromDist');
+  if (cascDistBtn) cascDistBtn.addEventListener('click', () => switchTab('cascades'));
 
   el.querySelectorAll('[data-open-river]').forEach(btn => {
     btn.addEventListener('click', () => selectRiver(btn.dataset.openRiver, true));
@@ -3026,13 +3412,21 @@ async function renderTab() {
 
   // Lazy-fetch tab-specific JSONs before rendering
   const needMap = {
-    landslides: ['landslides'],
-    live: ['faults', 'eq_history_m6'],
+    landslides: ['landslides', 'landslide_review_queue'],
+    cascades: ['cascades', 'exposure_isolation', 'tsho_rolpa_pilot'],
+    live: ['bipad_official', 'faults', 'eq_history_m6'],
+    sat: ['eo_sar'],
     glof: ['glof_history'],
     valid: ['validation', 'sensitivity'],
   };
   const needed = (needMap[tab] || []).filter(k => {
     if (k === 'landslides') return !S.landslides;
+    if (k === 'landslide_review_queue') return !S.lsReviewQueue;
+    if (k === 'cascades') return !S.cascades;
+    if (k === 'exposure_isolation') return !S.exposureIso;
+    if (k === 'tsho_rolpa_pilot') return !S.tshoRolpaPilot;
+    if (k === 'bipad_official') return !S.bipad;
+    if (k === 'eo_sar') return !S.eoSar;
     if (k === 'faults') return !S.faults;
     if (k === 'eq_history_m6') return !S.eqHist;
     if (k === 'glof_history') return !S.glofHist;
@@ -3057,6 +3451,7 @@ async function renderTab() {
   if (tab === 'watch') b.innerHTML = tabWatch();
   else if (tab === 'floods') b.innerHTML = tabFloods();
   else if (tab === 'landslides') b.innerHTML = tabLandslides();
+  else if (tab === 'cascades') b.innerHTML = tabCascades();
   else if (tab === 'live') b.innerHTML = tabLive();
   else if (tab === 'sat') b.innerHTML = tabSat();
   else if (tab === 'glof') b.innerHTML = tabGlof();
@@ -3087,7 +3482,7 @@ function wireTabInteractions(b) {
   const bindRow = (selector, handler) => {
     b.querySelectorAll(selector).forEach(tr => {
       tr.addEventListener('click', e => {
-        if (e.target && e.target.closest('a')) return;
+        if (e.target && e.target.closest('a,button')) return;
         handler(tr);
       });
       tr.addEventListener('keydown', e => {
@@ -3102,6 +3497,7 @@ function wireTabInteractions(b) {
   bindRow('tr[data-lake]', tr => selectLake(tr.dataset.lake, true));
   bindRow('tr[data-river]', tr => selectRiver(tr.dataset.river, true));
   bindRow('tr[data-node]', tr => selectNode(tr.dataset.node, true));
+  bindRow('tr[data-dist]', tr => selectDistrict(tr.dataset.dist, true));
   bindRow('tr[data-fly]', tr => {
     if (!tr.dataset.fly) return;
     const parts = tr.dataset.fly.split(',');
@@ -3109,6 +3505,52 @@ function wireTabInteractions(b) {
     const [la, lo, z] = parts.map(Number);
     if (Number.isFinite(la) && Number.isFinite(lo)) map.setView([la, lo], Number.isFinite(z) ? z : 11);
   });
+
+  // Buttons inside tabs: fly to lake, open district, filter landslide types, toggle isolation view, inspect cascade graph
+  b.querySelectorAll('button[data-open-lake]').forEach(btn => {
+    btn.addEventListener('click', () => selectLake(btn.dataset.openLake, true));
+  });
+  b.querySelectorAll('button[data-open-dist]').forEach(btn => {
+    btn.addEventListener('click', () => selectDistrict(btn.dataset.openDist, true));
+  });
+  b.querySelectorAll('button[data-ls-type]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      S.lsTypeFilter = btn.dataset.lsType || 'all';
+      renderTab();
+    });
+  });
+  b.querySelectorAll('button[data-iso-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      S.isoView = btn.dataset.isoView === 'districts' ? 'districts' : 'lakes';
+      renderTab();
+    });
+  });
+
+  const bindCascadeSelection = (selector, kind, attrKey) => {
+    b.querySelectorAll(selector).forEach(el => {
+      const pick = () => {
+        S.cascadeSel = { kind, id: el.dataset[attrKey] };
+        const insp = b.querySelector('#cascadeInspector');
+        if (insp && S.cascades) {
+          insp.innerHTML = renderCascadeInspector(S.cascades);
+          insp.querySelectorAll('button[data-open-dist]').forEach(btn => {
+            btn.addEventListener('click', () => selectDistrict(btn.dataset.openDist, true));
+          });
+        }
+        b.querySelectorAll('.cg-node,.cg-edge-hit').forEach(x => x.classList.remove('is-selected'));
+        el.classList.add('is-selected');
+      };
+      el.addEventListener('click', pick);
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          pick();
+        }
+      });
+    });
+  };
+  bindCascadeSelection('[data-cg-node]', 'node', 'cgNode');
+  bindCascadeSelection('[data-cg-edge]', 'edge', 'cgEdge');
 
   const dlCsv = b.querySelector('#dlCsv');
   if (dlCsv) dlCsv.addEventListener('click', downloadCsv);
@@ -3246,22 +3688,76 @@ function idCurveSvg(nodes) {
   </svg>`;
 }
 
-function tabLandslides() {
-  const nodes = (S.hydromet && S.hydromet.nodes) || [];
-  const evs = (S.landslides || []).slice(0, 150);
-  const nCoolr = (S.lsMeta && S.lsMeta.n_nasa_coolr) || 0;
-  const nOsm = (S.lsMeta && S.lsMeta.n_osm) || evs.length;
+function renderLandslideReviewQueue(rq) {
+  const isNe = getLang() === 'ne';
+  const nScanned = (rq && rq.n_records_scanned) || (S.landslides || []).length;
+  const cands = (rq && Array.isArray(rq.candidates)) ? rq.candidates : [];
+  const params = (rq && rq.parameters) || { max_km: 1.5, max_days: 3, undated_cross_source_max_km: 0.35 };
 
-  return `${nCoolr === 0 ? `<div class="callout"><b>${esc(t('coolrZeroNotice', { n: fmt(nOsm) }))}</b></div>` : ''}
+  const bodyHtml = cands.length
+    ? `<div class="tbl-scroll"><table><thead><tr>
+        <th scope="col">Candidate ID</th><th scope="col">Record A</th><th scope="col">Record B</th>
+        <th scope="col">Dist km</th><th scope="col">Δ Days</th><th scope="col">Title Sim</th>
+        <th scope="col">Reason</th><th scope="col">Status</th>
+      </tr></thead><tbody>
+      ${cands.slice(0, 100).map(c => `<tr>
+        <td class="mono">${esc(c.candidate_id)}</td>
+        <td class="wrap-cell"><b>${esc(c.record_a_title || c.record_a_id)}</b><div class="band">${esc(c.record_a_source || '')} · ${fmtNullDate(c.record_a_date_utc)}</div></td>
+        <td class="wrap-cell"><b>${esc(c.record_b_title || c.record_b_id)}</b><div class="band">${esc(c.record_b_source || '')} · ${fmtNullDate(c.record_b_date_utc)}</div></td>
+        <td class="num">${fmt(c.distance_km, 2)}</td>
+        <td class="num">${c.days_apart != null ? fmt(c.days_apart, 1) : `<span class="val-unknown">${esc(t('unknownVal'))}</span>`}</td>
+        <td class="num">${fmt((c.title_similarity || 0) * 100, 0)}%</td>
+        <td>${esc(c.reason || 'proximity')}</td>
+        <td><span class="hbadge h-mod">${esc(c.review_status || 'pending_review')}</span></td>
+      </tr>`).join('')}
+      </tbody></table></div>`
+    : `<p class="muted">${esc(t('lsReviewEmpty', { n: fmt(nScanned) }))}</p>`;
+
+  return `
+    <details class="review-queue-panel">
+      <summary>
+        <span>▸ ${esc(t('lsReviewQueueTitle'))} <span class="mono">(${fmt(cands.length)} ${isNe ? 'समीक्षा बाँकी' : 'pending'} / ${fmt(nScanned)} ${isNe ? 'जाँच गरिएको' : 'scanned'})</span></span>
+        <span class="badge-screening">${esc(t('lsReviewPolicyBadge'))}</span>
+      </summary>
+      <div class="review-queue-body">
+        <div class="band field-gap">Rules: dated pairs ≤ <b>${fmt(params.max_km, 1)} km</b> &amp; ≤ <b>${fmt(params.max_days, 0)} d</b> · undated cross-source ≤ <b>${fmt(params.undated_cross_source_max_km, 2)} km</b> · <code>auto_merged: false</code></div>
+        <div class="field-gap">${bodyHtml}</div>
+      </div>
+    </details>`;
+}
+
+function tabLandslides() {
+  const isNe = getLang() === 'ne';
+  const nodes = (S.hydromet && S.hydromet.nodes) || [];
+  const allEvs = S.landslides || [];
+  const meta = S.lsMeta || {};
+  const countsByType = meta.counts_by_type || {
+    landslide_event: 0,
+    landslide_scar: allEvs.length,
+    susceptibility_zone: 0,
+    hazard_report: 0,
+    coseismic_failure: 0,
+  };
+  const nBipad = meta.n_bipad || 0;
+  const nCoolr = meta.n_nasa_coolr || 0;
+  const nOsm = meta.n_osm || 0;
+  const activeFilter = S.lsTypeFilter || 'all';
+  const filtered = activeFilter === 'all'
+    ? allEvs
+    : allEvs.filter(e => (e.feature_type || 'landslide_scar') === activeFilter);
+  const evs = filtered.slice(0, 150);
+
+  return `${(nCoolr === 0 && nBipad === 0) ? `<div class="callout"><b>${esc(meta.coverage_note || t('coolrZeroNotice', { n: fmt(nOsm || allEvs.length) }))}</b></div>` : ''}
     <div class="split-2">
       <div>
         <h4>Nepal Himalaya Liquid-Rain I–D Threshold Diagram</h4>
         ${idCurveSvg(nodes)}
         <p class="muted field-gap">Plots 24 h (blue) and 72 h (teal) liquid-rain intensities across 24 sentinel zones against Dahal &amp; Hasegawa (2008). Updated ${esc(fmtNpt(S.hydromet && S.hydromet.updated_utc))} (${esc(fmtAge(S.hydromet && S.hydromet.updated_utc))}).</p>
+        ${meta.null_semantics_note ? `<div class="callout info"><b>Epistemic Null Policy:</b> ${esc(meta.null_semantics_note)}</div>` : ''}
       </div>
       <div>
-        <h4>Physiographic Rainfall–Landslide Watch (24 Sentinel Nodes)</h4>
-        <table><thead><tr>
+        <h4>Physiographic Rainfall–Landslide Watch (24 Sentinel Nodes) <span class="badge-screening">${esc(t('modelledBadge'))}</span></h4>
+        <div class="tbl-scroll"><table><thead><tr>
           <th scope="col">Station</th><th scope="col">District</th><th scope="col">Past 7d mm</th>
           <th scope="col">Next 5d mm</th><th scope="col">Max 24h</th><th scope="col">Soil</th>
           <th scope="col">0 °C level</th><th scope="col">D–H Status</th>
@@ -3280,23 +3776,514 @@ function tabLandslides() {
             <td><span class="hbadge ${DHCLASS[lv] || 'h-low'}">${esc(tDhLevel(lv))} (${fmt((dh.max_ratio || 0) * 100, 0)}%)</span></td>
           </tr>`;
         }).join('')}
-        </tbody></table>
+        </tbody></table></div>
 
-        <h4 class="field-gap">Mapped Landslide Records (${fmt((S.landslides || []).length)} total — ${fmt(nCoolr)} NASA COOLR, ${fmt(nOsm)} OSM)</h4>
-        <table><thead><tr>
-          <th scope="col">Date</th><th scope="col">Location / Title</th><th scope="col">Source</th>
-          <th scope="col">Trigger</th><th scope="col">Fatalities</th>
+        <div class="tbl-toolbar field-gap">
+          <h4>5-Type Landslide Inventory (${fmt(allEvs.length)} total · BIPAD: ${fmt(nBipad)} · COOLR: ${fmt(nCoolr)} · OSM: ${fmt(nOsm)})</h4>
+          <a class="btn sm pri" href="data/landslide_inventory.geojson" download="landslide_inventory.geojson">${esc(t('lsDownloadGeojson'))}</a>
+        </div>
+
+        <div class="ls-type-bar" role="group" aria-label="Filter landslide inventory by 5 canonical feature types">
+          <button type="button" class="ls-type-chip${activeFilter === 'all' ? ' on' : ''}" data-ls-type="all">
+            <span>${esc(t('lsTypeAll'))}</span><span class="ls-type-count">${fmt(allEvs.length)}</span>
+          </button>
+          ${LS_TYPE_ORDER.map(ft => `<button type="button" class="ls-type-chip${activeFilter === ft ? ' on' : ''}" data-ls-type="${esc(ft)}">
+            <span>${esc(tLandslideType(ft))}</span><span class="ls-type-count">${fmt(countsByType[ft] || 0)}</span>
+          </button>`).join('')}
+        </div>
+
+        <div class="tbl-scroll"><table><thead><tr>
+          <th scope="col">Date</th><th scope="col">Type</th><th scope="col">Location / Title</th>
+          <th scope="col">District</th><th scope="col">Source</th><th scope="col">Trigger</th>
+          <th scope="col">Fatalities</th><th scope="col">Injuries</th>
         </tr></thead><tbody>
-        ${evs.map(e => `<tr tabindex="0" data-fly="${safeFlyAttr(e.lat, e.lon, 12)}">
-          <td class="mono">${esc(e.date || 'undated')}</td>
-          <td>${esc(e.title)}</td>
-          <td>${esc(e.source)}</td>
-          <td>${esc(e.trigger || '—')}</td>
-          <td class="num">${e.fatalities != null ? fmt(e.fatalities) : '—'}</td>
-        </tr>`).join('')}
-        </tbody></table>
+        ${evs.length ? evs.map(e => {
+          const ttl = (isNe && e.title_ne) ? e.title_ne : (e.title || 'Landslide record');
+          const dtVal = e.event_date_utc || e.date;
+          return `<tr tabindex="0" data-fly="${safeFlyAttr(e.lat, e.lon, 12)}">
+            <td class="mono">${fmtNullDate(dtVal)}</td>
+            <td>${badgeLsType(e.feature_type)}</td>
+            <td class="wrap-cell">${esc(ttl)}${e.verified === true ? ' <span class="hbadge h-low">✓</span>' : ''}</td>
+            <td>${esc(tDistrict(e.district || e.admin, S.districtsMeta))}</td>
+            <td>${esc(e.source || '—')}</td>
+            <td>${esc(e.trigger || '—')}</td>
+            <td class="num">${fmtNullCount(e.fatalities)}</td>
+            <td class="num">${fmtNullCount(e.injuries)}</td>
+          </tr>`;
+        }).join('') : `<tr><td colspan="8" class="muted">${isNe ? 'यस प्रकारमा हाल ० अभिलेख छन्।' : '0 records currently loaded in this feature type.'}</td></tr>`}
+        </tbody></table></div>
+
+        ${renderLandslideReviewQueue(S.lsReviewQueue)}
       </div>
     </div>`;
+}
+
+/* ==========================================================================
+   14b. Cascades, Road-Cut Hospital Isolation & Tsho Rolpa 2D Pilot Tab
+   ========================================================================== */
+function svgWrapTwoLines(text, maxChars = 28) {
+  const s = String(text || '').trim();
+  if (s.length <= maxChars) return [s];
+  const words = s.split(/\s+/);
+  let line1 = '';
+  let idx = 0;
+  while (idx < words.length && (line1 + (line1 ? ' ' : '') + words[idx]).length <= maxChars) {
+    line1 += (line1 ? ' ' : '') + words[idx];
+    idx++;
+  }
+  if (!line1) {
+    line1 = s.slice(0, maxChars);
+    const rest = s.slice(maxChars);
+    return [line1, rest.length > maxChars ? rest.slice(0, maxChars - 1) + '…' : rest];
+  }
+  const rest = words.slice(idx).join(' ');
+  return rest ? [line1, rest.length > maxChars + 2 ? rest.slice(0, maxChars + 1) + '…' : rest] : [line1];
+}
+
+const CASCADE_NODE_POS = {
+  c1_heavy_rain_dh: { x: 24, y: 38 },
+  c1_dated_landslides: { x: 24, y: 90 },
+  c1_debris_dam_valley_flood: { x: 344, y: 64 },
+  c1_road_bridge_isolation: { x: 664, y: 64 },
+
+  c2_recent_eq_m45: { x: 24, y: 164 },
+  c2_coseismic_slope_moraine: { x: 344, y: 164 },
+  c2_corridor_access_cut: { x: 664, y: 164 },
+
+  c3_glof_high_susceptibility: { x: 24, y: 244 },
+  c3_glof_thermal_seismic_driver: { x: 24, y: 298 },
+  c3_glof_bridge_hydro_impact: { x: 344, y: 271 },
+  c3_hospital_access_disruption: { x: 664, y: 271 },
+};
+
+function buildCascadeGraphSvg(cas) {
+  const isNe = getLang() === 'ne';
+  const nodes = (cas && Array.isArray(cas.nodes)) ? cas.nodes : [];
+  const edges = (cas && Array.isArray(cas.edges)) ? cas.edges : [];
+  const nodeW = 232;
+  const nodeH = 46;
+  const sel = S.cascadeSel || {};
+
+  const evStroke = ev => (ev === 'observed' ? 'var(--cg-obs)' : ev === 'forecast' ? 'var(--cg-fc)' : 'var(--cg-mod)');
+  const evDash = ev => (ev === 'observed' ? '' : ev === 'forecast' ? '6 3' : '2 3');
+  const evMarker = ev => (ev === 'observed' ? 'url(#cg-arrow-obs)' : ev === 'forecast' ? 'url(#cg-arrow-fc)' : 'url(#cg-arrow-mod)');
+
+  const edgesSvg = edges.map(ed => {
+    const p1 = CASCADE_NODE_POS[ed.from];
+    const p2 = CASCADE_NODE_POS[ed.to];
+    if (!p1 || !p2) return '';
+    const x1 = p1.x + nodeW;
+    const y1 = p1.y + nodeH / 2;
+    const x2 = p2.x - 5;
+    const y2 = p2.y + nodeH / 2;
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const col = evStroke(ed.evidence_type);
+    const dash = evDash(ed.evidence_type);
+    const sw = ed.active ? 2.6 : 1.5;
+    const op = ed.active ? 1.0 : 0.62;
+    const isSel = sel.kind === 'edge' && sel.id === ed.rule_id;
+    return `<g class="cg-edge-hit${isSel ? ' is-selected' : ''}" tabindex="0" role="button" data-cg-edge="${esc(ed.rule_id)}" aria-label="${esc(ed.rule_id)} (${esc(tEvidenceType(ed.evidence_type))})">
+      <path d="M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="${col}" stroke-width="${sw}" ${dash ? `stroke-dasharray="${dash}"` : ''} opacity="${op}" marker-end="${evMarker(ed.evidence_type)}"/>
+      <rect class="cg-pill-rect" x="${(mx - 27).toFixed(1)}" y="${(my - 9).toFixed(1)}" width="54" height="18" rx="9" fill="var(--panel)" stroke="${col}" stroke-width="${ed.active ? 1.8 : 1.1}"/>
+      <text x="${mx.toFixed(1)}" y="${(my + 3.2).toFixed(1)}" text-anchor="middle" fill="${col}" font-size="8.5" font-weight="700" font-family="monospace">${esc(ed.rule_id)}</text>
+    </g>`;
+  }).join('');
+
+  const nodesSvg = nodes.map(nd => {
+    const pos = CASCADE_NODE_POS[nd.id];
+    if (!pos) return '';
+    const label = isNe ? (nd.label_ne || nd.label_en) : (nd.label_en || nd.id);
+    const lines = svgWrapTwoLines(label, isNe ? 24 : 30);
+    const isSel = sel.kind === 'node' && sel.id === nd.id;
+    const dotCol = (nd.severity === 'critical' || nd.severity === 'high')
+      ? 'var(--bad)'
+      : (nd.active ? 'var(--warn)' : evStroke(nd.evidence_type));
+    const txtSvg = lines.length === 1
+      ? `<text x="${pos.x + 14}" y="${pos.y + 26}" fill="var(--ink)" font-size="10.2" font-weight="600">${esc(lines[0])}</text>`
+      : `<text x="${pos.x + 14}" y="${pos.y + 20}" fill="var(--ink)" font-size="9.8" font-weight="600">${esc(lines[0])}</text>
+         <text x="${pos.x + 14}" y="${pos.y + 33}" fill="var(--ink)" font-size="9.8" font-weight="600">${esc(lines[1])}</text>`;
+    return `<g class="cg-node${nd.active ? ' is-active' : ''}${isSel ? ' is-selected' : ''}" tabindex="0" role="button" data-cg-node="${esc(nd.id)}" aria-label="${esc(label)}">
+      <rect class="cg-box" x="${pos.x}" y="${pos.y}" width="${nodeW}" height="${nodeH}" rx="6"/>
+      <circle cx="${pos.x + 8}" cy="${pos.y + 12}" r="3.4" fill="${dotCol}"/>
+      ${txtSvg}
+      <text x="${pos.x + nodeW - 6}" y="${pos.y + 11}" text-anchor="end" fill="${evStroke(nd.evidence_type)}" font-size="8" font-weight="700" font-family="monospace">${esc(tEvidenceType(nd.evidence_type).toUpperCase())}</text>
+    </g>`;
+  }).join('');
+
+  return `<svg class="cascade-svg" viewBox="0 0 920 364" role="img" aria-label="Directed multi-hazard cascade screening graph">
+    <defs>
+      <marker id="cg-arrow-obs" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--cg-obs)"/>
+      </marker>
+      <marker id="cg-arrow-fc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--cg-fc)"/>
+      </marker>
+      <marker id="cg-arrow-mod" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--cg-mod)"/>
+      </marker>
+    </defs>
+
+    <text x="140" y="16" text-anchor="middle" fill="var(--chart-text)" font-size="9.5" font-weight="700" font-family="monospace">STAGE 1 · TRIGGER</text>
+    <text x="460" y="16" text-anchor="middle" fill="var(--chart-text)" font-size="9.5" font-weight="700" font-family="monospace">STAGE 2 · INTERMEDIATE MECHANISM</text>
+    <text x="780" y="16" text-anchor="middle" fill="var(--chart-text)" font-size="9.5" font-weight="700" font-family="monospace">STAGE 3 · CORRIDOR &amp; HOSPITAL IMPACT</text>
+
+    <rect x="12" y="26" width="896" height="116" rx="8" fill="var(--panel2)" fill-opacity="0.42" stroke="var(--line)" stroke-dasharray="3 3"/>
+    <text x="20" y="34" fill="var(--ink3)" font-size="8.2" font-weight="700" font-family="monospace">CHAIN 1 · RAINFALL → LANDSLIDE / DEBRIS DAM → ROAD ISOLATION</text>
+
+    <rect x="12" y="150" width="896" height="72" rx="8" fill="var(--panel2)" fill-opacity="0.42" stroke="var(--line)" stroke-dasharray="3 3"/>
+    <text x="20" y="160" fill="var(--ink3)" font-size="8.2" font-weight="700" font-family="monospace">CHAIN 2 · M≥4.5 EARTHQUAKE → COSEISMIC SLOPE / MORAINE → ACCESS CUT</text>
+
+    <rect x="12" y="230" width="896" height="124" rx="8" fill="var(--panel2)" fill-opacity="0.42" stroke="var(--warn-bd)" stroke-dasharray="3 3"/>
+    <text x="20" y="240" fill="var(--warn)" font-size="8.2" font-weight="700" font-family="monospace">CHAIN 3 · GLOF SUSCEPTIBILITY (+ THERMAL/SEISMIC) → BRIDGES &amp; HYDRO → HOSPITAL ISOLATION</text>
+
+    ${edgesSvg}
+    ${nodesSvg}
+  </svg>`;
+}
+
+function badgeCascadeSeverity(sev, baselineCls = 'h-na') {
+  const s = String(sev || 'baseline').toLowerCase();
+  if (s === 'critical') return 'h-vhigh';
+  if (s === 'high') return 'h-high';
+  if (s === 'moderate' || s === 'watch') return 'h-mod';
+  return baselineCls;
+}
+
+function cascadeCardSeverityClass(sev) {
+  const s = String(sev || 'baseline').toLowerCase();
+  if (s === 'critical' || s === 'high') return 'is-alert';
+  if (s === 'moderate' || s === 'watch') return 'is-watch';
+  return '';
+}
+
+function renderCascadeInspector(cas) {
+  const isNe = getLang() === 'ne';
+  const nodes = (cas && Array.isArray(cas.nodes)) ? cas.nodes : [];
+  const edges = (cas && Array.isArray(cas.edges)) ? cas.edges : [];
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+  const sel = S.cascadeSel || {};
+
+  if (sel.kind === 'node') {
+    const nd = nodeById.get(sel.id) || nodes[0];
+    if (!nd) return `<p class="muted">${esc(t('cascClickHint'))}</p>`;
+    const label = isNe ? (nd.label_ne || nd.label_en) : nd.label_en;
+    const metrics = nd.metrics || {};
+    const metricRows = Object.entries(metrics)
+      .filter(([, v]) => typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean')
+      .map(([k, v]) => `<span>${esc(k.replaceAll('_', ' '))}</span><b>${esc(String(v))}</b>`)
+      .join('');
+    const dists = Array.isArray(nd.affected_districts) ? nd.affected_districts : [];
+    const ndBadgeCls = badgeCascadeSeverity(nd.severity, nd.active ? 'h-mod' : 'h-na');
+    const ndStatusLabel = nd.active
+      ? (nd.severity && nd.severity !== 'baseline' ? `Active (${nd.severity})` : 'Active Watch')
+      : 'Baseline';
+    return `
+      <h5>${esc(label)}</h5>
+      <div class="badge-row">
+        ${badgeEvidence(nd.evidence_type)}
+        <span class="hbadge ${ndBadgeCls}">${esc(ndStatusLabel)}</span>
+        <span class="hbadge h-info">${esc(nd.stage || '')}</span>
+      </div>
+      ${metricRows ? `<div class="kv">${metricRows}</div>` : ''}
+      ${dists.length ? `<div class="band field-gap">Affected districts (${fmt(dists.length)}):</div>
+        <div class="district-chips">${dists.slice(0, 12).map(d => `<button type="button" class="district-chip" data-open-dist="${esc(d)}">${esc(tDistrict(d, S.districtsMeta))}</button>`).join('')}${dists.length > 12 ? `<span class="band">+${fmt(dists.length - 12)}</span>` : ''}</div>` : '<p class="muted field-gap">0 districts currently triggered on this node.</p>'}`;
+  }
+
+  const ed = edges.find(e => e.rule_id === sel.id) || edges.find(e => e.active) || edges[0];
+  if (!ed) return `<p class="muted">${esc(t('cascClickHint'))}</p>`;
+  const fromNd = nodeById.get(ed.from);
+  const toNd = nodeById.get(ed.to);
+  const fromLbl = fromNd ? (isNe ? (fromNd.label_ne || fromNd.label_en) : fromNd.label_en) : ed.from;
+  const toLbl = toNd ? (isNe ? (toNd.label_ne || toNd.label_en) : toNd.label_en) : ed.to;
+  const sup = ed.supporting_evidence || {};
+  const supDists = Array.isArray(sup.affected_districts) ? sup.affected_districts : (Array.isArray(sup.districts) ? sup.districts : []);
+
+  return `
+    <h5>${esc(t('cascInspectorTitle'))} · <code>${esc(ed.rule_id)}</code></h5>
+    <div class="badge-row">
+      ${badgeEvidence(ed.evidence_type)}
+      <span class="hbadge ${ed.active ? 'h-mod' : 'h-na'}">${ed.active ? 'Active' : 'Baseline'}</span>
+      <span class="hbadge h-info">Confidence: ${esc(ed.confidence || 'moderate')}</span>
+    </div>
+    <div class="muted"><b>${esc(fromLbl)}</b> → <b>${esc(toLbl)}</b></div>
+    <div class="callout info field-gap"><b>Physical Trigger Rule:</b> <code>${esc(ed.trigger_rule)}</code></div>
+    <p class="muted"><b>Uncertainty:</b> ${esc(ed.uncertainty_note)}</p>
+    ${supDists.length ? `<div class="band">Affected districts (${fmt(supDists.length)}):</div>
+      <div class="district-chips">${supDists.slice(0, 12).map(d => `<button type="button" class="district-chip" data-open-dist="${esc(d)}">${esc(tDistrict(d, S.districtsMeta))}</button>`).join('')}${supDists.length > 12 ? `<span class="band">+${fmt(supDists.length - 12)}</span>` : ''}</div>` : ''}`;
+}
+
+function renderExposureIsolationSection(ei) {
+  if (!ei) return '<p class="muted">Exposure &amp; road-cut isolation screening dataset unavailable.</p>';
+  const sum = ei.summary || {};
+  const unc = ei.uncertainty_and_coverage_limits || {};
+  const view = S.isoView === 'districts' ? 'districts' : 'lakes';
+
+  let tblHtml = '';
+  if (view === 'lakes') {
+    const lakeEntries = Object.values(ei.lakes || {}).sort((a, b) => {
+      const pA = a.hazard_susceptibility_static && a.hazard_susceptibility_static.priority ? 1 : 0;
+      const pB = b.hazard_susceptibility_static && b.hazard_susceptibility_static.priority ? 1 : 0;
+      if (pA !== pB) return pB - pA;
+      const isoA = (a.road_cut_hospital_isolation && a.road_cut_hospital_isolation.upstream_settlements_potentially_isolated) || 0;
+      const isoB = (b.road_cut_hospital_isolation && b.road_cut_hospital_isolation.upstream_settlements_potentially_isolated) || 0;
+      return isoB - isoA;
+    }).slice(0, 45);
+
+    tblHtml = `<div class="tbl-scroll"><table><thead><tr>
+      <th scope="col">Lake / Corridor</th><th scope="col">District</th><th scope="col">Published Hazard</th>
+      <th scope="col">Isolation Risk</th><th scope="col">Bridges (Veh / ≤250m)</th><th scope="col">Isolated Settlements</th>
+      <th scope="col">Nearest Hosp (med/max)</th><th scope="col">Hydro MW</th><th scope="col">Critical Bridges / Settlements</th>
+    </tr></thead><tbody>
+    ${lakeEntries.map(lk => {
+      const hz = lk.hazard_susceptibility_static || {};
+      const exp = lk.corridor_exposure_screening || {};
+      const iso = lk.road_cut_hospital_isolation || {};
+      const rCls = iso.corridor_disruption_risk === 'high' ? 'h-vhigh' : iso.corridor_disruption_risk === 'moderate' ? 'h-mod' : 'h-low';
+      const brNames = (iso.critical_bridge_examples || []).slice(0, 2).map(x => x.name).filter(Boolean).join(', ');
+      const stNames = (iso.isolated_settlement_examples || []).slice(0, 2).map(x => x.name).filter(Boolean).join(', ');
+      return `<tr tabindex="0" data-lake="${esc(lk.lake_id)}">
+        <td><b>${esc(lk.name || lk.lake_id)}</b>${hz.priority ? ' <span class="hbadge h-vhigh">PFV ≥10</span>' : ''}</td>
+        <td>${esc(tDistrict(lk.district, S.districtsMeta))}</td>
+        <td><span class="hbadge ${HCLASS[hz.hazard] || 'h-na'}">${esc(tTier(hz.hazard))}</span></td>
+        <td><span class="hbadge ${rCls}">${esc(iso.corridor_disruption_risk || 'low')}</span></td>
+        <td class="num"><b>${fmt(iso.bridges_at_corridor_crossing)}</b> <span class="band">(${fmt(iso.vehicular_bridges_at_crossing)} / ${fmt(iso.critical_channel_bridges_250m)})</span></td>
+        <td class="num"><b>${fmt(iso.upstream_settlements_potentially_isolated)}</b> / ${fmt(exp.settlements)}</td>
+        <td class="num">${iso.nearest_hospital_km != null ? `${fmt(iso.nearest_hospital_km, 1)} / ${fmt(iso.nearest_hospital_max_km, 1)} km` : '—'}</td>
+        <td class="num">${exp.hydropower_mw_tagged ? fmt(exp.hydropower_mw_tagged, 1) : '—'}</td>
+        <td class="wrap-cell"><span class="band">${esc([brNames ? `Bridges: ${brNames}` : '', stNames ? `Settlements: ${stNames}` : ''].filter(Boolean).join(' · ') || '—')}</span></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div>`;
+  } else {
+    const riskRank = { high: 3, moderate: 2, low: 1, none: 0 };
+    const distRows = (ei.districts || []).slice().sort((a, b) => {
+      const d = (riskRank[b.district_isolation_risk] ?? 0) - (riskRank[a.district_isolation_risk] ?? 0);
+      if (d !== 0) return d;
+      return (b.unique_settlements_potentially_isolated || 0) - (a.unique_settlements_potentially_isolated || 0);
+    });
+
+    tblHtml = `<div class="tbl-scroll"><table><thead><tr>
+      <th scope="col">District</th><th scope="col">Province</th><th scope="col">Isolation Risk</th>
+      <th scope="col">Corridors (High)</th><th scope="col">Bridges (Vehicular)</th><th scope="col">Isolated / Corridor Settlements</th>
+      <th scope="col">Nearest Hosp (med/max)</th><th scope="col">Health (Hosp)</th><th scope="col">Hydro MW</th>
+    </tr></thead><tbody>
+    ${distRows.map(d => {
+      const rCls = d.district_isolation_risk === 'high' ? 'h-vhigh' : d.district_isolation_risk === 'moderate' ? 'h-mod' : d.district_isolation_risk === 'low' ? 'h-low' : 'h-na';
+      return `<tr tabindex="0" data-dist="${esc(d.name)}">
+        <td><b>${esc(tDistrict(d.name, S.districtsMeta))}</b></td>
+        <td>${esc(tProvince(d.prov, S.districtsMeta))}</td>
+        <td><span class="hbadge ${rCls}">${esc(d.district_isolation_risk)}</span></td>
+        <td class="num">${fmt(d.n_routed_corridors)} <span class="band">(${fmt(d.n_high_disruption_corridors)})</span></td>
+        <td class="num">${fmt(d.unique_bridges_at_crossings)} <span class="band">(${fmt(d.unique_vehicular_bridges_at_crossings)})</span></td>
+        <td class="num"><b>${fmt(d.unique_settlements_potentially_isolated)}</b> / ${fmt(d.unique_settlements_in_1km_corridors)}</td>
+        <td class="num">${d.nearest_hospital_km != null ? `${fmt(d.nearest_hospital_km, 1)} / ${fmt(d.nearest_hospital_max_km, 1)} km` : '—'}</td>
+        <td class="num">${fmt(d.unique_health_facilities_in_corridors)} (${fmt(d.unique_hospitals_in_corridors)})</td>
+        <td class="num">${d.hydropower_mw_exposed ? fmt(d.hydropower_mw_exposed, 1) : '—'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div>`;
+  }
+
+  return `
+    <section class="v2-section">
+      <div class="v2-section-head">
+        <h4><span>⛓ ${esc(t('isoSectionTitle'))}</span> ${badgeDataClass('static_assessment')}</h4>
+        <div class="seg-toggle" role="group" aria-label="Toggle corridor vs district isolation view">
+          <button type="button" class="seg-btn${view === 'lakes' ? ' on' : ''}" data-iso-view="lakes">${esc(t('isoTabLakes'))}</button>
+          <button type="button" class="seg-btn${view === 'districts' ? ' on' : ''}" data-iso-view="districts">${esc(t('isoTabDistricts'))}</button>
+        </div>
+      </div>
+
+      <div class="corridor-disclaimer">
+        <span class="hbadge h-mod">${esc(t('isoCorridorBadge'))}</span>
+        <div class="muted field-gap">${esc(unc.osm_completeness_caveat || ei.methodology_notice || '')}</div>
+      </div>
+
+      <div class="mini-kpis">
+        <div class="mini-kpi"><div class="mini-kpi-lbl">Routed Corridors</div><div class="mini-kpi-val">${fmt(sum.n_routed_lakes_analyzed)}</div></div>
+        <div class="mini-kpi"><div class="mini-kpi-lbl">High Disruption Corridors</div><div class="mini-kpi-val text-bad">${fmt(sum.corridor_disruption_risk_counts && sum.corridor_disruption_risk_counts.high)}</div></div>
+        <div class="mini-kpi"><div class="mini-kpi-lbl">High-Isolation Districts</div><div class="mini-kpi-val text-bad">${fmt(sum.district_isolation_risk_counts && sum.district_isolation_risk_counts.high)} / 77</div></div>
+        <div class="mini-kpi"><div class="mini-kpi-lbl">Settlements Potentially Isolated</div><div class="mini-kpi-val">${fmt(sum.total_unique_settlements_potentially_isolated)}</div></div>
+        <div class="mini-kpi"><div class="mini-kpi-lbl">Crossing Bridges (OSM)</div><div class="mini-kpi-val">${fmt(sum.total_unique_bridges_at_crossings)}</div></div>
+        <div class="mini-kpi"><div class="mini-kpi-lbl">Tagged Hydropower</div><div class="mini-kpi-val">${fmt(sum.total_unique_hydropower_mw_in_corridors, 1)} MW</div></div>
+      </div>
+
+      ${tblHtml}
+    </section>`;
+}
+
+function renderTshoRolpaPilotSection(trp) {
+  if (!trp) return '';
+  const isNe = getLang() === 'ne';
+  const lid = trp.lake_identification || {};
+  const inv = trp.traya_inventory_parameters || {};
+  const pub = trp.published_peer_reviewed_benchmarks || {};
+  const bathy = pub.bathymetry_and_geometry || {};
+  const eng = pub.engineering_mitigation_2000 || {};
+  const reqs = trp.pre_simulation_2d_requirements || {};
+  const cps = Array.isArray(trp.valley_checkpoints) ? trp.valley_checkpoints : [];
+  const scns = Array.isArray(trp.breach_scenario_framework) ? trp.breach_scenario_framework : [];
+  const volRange = Array.isArray(bathy.surveyed_volume_Mm3_range) ? bathy.surveyed_volume_Mm3_range : [];
+
+  return `
+    <section class="v2-section">
+      <div class="v2-section-head">
+        <h4><span>🏔 ${esc(t('pilotTitle'))}</span> <span class="dc-badge dc-static">${esc(t('pilotBadge'))}</span></h4>
+        <div class="btn-row">
+          <button type="button" class="btn sm pri" data-open-lake="${esc(lid.matched_inventory_id || 'GL_27.86029_86.47725')}">${esc(t('pilotFlyLake'))}</button>
+          <a class="btn sm" href="${esc(TSHO_ROLPA_PLAN_URL)}" target="_blank" rel="noopener noreferrer">${esc(t('pilotStudyPlanLink'))}</a>
+        </div>
+      </div>
+
+      <div class="pilot-card">
+        <div class="badge-row">
+          <span class="hbadge h-vhigh">Hazard: ${esc(tTier(inv.hazard_published || 'very high'))}</span>
+          <span class="hbadge h-info">Target Solvers: ${esc((trp.target_solvers || ['LISFLOOD-FP', 'BASEMENT']).join(' · '))}</span>
+          <span class="hbadge h-mod">Ice-Cored Moraine · SLA ${fmt(inv.sla_max_angle_deg, 1)}°</span>
+          <span class="band">${esc(lid.river_basin || 'Rolwaling Khola → Tama Koshi → Sun Koshi')}</span>
+        </div>
+        <p class="muted field-gap">${esc(trp.status_note || '')}</p>
+
+        <div class="pilot-grid">
+          <div class="pilot-box">
+            <h5>Published Rolwaling Bathymetry &amp; Parameters</h5>
+            <div class="kv">
+              <span>Elevation / Area</span><b>${fmt(lid.elevation_m, 0)} m · ${fmt(inv.area_km2, 2)} km²</b>
+              <span>Surveyed Volume (Yamada/ICIMOD)</span><b>${volRange.length === 2 ? `${fmt(volRange[0], 1)}–${fmt(volRange[1], 1)} Mm³` : '76.6–85.9 Mm³'}</b>
+              <span>Surveyed Max / Mean Depth</span><b>${fmt(bathy.surveyed_max_depth_m, 0)} / ${fmt(bathy.surveyed_mean_depth_m, 1)} m</b>
+              <span>TRĀYA PFV (Fujita 2013)</span><b>${fmt(inv.pfv_Mm3, 2)} Mm³ (Hp ${fmt(inv.hp_m, 1)} m)</b>
+              <span>Veh Median Qp (95% CI)</span><b>${fmt(inv.veh_qp_median_m3s, 0)} m³/s</b>
+            </div>
+            <p class="band field-gap">${esc((bathy.comparison_with_traya_empirical_scaling && bathy.comparison_with_traya_empirical_scaling.volume_bias_note) || '')}</p>
+          </div>
+
+          <div class="pilot-box">
+            <h5>2000 Engineering Spillway Lowering History</h5>
+            <div class="kv">
+              <span>Intervention</span><b>${esc(eng.intervention || '3.0 m open gated spillway')}</b>
+              <span>Completed</span><b>${fmt(eng.completion_year, 0)}</b>
+              <span>Agencies</span><b>${esc(eng.implementing_agencies || 'Nepal DHM / WECS')}</b>
+            </div>
+            <p class="muted field-gap">${esc(eng.residual_risk_note || '')}</p>
+          </div>
+
+          <div class="pilot-box">
+            <h5>2D Hydrodynamic Prerequisites (Pre-Simulation)</h5>
+            <ul class="trig-list">
+              ${(reqs.required_inputs_for_lisflood_basement || []).slice(0, 4).map(item => `<li>${esc(item)}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+
+        <h5 class="field-gap">4-Tier Breach Scenario Framework (Pre-Simulation Boundary Hydrographs)</h5>
+        <div class="tbl-scroll"><table><thead><tr>
+          <th scope="col">Scenario</th><th scope="col">Breach Fraction</th><th scope="col">Approx Depth</th>
+          <th scope="col">TRĀYA Qp (m³/s)</th><th scope="col">Published Analog</th><th scope="col">2D Solver Role</th>
+        </tr></thead><tbody>
+        ${scns.map(sc => `<tr>
+          <td><b>${esc(sc.scenario_id)}</b><div class="band">${esc(sc.label)}</div></td>
+          <td class="num">${fmt((sc.breach_fraction || 0) * 100, 0)}%</td>
+          <td class="num">${fmt(sc.approx_breach_depth_m, 1)} m</td>
+          <td class="num"><b>${fmt(sc.traya_empirical_qp_m3s, 0)}</b></td>
+          <td class="wrap-cell">${esc(sc.published_analog || '')}</td>
+          <td class="wrap-cell">${esc(sc.target_2d_solver_role || '')}</td>
+        </tr>`).join('')}
+        </tbody></table></div>
+
+        <h5 class="field-gap">Rolwaling–Tama Koshi Downstream Checkpoints (${fmt(cps.length)} benchmarks — click row to fly)</h5>
+        <div class="tbl-scroll"><table><thead><tr>
+          <th scope="col">Checkpoint</th><th scope="col">District</th><th scope="col">River km</th>
+          <th scope="col">Elev m</th><th scope="col">Arrival (10 / 5 / 2 m/s)</th><th scope="col">Operational Significance</th>
+        </tr></thead><tbody>
+        ${cps.map(cp => {
+          const arr = cp.first_order_arrival_bracket || {};
+          const cpName = isNe && cp.name_ne ? `${cp.name_ne} (${cp.name})` : cp.name;
+          return `<tr tabindex="0" data-fly="${safeFlyAttr(cp.lat, cp.lon, 12)}">
+            <td><b>${esc(cpName)}</b>${cp.capacity_mw ? ` <span class="hbadge h-high">${fmt(cp.capacity_mw, 0)} MW</span>` : ''}</td>
+            <td>${esc(tDistrict(cp.district, S.districtsMeta))}</td>
+            <td class="num"><b>${fmt(cp.along_river_km, 1)}</b></td>
+            <td class="num">${cp.approx_elev_m != null ? fmt(cp.approx_elev_m, 0) : '—'}</td>
+            <td class="num mono">${fmt(arr.fast_10ms_min, 0)}m / <b>${fmt(arr.observed_ref_5ms_min, 0)}m</b> / ${fmt(arr.slow_2ms_min, 0)}m</td>
+            <td class="wrap-cell">${esc(cp.significance || '')}</td>
+          </tr>`;
+        }).join('')}
+        </tbody></table></div>
+      </div>
+    </section>`;
+}
+
+function tabCascades() {
+  const isNe = getLang() === 'ne';
+  const cas = S.cascades;
+  if (!cas) return '<p class="muted">Cascade dataset unavailable.</p>';
+
+  const sum = cas.summary || {};
+  const chains = Object.values(cas.chains || {});
+  const edges = Array.isArray(cas.edges) ? cas.edges : [];
+  const activeScenarios = Array.isArray(cas.active_scenarios) ? cas.active_scenarios : [];
+  const headSevCls = badgeCascadeSeverity(sum.highest_severity, 'h-low');
+
+  return `
+    <section class="v2-section">
+      <div class="v2-section-head">
+        <h4><span>⇶ ${esc(t('cascGraphTitle'))}</span> <span class="hbadge ${headSevCls}">${esc(sum.highest_severity || 'baseline')}</span></h4>
+        <div class="badge-row">
+          <span class="band mono">${fmt(sum.n_chains)} chains · ${fmt(sum.n_nodes)} nodes · ${fmt(sum.n_edges)} rules (${fmt(sum.n_active_edges)} active / ${fmt(sum.n_active_dynamic_edges)} dynamic)</span>
+        </div>
+      </div>
+
+      <div class="callout info"><b>Epistemic Scope:</b> ${esc(cas.epistemic_notice || '')}</div>
+
+      <div class="cascade-layout">
+        <div>
+          <div class="cascade-svg-wrap">
+            ${buildCascadeGraphSvg(cas)}
+          </div>
+          <div class="cascade-legend">
+            <span><span class="cg-leg-swatch"></span><b>${esc(t('evObserved'))}</b> (solid)</span>
+            <span><span class="cg-leg-swatch fc"></span><b>${esc(t('evForecast'))}</b> (dashed)</span>
+            <span><span class="cg-leg-swatch mod"></span><b>${esc(t('evModelled'))}</b> (dotted)</span>
+            <span class="band">${esc(t('cascClickHint'))}</span>
+          </div>
+        </div>
+        <div id="cascadeInspector" class="cascade-inspector" aria-live="polite">
+          ${renderCascadeInspector(cas)}
+        </div>
+      </div>
+
+      <h4 class="field-gap">${esc(t('cascScenariosTitle'))}</h4>
+      <div class="cascade-cards">
+        ${chains.map(ch => {
+          const chEdges = edges.filter(e => e.chain_id === ch.chain_id);
+          const scn = activeScenarios.find(x => x.chain_id === ch.chain_id);
+          const dists = Array.isArray(ch.affected_districts) ? ch.affected_districts : [];
+          const ttl = isNe ? (ch.title_ne || ch.title_en) : ch.title_en;
+          const sumTxt = isNe ? (ch.summary_ne || ch.summary_en) : ch.summary_en;
+          const cardCls = cascadeCardSeverityClass(ch.severity);
+          const cardBadgeCls = badgeCascadeSeverity(ch.severity, 'h-na');
+          return `<article class="cascade-card ${cardCls}">
+            <h5>${esc(ttl)}</h5>
+            <div class="badge-row">
+              <span class="hbadge ${cardBadgeCls}">${esc(ch.severity || 'baseline')}</span>
+              ${ch.dynamic_active ? '<span class="hbadge h-high">Dynamic Trigger Active</span>' : '<span class="hbadge h-info">No Dynamic Trigger Today</span>'}
+              ${scn && scn.confidence ? `<span class="band">Conf: <b>${esc(scn.confidence)}</b></span>` : ''}
+            </div>
+            <p class="muted">${esc(sumTxt)}</p>
+            <div class="badge-row">
+              ${chEdges.map(ed => `<button type="button" class="district-chip" data-cg-edge="${esc(ed.rule_id)}"><code>${esc(ed.rule_id)}</code> · ${esc(tEvidenceType(ed.evidence_type))}${ed.active ? ' ●' : ''}</button>`).join('')}
+            </div>
+            ${dists.length ? `<div class="district-chips">
+              ${dists.slice(0, 8).map(d => `<button type="button" class="district-chip" data-open-dist="${esc(d)}">${esc(tDistrict(d, S.districtsMeta))}</button>`).join('')}
+              ${dists.length > 8 ? `<span class="band">+${fmt(dists.length - 8)} more</span>` : ''}
+            </div>` : ''}
+          </article>`;
+        }).join('')}
+      </div>
+    </section>
+
+    ${renderExposureIsolationSection(S.exposureIso)}
+    ${renderTshoRolpaPilotSection(S.tshoRolpaPilot)}`;
 }
 
 function tabLive() {
@@ -3338,7 +4325,15 @@ function tabLive() {
   const faults = S.faults || [];
   const m6 = S.eqHist || [];
 
-  return `${gfHead}
+  return `${renderOfficialAuthorityPanel({ compact: false })}
+    <div class="screening-lane-head">
+      <b>${esc(t('openDataSeismicHead'))}</b>
+      <div class="badge-row">
+        <span class="badge-screening">${esc(t('screeningBadge'))}</span>
+        ${badgeDataClass(S.liveStatus === 'live' ? 'live_observation' : 'cached')}
+      </div>
+    </div>
+    ${gfHead}
     ${faultNote ? `<div class="callout info"><b>Fault map scope:</b> ${esc(faultNote)}</div>` : ''}
     <div class="split-2">
       <div>
@@ -3366,13 +4361,69 @@ function tabLive() {
     </div>`;
 }
 
+function renderSentinel1SarSection(eo) {
+  if (!eo || !Array.isArray(eo.lakes)) return '';
+  const prov = eo.provenance || {};
+  const dClass = prov.data_class || 'cached';
+
+  return `
+    <section class="sar-panel" aria-label="${esc(t('sarSectionTitle'))}">
+      <div class="official-lane-head">
+        <div class="official-lane-title">
+          <span>📡 ${esc(t('sarSectionTitle'))}</span>
+          <span class="dc-badge dc-hist">${esc(t('sarRadarBadge'))}</span>
+        </div>
+        <div class="badge-row">
+          ${badgeDataClass(dClass)}
+          <span class="band mono">S1 SAR: ${fmt(eo.n_s1_covered)}/${fmt(eo.n_priority_lakes)} · S2: ${fmt(eo.n_s2_covered)}/${fmt(eo.n_priority_lakes)} · ${esc(fmtNpt(prov.retrieved_at_utc, false))}</span>
+        </div>
+      </div>
+      <p class="muted">C-band Synthetic Aperture Radar (Sentinel-1 GRD, Interferometric Wide Swath <code>VV/VH</code>) penetrates June–September monsoon cloud cover day and night over Tsho Rolpa and Nepal's high-hazard moraine-dammed lakes. ${esc(prov.notes || '')}</p>
+      <div class="tbl-scroll field-gap"><table><thead><tr>
+        <th scope="col">Priority Lake</th><th scope="col">District</th><th scope="col">Elev m</th>
+        <th scope="col">SAR Mode &amp; Pol</th><th scope="col">Platform &amp; Orbit</th><th scope="col">Latest S1 Pass (NPT)</th>
+        <th scope="col">Latest S2 Optical</th><th scope="col">Copernicus Links</th>
+      </tr></thead><tbody>
+      ${eo.lakes.map(lk => {
+        const s1 = lk.sentinel1;
+        const s2 = lk.sentinel2;
+        const fallbackS1Url = safeUrl(
+          `https://browser.dataspace.copernicus.eu/?zoom=14&lat=${Number(lk.lat).toFixed(4)}&lng=${Number(lk.lon).toFixed(4)}&datasetId=S1_AWS_IW_VVVH`,
+          ['browser.dataspace.copernicus.eu']
+        );
+        const s1Url = safeUrl(s1 && s1.copernicus_browser_url, ['browser.dataspace.copernicus.eu']) || fallbackS1Url;
+        const s2Url = safeUrl(s2 && s2.copernicus_browser_url, ['browser.dataspace.copernicus.eu']);
+        const pols = (s1 && Array.isArray(s1.polarizations) && s1.polarizations.length) ? s1.polarizations : ['VV', 'VH'];
+        const modeTxt = (s1 && s1.instrument_mode) ? s1.instrument_mode : 'IW';
+        return `<tr tabindex="0" data-lake="${esc(lk.id)}" class="${lk.id === S.sel && S.selKind === 'lake' ? 'sel' : ''}">
+          <td><b>${esc(lk.name)}</b></td>
+          <td>${esc(tDistrict(lk.district, S.districtsMeta))}</td>
+          <td class="num">${fmt(lk.z_m, 0)}</td>
+          <td><span class="orbit-chip">${esc(modeTxt)}</span> ${pols.map(p => `<span class="pol-chip">${esc(p)}</span>`).join('')}</td>
+          <td>${s1
+            ? `<span class="mono">${esc(s1.platform || 'sentinel-1')}</span>${s1.orbit_state ? ` <span class="orbit-chip">${esc(s1.orbit_state)}</span>` : ''}`
+            : `<span class="val-unknown">${esc(t('sarAwaitingLive'))}</span>`}</td>
+          <td class="mono">${s1 && s1.datetime ? esc(fmtNpt(s1.datetime)) : `<span class="val-unknown">—</span>`}</td>
+          <td class="mono">${s2 && s2.datetime ? `${esc(fmtNpt(s2.datetime, false))} (${s2.cloud_cover_pct != null ? fmt(s2.cloud_cover_pct, 1) + '%' : '—'})` : '—'}</td>
+          <td>
+            ${s1Url ? `<a href="${esc(s1Url)}" target="_blank" rel="noopener noreferrer">${esc(t('sarOpenBrowser'))}</a>` : '—'}
+            ${s2Url ? ` · <a href="${esc(s2Url)}" target="_blank" rel="noopener noreferrer">${esc(t('sarOpenS2'))}</a>` : ''}
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody></table></div>
+    </section>`;
+}
+
 function tabSat() {
   const pls = (S.hydromet && S.hydromet.priority_lakes) || [];
   const hmLakeTs = S.hydromet && (S.hydromet.priority_lakes_updated_utc || S.hydromet.updated_utc);
-  return `<div class="muted field-gap">
+  return `${renderSentinel1SarSection(S.eoSar)}
+  <h4>Cryosphere 0 °C Freezing-Level &amp; Optical Sentinel-2 L2A Watch (20 Priority Lakes)</h4>
+  <div class="muted field-gap">
     Weekly <b>Copernicus Sentinel-2 L2A</b> cloud-screened STAC scenes (Element84 Earth Search) and <b>Open-Meteo 0 °C freezing-level altitude</b> across Nepal's 16 priority (PFV ≥ 10 Mm³) and documented ice-cored lakes (thermal/precip updated ${esc(fmtNpt(hmLakeTs))}). Click any row to fly to the lake.
   </div>
-  <table><thead><tr>
+  <div class="tbl-scroll field-gap"><table><thead><tr>
     <th scope="col">Lake</th><th scope="col">District</th><th scope="col">Elev m</th><th scope="col">PFV Mm³</th>
     <th scope="col">0 °C max</th><th scope="col">Thermal margin</th><th scope="col">12d rain / snow</th>
     <th scope="col">Clearest S2</th><th scope="col">Cloud %</th><th scope="col">Copernicus</th>
@@ -3393,7 +4444,7 @@ function tabSat() {
       <td>${cUrl ? `<a href="${esc(cUrl)}" target="_blank" rel="noopener noreferrer">open ↗</a>` : '—'}</td>
     </tr>`;
   }).join('')}
-  </tbody></table>`;
+  </tbody></table></div>`;
 }
 
 function tabGlof() {
@@ -3638,7 +4689,13 @@ function tabMethods() {
       <li><b>Glacial Lake Outburst Floods (GLOFs):</b> D8 mass-movement routing (${fmt(th.avalanche_slope && th.avalanche_slope[0])}–${fmt(th.avalanche_slope && th.avalanche_slope[1])}° ice avalanche; &gt;${fmt(th.rockfall_slope)}° rockfall), Fujita et al. (2013) steep lakefront depression (&gt;${fmt(th.sla_threshold)}°) and PFV, Veh et al. (2020) Bayesian depth &amp; Walder–O'Connor peak discharge Qp, and 120 km HydroRIVERS corridor routing using perpendicular point-to-segment exposure matching (≤1,000 m).</li>
       <li><b>Fluvial Floods (Copernicus GloFAS):</b> 30-day reanalysis + 30-day ensemble river discharge across Nepal's 10 major river outlets, graded against ${fmt(yrs)}-year Gumbel EV1 return periods (Q₂, Q₅, Q₂₀), with explicit grid-snap quality flags.</li>
       <li><b>Rainfall &amp; Coseismic Landslides:</b> Rolling 24 h, 72 h, and 168 h liquid rainfall (<code>rain_sum</code>) across 24 physiographic zones screened against Dahal &amp; Hasegawa (2008) (I = 73.90 D⁻⁰·⁷⁹), paired with mapped landslide records and live USGS Nowicki Jessee (2018) ground-failure alerts.</li>
-      <li><b>Cryosphere &amp; Satellite EO:</b> Weekly Copernicus Sentinel-2 L2A cloud-screened STAC scenes (Element84 Earth Search), 10 m EOX cloudless mosaic, daily NASA EOSDIS GIBS overlays, and 0 °C freezing-level isotherm tracking.</li>
+      <li><b>Cryosphere &amp; Satellite EO:</b> Weekly Copernicus Sentinel-1 SAR (C-band IW VV/VH all-weather monsoon radar) and Sentinel-2 L2A cloud-screened STAC scenes (Element84 Earth Search), 10 m EOX cloudless mosaic, daily NASA EOSDIS GIBS overlays, and 0 °C freezing-level isotherm tracking.</li>
+      <li><b>Governance, Cascades &amp; 2D Pilot Documentation:</b>
+        <a href="${esc(DATA_LICENSES_URL)}" target="_blank" rel="noopener noreferrer">DATA_LICENSES.md ↗</a> ·
+        <a href="${esc(MODEL_CARDS_URL)}" target="_blank" rel="noopener noreferrer">docs/MODEL_CARDS.md ↗</a> ·
+        <a href="${esc(INST_SPEC_URL)}" target="_blank" rel="noopener noreferrer">docs/INSTITUTIONAL_INTEGRATION_SPEC.md ↗</a> ·
+        <a href="${esc(TSHO_ROLPA_PLAN_URL)}" target="_blank" rel="noopener noreferrer">docs/TSHO_ROLPA_2D_STUDY_PLAN.md ↗</a>
+      </li>
     </ul>
 
     <div class="callout bad">
@@ -3685,6 +4742,153 @@ function closeEmergencyModal() {
   if (lastFocusedBeforeModal && typeof lastFocusedBeforeModal.focus === 'function') {
     lastFocusedBeforeModal.focus();
   }
+}
+
+async function openSourceHealthModal() {
+  const modal = document.getElementById('sourceHealthModal');
+  const body = document.getElementById('sourceHealthBody');
+  if (!modal || !body) return;
+  lastFocusedBeforeModal = document.activeElement;
+  modal.hidden = false;
+  const closeBtn = document.getElementById('btnCloseSourceHealth');
+  if (closeBtn) closeBtn.focus();
+
+  if (!S.manifest || !S.kpiBaseline) {
+    body.innerHTML = `<p class="loading">${esc(t('shLoading'))}</p>`;
+    try {
+      await Promise.all([ensureData('manifest'), ensureData('kpi_baseline')]);
+      updateSourceHealthButton();
+    } catch (err) {
+      if (!modal.hidden) {
+        body.innerHTML = `<div class="callout bad">Failed to load provenance manifest (${esc(err.message)}).</div>`;
+      }
+      return;
+    }
+  }
+  if (!modal.hidden) renderSourceHealthModal();
+}
+
+function closeSourceHealthModal() {
+  const modal = document.getElementById('sourceHealthModal');
+  if (!modal || modal.hidden) return;
+  modal.hidden = true;
+  if (lastFocusedBeforeModal && typeof lastFocusedBeforeModal.focus === 'function') {
+    lastFocusedBeforeModal.focus();
+  }
+}
+
+function renderSourceHealthModal() {
+  const body = document.getElementById('sourceHealthBody');
+  if (!body) return;
+  const mf = S.manifest;
+  const kpi = S.kpiBaseline;
+  if (!mf) {
+    body.innerHTML = '<p class="muted">Provenance manifest unavailable.</p>';
+    return;
+  }
+
+  const health = mf.overall_health || 'degraded';
+  const hCls = health === 'healthy' ? 'sla-available' : health === 'stale' ? 'sla-unavailable' : 'sla-stale';
+  const sc = mf.source_counts || {};
+  const checksumCount = mf.input_checksums ? Object.keys(mf.input_checksums).length : 0;
+
+  const ffDet = (kpi && kpi.feed_freshness_detail) || {};
+  const provDet = (kpi && kpi.provenance_completeness_detail) || {};
+  const lsMat = (kpi && kpi.landslide_maturity) || {};
+  const expCov = (kpi && kpi.exposure_coverage) || {};
+  const natTot = (expCov && expCov.national_totals) || {};
+  const casSum = (kpi && kpi.cascade_summary) || {};
+  const sources = Array.isArray(mf.sources) ? mf.sources : [];
+
+  body.innerHTML = `
+    <div class="sh-meta-bar">
+      <div>
+        <b>${esc(t('shOverallHealth'))}:</b>
+        <span class="sla-badge ${hCls}">${esc(tHealthState(health))}</span>
+        <span class="band mono"> · Build ${esc(fmtNpt(mf.build_utc))} · SHA <code>${esc(mf.git_sha || '—')}</code> · ${fmt(checksumCount)} SHA-256 checksums</span>
+      </div>
+      <div class="sh-meta-links">
+        <a href="${esc(DATA_LICENSES_URL)}" target="_blank" rel="noopener noreferrer">${esc(t('shViewLicenses'))}</a>
+        <a href="${esc(MODEL_CARDS_URL)}" target="_blank" rel="noopener noreferrer">MODEL_CARDS.md ↗</a>
+        <a href="${esc(INST_SPEC_URL)}" target="_blank" rel="noopener noreferrer">INSTITUTIONAL_SPEC.md ↗</a>
+      </div>
+    </div>
+
+    ${kpi ? `
+    <div class="scorecard-grid" role="region" aria-label="KPI Baseline Scorecard">
+      <div class="score-card">
+        <span class="score-lbl">${esc(t('shKpiFreshness'))}</span>
+        <span class="score-val">${fmt(kpi.feed_freshness_pct, 1)}%</span>
+        <span class="score-sub">${fmt(ffDet.within_sla)}/${fmt(ffDet.active_sources)} active within SLA · ${fmt(ffDet.stale_or_expired)} stale · ${fmt(ffDet.unavailable_active)} unavailable · ${fmt(ffDet.institutional_stubs)} MOU stubs</span>
+      </div>
+      <div class="score-card">
+        <span class="score-lbl">${esc(t('shKpiProvenance'))}</span>
+        <span class="score-val text-ok">${fmt(kpi.provenance_completeness_pct, 1)}%</span>
+        <span class="score-sub">${fmt(provDet.complete_datasets)}/${fmt(provDet.total_datasets)} datasets carry source, NPT timestamp, licence &amp; 6-state class</span>
+      </div>
+      <div class="score-card">
+        <span class="score-lbl">${esc(t('shKpiLandslide'))}</span>
+        <span class="score-val">${fmt(lsMat.dated_events)} <span class="band">dated</span> / ${fmt(lsMat.undated_scars)} <span class="band">scars</span></span>
+        <span class="score-sub">${fmt(lsMat.dated_share_pct, 1)}% dated · ${fmt(lsMat.duplicate_candidates)} review queue · null-not-0: ${lsMat.null_casualty_integrity_ok ? '<b class="text-ok">Verified ✓</b>' : '<b class="text-bad">Check</b>'}</span>
+      </div>
+      <div class="score-card">
+        <span class="score-lbl">${esc(t('shKpiExposure'))}</span>
+        <span class="score-val">${fmt(expCov.n_provinces_covered)}P · ${fmt(expCov.n_districts_covered)}D</span>
+        <span class="score-sub">${fmt(natTot.total_unique_bridges_at_crossings)} bridges · ${fmt(natTot.total_unique_settlements_potentially_isolated)} isolated · ${fmt(casSum.active_pathways)}/${fmt(casSum.total_pathways)} cascades</span>
+      </div>
+    </div>` : ''}
+
+    <div class="muted field-gap">
+      Operational feeds: <b>${fmt(sc.available)}/${fmt(sc.operational)}</b> available · <b>${fmt(sc.fallback_used)}</b> fallback cached · <b>${fmt(sc.institutional_stubs)}</b> institutional MOU stubs (direct DHM/NEMRC/DoR pending formal agreements).
+    </div>
+
+    <div class="tbl-scroll field-gap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">${esc(t('shColDataset'))}</th>
+            <th scope="col">${esc(t('shColClass'))}</th>
+            <th scope="col">${esc(t('shColUpdated'))}</th>
+            <th scope="col">${esc(t('shColSla'))}</th>
+            <th scope="col">${esc(t('shColFallback'))}</th>
+            <th scope="col">${esc(t('shColRecords'))}</th>
+            <th scope="col">${esc(t('shColLicense'))}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sources.map(src => {
+            const isMou = Boolean(src.requires_institutional_agreement);
+            return `<tr>
+              <td class="wrap-cell">
+                <b>${esc(src.source)}</b>
+                ${isMou ? `<span class="fb-tag is-mou">${esc(t('shMouRequired'))}</span>` : ''}
+                <div class="band mono">${esc(src.dataset)}</div>
+                ${src.notes ? `<div class="band">${esc(src.notes)}</div>` : ''}
+              </td>
+              <td>${badgeDataClass(src.data_class)}</td>
+              <td class="mono">
+                ${esc(fmtNpt(src.retrieved_at_utc))}
+                ${src.observation_time_utc ? `<div class="band">obs: ${esc(fmtNpt(src.observation_time_utc, false))}</div>` : ''}
+              </td>
+              <td>
+                ${badgeSla(src.status)}
+                <div class="band mono">SLA ${fmt(src.sla_hours)}h</div>
+              </td>
+              <td>
+                ${src.fallback_used
+                  ? `<span class="fb-tag is-fallback">${esc(t('shFallback'))}</span>`
+                  : `<span class="fb-tag">${esc(t('shDirect'))}</span>`}
+              </td>
+              <td class="num">${fmt(src.record_count)}</td>
+              <td class="wrap-cell">
+                <span class="band">${esc(src.license_ref)}</span>
+                <div><a href="${esc(DATA_LICENSES_URL)}" target="_blank" rel="noopener noreferrer">${esc(t('shViewLicenses'))}</a></div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 function switchTab(tabKey, focusTab = false) {
@@ -3887,6 +5091,7 @@ function wireEvents() {
     updateStatusPills();
     drawRiversLayer();
     if (document.getElementById('lNodes').checked) drawNodesLayer();
+    if (document.getElementById('lLandslides').checked) drawLandslidesLayer();
     if (S.selKind === 'district' && S.selDistrict) renderDistrictByName(S.selDistrict);
     else if (S.selKind === 'river' && S.sel) selectRiver(S.sel, false);
     else if (S.selKind === 'node' && S.sel) selectNode(S.sel, false);
@@ -3896,6 +5101,8 @@ function wireEvents() {
     } else {
       renderDefaultInspector();
     }
+    const shModal = document.getElementById('sourceHealthModal');
+    if (shModal && !shModal.hidden) renderSourceHealthModal();
     renderTab();
   });
 
@@ -3903,6 +5110,13 @@ function wireEvents() {
   document.getElementById('btnRefreshLive').addEventListener('click', refreshAllLiveInBrowser);
   document.getElementById('btnStaleRefresh').addEventListener('click', refreshAllLiveInBrowser);
   document.getElementById('btnCloseToast').addEventListener('click', () => setToast(''));
+
+  // Source Health & Provenance modal
+  document.getElementById('btnSourceHealth').addEventListener('click', openSourceHealthModal);
+  document.getElementById('btnCloseSourceHealth').addEventListener('click', closeSourceHealthModal);
+  document.getElementById('sourceHealthModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeSourceHealthModal();
+  });
 
   // Emergency drawer modal
   document.getElementById('btnEmergency').addEventListener('click', openEmergencyModal);
@@ -3926,6 +5140,7 @@ function wireEvents() {
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       closeEmergencyModal();
+      closeSourceHealthModal();
       map.closePopup();
       return;
     }
@@ -3980,8 +5195,22 @@ async function init() {
     document.getElementById('k-lakes').textContent = fmt(S.lakes.length);
     document.getElementById('k-prio').textContent = `${fmt(S.lakes.filter(f => f.properties.priority).length)} priority`;
     document.getElementById('k-sat').textContent = `${fmt(((hydrometWeekly && hydrometWeekly.priority_lakes) || []).length)} lakes`;
+    const eoSum = summary && summary.eo_sar;
+    if (eoSum) {
+      document.getElementById('k-sat-sub').textContent = `S1 SAR (${fmt(eoSum.n_s1_covered)}/${fmt(eoSum.n_priority_lakes)}) · S2 (${fmt(eoSum.n_s2_covered)}/${fmt(eoSum.n_priority_lakes)}) · 0 °C`;
+    }
     const nFaults = (summary && summary.active_faults && summary.active_faults.n_traces) || 70;
-    document.getElementById('k-eq-sub').textContent = `USGS Nepal · ${fmt(nFaults)} GEM surface traces`;
+    document.getElementById('k-eq-sub').textContent = `NDRRMA BIPAD · USGS + ${fmt(nFaults)} GEM traces`;
+    const cascSum = summary && summary.cascades;
+    const isoSum = summary && summary.exposure_isolation;
+    const kCasc = document.getElementById('k-casc');
+    const kCascSub = document.getElementById('k-casc-sub');
+    if (kCasc && cascSum) {
+      kCasc.textContent = `${fmt(cascSum.n_chains)} chains · ${fmt(cascSum.n_active_scenarios)} watch`;
+    }
+    if (kCascSub && isoSum) {
+      kCascSub.textContent = `${fmt(isoSum.total_unique_settlements_potentially_isolated)} isolated · ${fmt(isoSum.total_unique_bridges_at_crossings)} bridges`;
+    }
 
     populateProvinceAndDistrictDropdowns();
     updateStatusPills();

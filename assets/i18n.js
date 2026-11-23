@@ -22,9 +22,10 @@ const DICT = {
     suiteHub: 'Observatory Hub',
     suiteNeuro: 'Open Neuro & AI Suite ↗',
     brandScope: '7-Day Risk Observatory',
-    brandSub: 'Open-Data Multi-Hazard Screening — GLOFs · River Floods · Earthquakes · Landslides · Satellite EO',
+    brandSub: 'Open-Data Multi-Hazard Screening — GLOFs · River Floods · Earthquakes · Landslides · Cascades · SAR EO',
     btnRefreshLive: '↻ Refresh live',
     btnRefreshing: '↻ Refreshing…',
+    btnSourceHealth: 'Source Health',
     btnKpi: 'KPIs',
     btnTheme: '◐ Theme',
     btnLang: 'नेपाली',
@@ -44,10 +45,12 @@ const DICT = {
     kpiRiversSub: 'Ensemble discharge & Gumbel return levels',
     kpiLsLbl: 'Landslide Rainfall Watch',
     kpiLsSub: 'Dahal & Hasegawa (2008) liquid-rain I–D',
-    kpiEqLbl: 'Seismic & Active Faults',
-    kpiEqSub: 'USGS Nepal live feed + GEM surface traces',
-    kpiSatLbl: 'Cryosphere & Sentinel-2 EO',
-    kpiSatSub: '0 °C freezing level & cloud-free STAC scenes',
+    kpiEqLbl: 'Official Alerts & Seismic',
+    kpiEqSub: 'NDRRMA BIPAD · USGS live + GEM traces',
+    kpiSatLbl: 'Cryosphere & SAR / S2 EO',
+    kpiSatSub: '0 °C isotherm · Sentinel-1 SAR & S2',
+    kpiCascLbl: 'Cascades & Isolation',
+    kpiCascSub: '1 km corridor · hospital access · Tsho Rolpa',
     kpiValLbl: 'Validation & 7-Day Cycle',
     kpiValSub: 'Screening tool — not an operational warning',
 
@@ -86,7 +89,7 @@ const DICT = {
     lRivers: 'GloFAS river stations (10)',
     lFaults: 'Active faults — surface (GEM)',
     lNodes: 'Rainfall–landslide nodes (24)',
-    lLandslides: 'Catalogued landslides (OSM)',
+    lLandslides: 'Landslide inventory (5-type)',
     lEq: 'Live earthquakes (USGS)',
     lMmi: 'ShakeMap MMI contours',
     lEqHist: 'Historical earthquakes M≥6',
@@ -121,8 +124,9 @@ const DICT = {
     tabWatch: 'Glacial Lakes',
     tabFloods: 'Flood Watch (GloFAS)',
     tabLandslides: 'Landslide Watch',
-    tabLive: 'Earthquakes & Faults',
-    tabSat: 'Satellite & Cryosphere',
+    tabCascades: 'Cascades & Isolation',
+    tabLive: 'Official Alerts & Quakes',
+    tabSat: 'Satellite & SAR EO',
     tabGlof: 'Recorded GLOFs',
     tabCharts: 'Analytics',
     tabValid: 'Validation & Limits',
@@ -172,8 +176,92 @@ const DICT = {
     liveFresh: 'Live',
     liveStale: 'Stale',
     liveOffline: 'Offline',
+    unknownVal: 'Unknown',
     coolrZeroNotice: 'Data coverage notice: 0 NASA COOLR records are currently loaded (upstream endpoint returned no records or was unavailable). Displaying {n} undated OpenStreetMap mapped landslide scars only — absence of markers does not imply low landslide hazard.',
     gridSnapNotice: '{n} of 10 cached GloFAS stations have off-mainstem grid-cell warnings (flagged ⚠ below) until the next live 3×3 mainstem snap runs. Always verify with DHM real-time river gauges (hydrology.gov.np).',
+
+    /* TRĀYA 2.0 Source Health & 6-State Provenance */
+    shTitle: 'Source Health, Provenance & KPI Scorecard',
+    shSubtitle: '6-state epistemic data classification, SLA freshness (NPT), fallback transparency & dataset licences',
+    shLoading: 'Loading provenance manifest & KPI baseline…',
+    shOverallHealth: 'Overall Feed Health',
+    shHealthHealthy: 'Healthy',
+    shHealthDegraded: 'Degraded',
+    shHealthStale: 'Stale',
+    shKpiFreshness: 'Feed Freshness SLA',
+    shKpiProvenance: 'Provenance Completeness',
+    shKpiLandslide: 'Landslide Maturity',
+    shKpiExposure: 'Exposure & Cascade Coverage',
+    shColDataset: 'Source / Dataset',
+    shColClass: 'Data Class',
+    shColUpdated: 'Updated (NPT)',
+    shColSla: 'SLA Status',
+    shColFallback: 'Delivery',
+    shColRecords: 'Records',
+    shColLicense: 'Licence',
+    shDirect: 'Direct',
+    shFallback: 'Fallback',
+    shMouRequired: 'MOU Required',
+    shViewLicenses: 'DATA_LICENSES.md ↗',
+    dcLiveObservation: 'Live Observation',
+    dcForecast: 'Forecast',
+    dcHistorical: 'Historical',
+    dcStaticAssessment: 'Static Assessment',
+    dcCached: 'Cached',
+    dcUnavailable: 'Unavailable',
+    slaAvailable: 'Available',
+    slaStale: 'Stale',
+    slaUnavailable: 'Unavailable',
+
+    /* Official Nepal Authority Feeds (BIPAD · DHM · NSC) */
+    officialLaneTitle: 'Official Nepal Authority Feeds (NDRRMA BIPAD · DHM · NSC)',
+    officialBadge: 'Official Observation',
+    modelledBadge: 'Modelled Forecast',
+    screeningBadge: 'Screening Layer',
+    officialNotice: 'Official Government of Nepal NDRRMA/BIPAD records — kept structurally separate from modelled forecasts.',
+    bipadAwaitingRefresh: 'BIPAD snapshot awaiting next live refresh',
+    bipadAlertsHead: 'Verified BIPAD Alerts',
+    bipadRiversHead: 'DHM River Gauges (via BIPAD)',
+    bipadRainHead: 'DHM Rain Gauges (via BIPAD)',
+    bipadEqHead: 'NSC / NEMRC Earthquakes (via BIPAD)',
+    bipadLsHead: 'Verified BIPAD Landslide Incidents',
+    openDataSeismicHead: 'Open-Data Seismic & Fault Screening (USGS FDSN · GEM Surface Faults)',
+
+    /* Cascades & Isolation Tab */
+    cascGraphTitle: 'Interpretable Directed Multi-Hazard Cascade Graph',
+    cascInspectorTitle: 'Rule & Evidence Inspector',
+    cascClickHint: 'Click any node or rule edge in the graph to inspect its physical trigger rule, evidence tier, confidence, and uncertainty bounds.',
+    cascScenariosTitle: 'Multi-Hazard Cascade Pathways & Active Scenarios',
+    evObserved: 'Observed',
+    evForecast: 'Forecast',
+    evModelled: 'Modelled',
+    isoSectionTitle: 'Downstream Exposure & Road-Cut Hospital Isolation',
+    isoCorridorBadge: '1 km screening search corridor — NOT a hydrodynamic inundation boundary',
+    isoTabLakes: 'Priority Lakes & Corridors',
+    isoTabDistricts: 'All 77 Districts (Isolation)',
+    pilotTitle: 'Tsho Rolpa 2D Hydrodynamic Pilot Benchmark (TRAYA-011)',
+    pilotBadge: 'Pre-simulation reference framework — NOT yet a 2D inundation map',
+    pilotStudyPlanLink: 'Read Tsho Rolpa 2D Study Plan (docs/TSHO_ROLPA_2D_STUDY_PLAN.md) ↗',
+    pilotFlyLake: 'Inspect Tsho Rolpa on map',
+
+    /* Upgraded 5-Type Landslides Tab */
+    lsTypeAll: 'All Records',
+    lsTypeEvent: 'Dated Events (BIPAD/COOLR)',
+    lsTypeScar: 'Undated OSM Scars',
+    lsTypeSuscept: 'Susceptibility Zones',
+    lsTypeReport: 'Hazard Reports',
+    lsTypeCoseismic: 'Coseismic Failures',
+    lsDownloadGeojson: '⬇ Download landslide_inventory.geojson (RFC 7946)',
+    lsReviewQueueTitle: 'Duplicate-Candidate Review Queue',
+    lsReviewPolicyBadge: 'Flag-Only · Never Auto-Merged',
+    lsReviewEmpty: '0 duplicate candidates currently flagged across {n} scanned records. Cross-source candidate pairs (<= 1.5 km & <= 3 d dated, or <= 0.35 km undated cross-source) populate automatically for human review when live BIPAD/COOLR feeds load.',
+
+    /* Sentinel-1 SAR Section */
+    sarSectionTitle: 'Sentinel-1 SAR — All-Weather Monsoon Radar (Priority Glacial Lakes)',
+    sarRadarBadge: 'All-Weather Cloud-Penetrating C-Band SAR (IW VV/VH)',
+    sarAwaitingLive: 'Awaiting live Sentinel-1 STAC refresh',
+    sarOpenBrowser: 'Open S1 SAR ↗',
+    sarOpenS2: 'Open S2 ↗',
   },
 
   ne: {
@@ -182,9 +270,10 @@ const DICT = {
     suiteHub: 'अवलोकन केन्द्र',
     suiteNeuro: 'ओपन न्यूरो र एआई सुइट ↗',
     brandScope: '७-दिने जोखिम अवलोकन',
-    brandSub: 'खुला तथ्याङ्क बहु-प्रकोप मूल्याङ्कन — हिमताल विस्फोट · नदी बाढी · भूकम्प · पहिरो · भू-उपग्रह',
+    brandSub: 'खुला तथ्याङ्क बहु-प्रकोप मूल्याङ्कन — हिमताल · नदी बाढी · भूकम्प · पहिरो · शृङ्खला · SAR EO',
     btnRefreshLive: '↻ प्रत्यक्ष ताजा',
     btnRefreshing: '↻ ताजा हुँदै…',
+    btnSourceHealth: 'स्रोत स्वास्थ्य',
     btnKpi: 'सारांश',
     btnTheme: '◐ थिम',
     btnLang: 'English',
@@ -204,10 +293,12 @@ const DICT = {
     kpiRiversSub: '१० प्रमुख नदी प्रवाह र पुनरावृत्ति स्तर',
     kpiLsLbl: 'वर्षा–पहिरो निगरानी',
     kpiLsSub: 'दाहाल र हासेगावा (२००८) वर्षा सीमा',
-    kpiEqLbl: 'भूकम्प र सक्रिय फल्ट',
-    kpiEqSub: 'USGS प्रत्यक्ष भूकम्प + GEM सतही फल्ट',
-    kpiSatLbl: 'हिममण्डल र सेन्टिनेल-२ EO',
-    kpiSatSub: '० °C हिउँरेखा र बादलरहित भू-उपग्रह चित्र',
+    kpiEqLbl: 'आधिकारिक सूचना र भूकम्प',
+    kpiEqSub: 'NDRRMA BIPAD · USGS प्रत्यक्ष + GEM फल्ट',
+    kpiSatLbl: 'हिममण्डल र SAR / S2 EO',
+    kpiSatSub: '० °C हिउँरेखा · सेन्टिनेल-१ SAR र S2',
+    kpiCascLbl: 'शृङ्खला र विच्छेद',
+    kpiCascSub: '१ कि.मि. करिडोर · अस्पताल पहुँच · छो रोल्पा',
     kpiValLbl: 'प्रमाणीकरण र ७-दिने चक्र',
     kpiValSub: 'प्रारम्भिक मूल्याङ्कन — आधिकारिक चेतावनी होइन',
 
@@ -246,7 +337,7 @@ const DICT = {
     lRivers: 'GloFAS नदी केन्द्रहरू (१०)',
     lFaults: 'सक्रिय सतही फल्टहरू (GEM)',
     lNodes: 'वर्षा–पहिरो केन्द्रहरू (२४)',
-    lLandslides: 'अभिलेखित पहिरोहरू (OSM)',
+    lLandslides: 'पहिरो सूची (५-प्रकार)',
     lEq: 'प्रत्यक्ष भूकम्प (USGS)',
     lMmi: 'ShakeMap कम्पन रेखाहरू',
     lEqHist: 'ऐतिहासिक भूकम्प M≥६',
@@ -281,8 +372,9 @@ const DICT = {
     tabWatch: 'हिमतालहरू',
     tabFloods: 'नदी बाढी (GloFAS)',
     tabLandslides: 'पहिरो निगरानी',
-    tabLive: 'भूकम्प र फल्ट',
-    tabSat: 'भू-उपग्रह र हिममण्डल',
+    tabCascades: 'शृङ्खला र विच्छेद',
+    tabLive: 'आधिकारिक सूचना र भूकम्प',
+    tabSat: 'भू-उपग्रह र SAR EO',
     tabGlof: 'ऐतिहासिक विस्फोट',
     tabCharts: 'विश्लेषण',
     tabValid: 'प्रमाणीकरण र सीमा',
@@ -332,8 +424,92 @@ const DICT = {
     liveFresh: 'प्रत्यक्ष',
     liveStale: 'पुरानो',
     liveOffline: 'अफलाइन',
+    unknownVal: 'अज्ञात',
     coolrZeroNotice: 'तथ्याङ्क दायरा सूचना: हाल ० NASA COOLR अभिलेख लोड भएको छ (माथिल्लो स्रोत उपलब्ध नभएको)। मिति नखुलेका {n} OpenStreetMap पहिरो चिन्ह मात्र देखाइएको छ — चिन्ह नहुनुको अर्थ पहिरो जोखिम कम हुनु होइन।',
     gridSnapNotice: '१० मध्ये {n} साप्ताहिक GloFAS केन्द्रहरूमा ग्रिड-स्न्याप चेतावनी (⚠) छ। प्रत्यक्ष ताजा गरेपछि वा नेपाल DHM (hydrology.gov.np) बाट आधिकारिक नदी सतह अनिवार्य जाँच गर्नुहोस्।',
+
+    /* TRĀYA 2.0 स्रोत स्वास्थ्य र ६-अवस्था तथ्याङ्क वर्गीकरण */
+    shTitle: 'स्रोत स्वास्थ्य, तथ्याङ्क उत्पत्ति र KPI स्कोरकार्ड',
+    shSubtitle: '६-अवस्था तथ्याङ्क वर्गीकरण, SLA ताजापन (NPT), विकल्प पारदर्शिता र इजाजतपत्र विवरण',
+    shLoading: 'तथ्याङ्क उत्पत्ति म्यानिफेस्ट र KPI आधार लोड हुँदै…',
+    shOverallHealth: 'समग्र फिड स्वास्थ्य',
+    shHealthHealthy: 'स्वस्थ',
+    shHealthDegraded: 'आंशिक',
+    shHealthStale: 'पुरानो',
+    shKpiFreshness: 'फिड ताजापन (SLA)',
+    shKpiProvenance: 'उत्पत्ति पूर्णता',
+    shKpiLandslide: 'पहिरो सूची परिपक्वता',
+    shKpiExposure: 'जोखिम र शृङ्खला दायरा',
+    shColDataset: 'स्रोत / डेटासेट',
+    shColClass: 'तथ्याङ्क वर्ग',
+    shColUpdated: 'अद्यावधिक (NPT)',
+    shColSla: 'SLA स्थिति',
+    shColFallback: 'प्राप्ति विधि',
+    shColRecords: 'अभिलेख',
+    shColLicense: 'इजाजतपत्र',
+    shDirect: 'प्रत्यक्ष',
+    shFallback: 'वैकल्पिक',
+    shMouRequired: 'सम्झौता आवश्यक',
+    shViewLicenses: 'DATA_LICENSES.md ↗',
+    dcLiveObservation: 'प्रत्यक्ष अवलोकन',
+    dcForecast: 'पूर्वानुमान',
+    dcHistorical: 'ऐतिहासिक',
+    dcStaticAssessment: 'स्थिर मूल्याङ्कन',
+    dcCached: 'सञ्चित (Cached)',
+    dcUnavailable: 'अनुपलब्ध',
+    slaAvailable: 'उपलब्ध',
+    slaStale: 'पुरानो',
+    slaUnavailable: 'अनुपलब्ध',
+
+    /* आधिकारिक नेपाल सरकारी निकाय फिड (BIPAD · DHM · NSC) */
+    officialLaneTitle: 'आधिकारिक नेपाल सरकारी निकाय फिड (NDRRMA BIPAD · DHM · NSC)',
+    officialBadge: 'आधिकारिक अवलोकन',
+    modelledBadge: 'मोडेल पूर्वानुमान',
+    screeningBadge: 'प्रारम्भिक मूल्याङ्कन तह',
+    officialNotice: 'नेपाल सरकार NDRRMA/BIPAD का आधिकारिक अभिलेख — मोडेल पूर्वानुमानबाट संरचनात्मक रूपमा अलग राखिएको।',
+    bipadAwaitingRefresh: 'BIPAD स्न्यापसट आगामी प्रत्यक्ष अद्यावधिकको प्रतीक्षामा छ',
+    bipadAlertsHead: 'प्रमाणित BIPAD चेतावनीहरू',
+    bipadRiversHead: 'DHM नदी गेज (BIPAD मार्फत)',
+    bipadRainHead: 'DHM वर्षा गेज (BIPAD मार्फत)',
+    bipadEqHead: 'राष्ट्रिय भूकम्प मापन केन्द्र (NSC) भूकम्प',
+    bipadLsHead: 'प्रमाणित BIPAD पहिरो घटनाहरू',
+    openDataSeismicHead: 'खुला तथ्याङ्क भूकम्प र फल्ट मूल्याङ्कन (USGS FDSN · GEM सतही फल्ट)',
+
+    /* शृङ्खला र विच्छेद ट्याब */
+    cascGraphTitle: 'व्याख्यात्मक बहु-प्रकोप शृङ्खला ग्राफ',
+    cascInspectorTitle: 'नियम र प्रमाण निरीक्षक',
+    cascClickHint: 'कुनै पनि बिन्दु वा नियम रेखामा क्लिक गरी भौतिक नियम, प्रमाण स्तर, विश्वास तह र अनिश्चितता हेर्नुहोस्।',
+    cascScenariosTitle: 'बहु-प्रकोप शृङ्खला मार्ग र सक्रिय परिदृश्यहरू',
+    evObserved: 'अवलोकित',
+    evForecast: 'पूर्वानुमानित',
+    evModelled: 'मोडेल गरिएको',
+    isoSectionTitle: 'तल्लो तटीय जोखिम र सडक-विच्छेद अस्पताल पहुँच अवरोध',
+    isoCorridorBadge: '१ कि.मि. प्रारम्भिक खोज करिडोर — २डी जलप्रवाह डुबान सीमा होइन',
+    isoTabLakes: 'प्राथमिकता हिमताल करिडोर',
+    isoTabDistricts: 'सबै ७७ जिल्ला (विच्छेद जोखिम)',
+    pilotTitle: 'छो रोल्पा २डी जलप्रवाह पाइलट बेन्चमार्क (TRAYA-011)',
+    pilotBadge: 'पूर्व-सिमुलेसन सन्दर्भ ढाँचा — २डी डुबान नक्सा अझै होइन',
+    pilotStudyPlanLink: 'छो रोल्पा २डी अध्ययन योजना पढ्नुहोस् (docs/TSHO_ROLPA_2D_STUDY_PLAN.md) ↗',
+    pilotFlyLake: 'नक्सामा छो रोल्पा हेर्नुहोस्',
+
+    /* ५-प्रकार पहिरो सूची र दोहोरो समीक्षा पङ्क्ति */
+    lsTypeAll: 'सबै अभिलेख',
+    lsTypeEvent: 'मिति प्रमाणित घटना (BIPAD/COOLR)',
+    lsTypeScar: 'मिति नखुलेका OSM दाग',
+    lsTypeSuscept: 'संवेदनशीलता क्षेत्र',
+    lsTypeReport: 'प्रकोप प्रतिवेदन',
+    lsTypeCoseismic: 'भूकम्प-प्रेरित पहिरो',
+    lsDownloadGeojson: '⬇ landslide_inventory.geojson डाउनलोड (RFC 7946)',
+    lsReviewQueueTitle: 'सम्भावित दोहोरो अभिलेख समीक्षा पङ्क्ति',
+    lsReviewPolicyBadge: 'झण्डा मात्र · स्वतः विलय नगरिने',
+    lsReviewEmpty: 'जाँच गरिएका {n} अभिलेखमध्ये हाल ० सम्भावित दोहोरो जोडी भेटिएका छन्। प्रत्यक्ष BIPAD/COOLR अभिलेख लोड भएपछि मिल्दाजुल्दा जोडी मानवीय समीक्षाका लागि यहाँ सूचीबद्ध हुन्छन्।',
+
+    /* सेन्टिनेल-१ SAR मनसुन राडार */
+    sarSectionTitle: 'सेन्टिनेल-१ SAR — सबै मौसमको मनसुन राडार (प्राथमिकता हिमताल)',
+    sarRadarBadge: 'बादल छेड्ने सबै-मौसम C-ब्यान्ड SAR राडार (IW VV/VH)',
+    sarAwaitingLive: 'प्रत्यक्ष सेन्टिनेल-१ STAC अद्यावधिकको प्रतीक्षामा',
+    sarOpenBrowser: 'S1 SAR खोल्नुहोस् ↗',
+    sarOpenS2: 'S2 खोल्नुहोस् ↗',
   },
 };
 
@@ -403,6 +579,47 @@ export function tDhLevel(lv) {
   if (k === 'watch') return t('dhWatch');
   if (k === 'elevated') return t('dhElevated');
   return t('dhLow');
+}
+
+export function tDataClass(dc) {
+  const k = String(dc || 'unavailable').toLowerCase();
+  if (k === 'live_observation') return t('dcLiveObservation');
+  if (k === 'forecast') return t('dcForecast');
+  if (k === 'historical') return t('dcHistorical');
+  if (k === 'static_assessment') return t('dcStaticAssessment');
+  if (k === 'cached') return t('dcCached');
+  return t('dcUnavailable');
+}
+
+export function tSlaStatus(st) {
+  const k = String(st || 'unavailable').toLowerCase();
+  if (k === 'available') return t('slaAvailable');
+  if (k === 'stale') return t('slaStale');
+  return t('slaUnavailable');
+}
+
+export function tHealthState(h) {
+  const k = String(h || 'degraded').toLowerCase();
+  if (k === 'healthy') return t('shHealthHealthy');
+  if (k === 'stale') return t('shHealthStale');
+  return t('shHealthDegraded');
+}
+
+export function tEvidenceType(ev) {
+  const k = String(ev || 'modelled_static').toLowerCase();
+  if (k === 'observed') return t('evObserved');
+  if (k === 'forecast') return t('evForecast');
+  return t('evModelled');
+}
+
+export function tLandslideType(ft) {
+  const k = String(ft || '').toLowerCase();
+  if (k === 'landslide_event') return t('lsTypeEvent');
+  if (k === 'landslide_scar') return t('lsTypeScar');
+  if (k === 'susceptibility_zone') return t('lsTypeSuscept');
+  if (k === 'hazard_report') return t('lsTypeReport');
+  if (k === 'coseismic_failure') return t('lsTypeCoseismic');
+  return t('lsTypeAll');
 }
 
 export function tProvince(prov, districtsMeta) {

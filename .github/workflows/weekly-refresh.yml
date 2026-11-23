@@ -80,19 +80,16 @@ jobs:
             cache/landslides.json
             cache/stac_scenes.json
             cache/nepal_admin.json
+            cache/bipad_snapshot.json
+            cache/eo_sar.json
             index.html
             src/template.html
           )
-          EXISTING_PATHS=()
-          for path in "${CANDIDATE_PATHS[@]}"; do
-            if [ -e "$path" ]; then
-              EXISTING_PATHS+=("$path")
+          for f in "${CANDIDATE_PATHS[@]}"; do
+            if [ -e "$f" ]; then
+              git add -f -- "$f"
             fi
           done
-
-          if [ "${#EXISTING_PATHS[@]}" -gt 0 ]; then
-            git add -f -- "${EXISTING_PATHS[@]}"
-          fi
 
           if git diff --staged --quiet; then
             echo "No changes to commit."
@@ -114,6 +111,14 @@ jobs:
           cp index.html _site/
           cp -r assets vendor _site/
           cp data/*.json _site/data/
+          for gj in data/*.geojson; do
+            if [ -e "$gj" ]; then
+              cp "$gj" _site/data/
+            fi
+          done
+          if [ -d schemas ]; then
+            cp -r schemas _site/
+          fi
           touch _site/.nojekyll
 
       - name: Upload static site artifact

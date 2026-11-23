@@ -47,6 +47,14 @@ jobs:
           cp index.html _site/
           cp -r assets vendor _site/
           cp data/*.json _site/data/
+          for gj in data/*.geojson; do
+            if [ -e "$gj" ]; then
+              cp "$gj" _site/data/
+            fi
+          done
+          if [ -d schemas ]; then
+            cp -r schemas _site/
+          fi
           touch _site/.nojekyll
 
       - name: Configure GitHub Pages

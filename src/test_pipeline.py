@@ -13,9 +13,11 @@ Exit status is non-zero if any test fails.
 from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
+import json
 import math
 import os
 import sys
+import tempfile
 import warnings
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -29,10 +31,13 @@ except ImportError:
 
 import admin as AD
 import build as BD
+import cascades as CAS
 import config as C
 import exposure as EX
+import exposure_isolation as EI
 import hazard as HZ
 import hydromet as HM
+import landslides as LS
 import models_glof as MG
 import refresh_weekly as RW
 import routing as RT
@@ -40,6 +45,14 @@ import seismic as SZ
 import sensitivity as SN
 import terrain as TR
 import validate as VL
+from integrations import (
+    bipad as BIPAD,
+    copernicus as COP,
+    dhm as DHM,
+    nemrc as NEMRC,
+    provenance as PROV,
+    roads_authority as DOR,
+)
 
 FAILS: list[str] = []
 
@@ -683,7 +696,783 @@ def test_hydromet_hourly_and_rain_basis():
 
 
 # ---------------------------------------------------------------------------
-# 7. Full-mode scientific tests (requires numpy, scipy, pyreadr, lit/*.rds)
+# 7. TRĀYA 2.0 pure-stdlib unit tests (Provenance, BIPAD, Landslides,
+#    Road-Cut Hospital Isolation, Multi-Hazard Cascades & Sentinel-1 SAR)
+# ---------------------------------------------------------------------------
+def test_provenance_envelope_and_manifest():
+    """Verify 6-state ProvenanceEnvelope validation, SLA evaluation, manifest
+    health roll-up with institutional stubs, KPI baseline & Markdown summary."""
+    build_iso = "2026-11-23T12:00:00Z"
+    created = []
+    for dc in PROV.VALID_DATA_CLASSES:
+        env = PROV.make_envelope(
+            source="UnitTest Source",
+            dataset=f"ds_{dc}",
+            data_class=dc,
+            retrieved_at_utc=build_iso,
+            status="unavailable" if dc == "unavailable" else "available",
+            license_ref="CC-BY-4.0",
+            sla_hours=168,
+            record_count=0 if dc == "unavailable" else 5,
+        )
+        created.append(env)
+    check(
+        "ProvenanceEnvelope accepts all 6 canonical data_class states",
+        len(created) == 6 and {e["data_class"] for e in created} == set(PROV.VALID_DATA_CLASSES),
+        str(PROV.VALID_DATA_CLASSES),
+    )
+
+    rejected_dc = False
+    try:
+        PROV.make_envelope("S", "D", "bogus_class", build_iso, license_ref="MIT")
+    except ValueError:
+        rejected_dc = True
+    rejected_st = False
+    try:
+        PROV.make_envelope("S", "D", "cached", build_iso, status="broken", license_ref="MIT")
+    except ValueError:
+        rejected_st = True
+    check(
+        "ProvenanceEnvelope rejects invalid data_class and status values",
+        rejected_dc and rejected_st,
+        f"rejected_dc={rejected_dc}, rejected_st={rejected_st}",
+    )
+
+    # SLA evaluation: fresh vs expired forecast vs aged-past-SLA vs unavailable
+    ev_fresh = PROV.evaluate_envelope_sla(
+        {"status": "available", "data_class": "forecast", "retrieved_at_utc": "2026-11-23T06:00:00Z",
+         "valid_until_utc": "2026-11-26T00:00:00Z", "sla_hours": 168},
+        ref_utc=build_iso,
+    )
+    ev_expired = PROV.evaluate_envelope_sla(
+        {"status": "available", "data_class": "forecast", "retrieved_at_utc": "2026-11-20T06:00:00Z",
+         "valid_until_utc": "2026-11-22T23:59:59Z", "sla_hours": 168},
+        ref_utc=build_iso,
+    )
+    ev_aged = PROV.evaluate_envelope_sla(
+        {"status": "available", "data_class": "cached", "retrieved_at_utc": "2026-11-10T00:00:00Z",
+         "sla_hours": 168},
+        ref_utc=build_iso,
+    )
+    ev_unavail = PROV.evaluate_envelope_sla(
+        {"status": "unavailable", "data_class": "unavailable", "retrieved_at_utc": build_iso,
+         "sla_hours": 168},
+        ref_utc=build_iso,
+    )
+    check(
+        "evaluate_envelope_sla distinguishes fresh, expired forecast, stale SLA & unavailable",
+        ev_fresh["within_sla"] is True
+        and ev_fresh["effective_status"] == "available"
+        and ev_expired["within_sla"] is False
+        and ev_expired["effective_status"] == "stale"
+        and ev_expired["expired"] is True
+        and ev_aged["within_sla"] is False
+        and ev_aged["effective_status"] == "stale"
+        and ev_unavail["effective_status"] == "unavailable",
+        f"fresh={ev_fresh['effective_status']}, exp={ev_expired['effective_status']}, aged={ev_aged['effective_status']}",
+    )
+
+    # Manifest health ignores institutional stubs (DHM, NEMRC, DoR) when operational feeds are healthy
+    op_env = PROV.make_envelope(
+        source="Open-Meteo",
+        dataset="openmeteo_test",
+        data_class="forecast",
+        retrieved_at_utc=build_iso,
+        valid_until_utc="2026-11-27T23:59:59Z",
+        status="available",
+        fallback_used=False,
+        license_ref="CC-BY-4.0",
+        sla_hours=168,
+        record_count=24,
+    )
+    envelopes = [
+        op_env,
+        DHM.get_provenance(build_iso),
+        NEMRC.get_provenance(build_iso),
+        DOR.get_provenance(build_iso),
+    ]
+    with tempfile.TemporaryDirectory() as tmpd:
+        mf = PROV.build_manifest(tmpd, envelopes, build_iso, git_sha="deadbeef", write=False)
+        kpi = PROV.build_kpi_baseline(tmpd, mf, {"n_provinces": 7, "n_districts": 77}, None, None, None, write=False)
+        md = PROV.format_step_summary_markdown(mf, kpi)
+    check(
+        "build_manifest keeps overall_health='healthy' with 3 institutional stubs & formats step summary",
+        mf["overall_health"] == "healthy"
+        and mf["source_counts"]["operational"] == 1
+        and mf["source_counts"]["institutional_stubs"] == 3
+        and kpi["feed_freshness_pct"] == 100.0
+        and kpi["provenance_completeness_pct"] == 100.0
+        and "## Nepal TRĀYA 2.0" in md
+        and "openmeteo_test" in md,
+        f"health={mf['overall_health']}, stubs={mf['source_counts']['institutional_stubs']}, freshness={kpi['feed_freshness_pct']}%",
+    )
+
+
+def test_bipad_record_normalization():
+    """Verify BIPAD v1 parser preserves verified 0 vs null (NEVER coerces None -> 0),
+    filters empty river stations, and degrades gracefully offline without cache."""
+    verified_zero_raw = {
+        "id": 96552,
+        "title": "Landslide at Pachaljharana Rural Municipality-3",
+        "titleNe": "कर्णाली, कालिकोट, पचालझरना-३ मा पहिरो",
+        "incidentOn": "2026-11-19T00:00:00+05:45",
+        "reportedOn": "2026-11-20T10:33:04+05:45",
+        "point": {"type": "Point", "coordinates": [81.74506, 29.21559]},
+        "hazard": 17,
+        "verified": True,
+        "approved": True,
+        "loss": {
+            "id": 491281,
+            "peopleDeathCount": 0,
+            "peopleInjuredCount": 0,
+            "peopleMissingCount": None,
+            "familyAffectedCount": 0,
+            "estimatedLoss": None,
+        },
+        "source": "other",
+    }
+    null_loss_raw = {
+        "id": 96999,
+        "title": "Unverified slope slip report",
+        "incidentOn": "2026-11-20T06:00:00+05:45",
+        "point": {"type": "Point", "coordinates": [86.16, 27.74]},
+        "hazard": 17,
+        "verified": False,
+        "loss": None,
+    }
+    p_ver = BIPAD.parse_landslide_incident(verified_zero_raw)
+    p_null = BIPAD.parse_landslide_incident(null_loss_raw)
+    ok_bipad = (
+        p_ver["peopleDeathCount"] == 0
+        and p_ver["peopleInjuredCount"] == 0
+        and p_ver["peopleMissingCount"] is None
+        and p_ver["estimatedLoss"] is None
+        and p_ver["verified"] is True
+        and p_ver["date"] == "2026-11-19"
+        and p_null["loss"] is None
+        and p_null["peopleDeathCount"] is None
+        and p_null["peopleInjuredCount"] is None
+        and p_null["estimatedLoss"] is None
+    )
+    check(
+        "BIPAD incident normalization preserves verified 0 and strict None (never None -> 0)",
+        ok_bipad,
+        f"ver=(death={p_ver['peopleDeathCount']}, missing={p_ver['peopleMissingCount']}), null=(death={p_null['peopleDeathCount']})",
+    )
+
+    # Cross-check with landslides.parse_bipad_incident: verified=True keeps 0; verified=False maps 0 -> None
+    ls_ver = LS.parse_bipad_incident(verified_zero_raw)
+    ls_unver_zero = LS.parse_bipad_incident({
+        **verified_zero_raw,
+        "id": 96553,
+        "verified": False,
+    })
+    check(
+        "landslides.parse_bipad_incident allows 0 only when verified=True and enforces null when verified=False",
+        ls_ver is not None
+        and ls_ver["feature_type"] == "landslide_event"
+        and ls_ver["fatalities"] == 0
+        and ls_ver["injuries"] == 0
+        and ls_ver["households_affected"] == 0
+        and ls_unver_zero is not None
+        and ls_unver_zero["feature_type"] == "hazard_report"
+        and ls_unver_zero["fatalities"] is None
+        and ls_unver_zero["injuries"] is None
+        and ls_unver_zero["households_affected"] is None
+        and not LS.validate_landslide_record(ls_ver)
+        and not LS.validate_landslide_record(ls_unver_zero),
+        f"ver_ft={ls_ver['feature_type']}/fat={ls_ver['fatalities']}, unver_ft={ls_unver_zero['feature_type']}/fat={ls_unver_zero['fatalities']}",
+    )
+
+    # Verify landslides.py live BIPAD endpoint requests expand=loss and shares cache/bipad_snapshot.json
+    check(
+        "landslides.py requests BIPAD expand=loss and aligns CACHE_BIPAD with bipad_snapshot.json",
+        "expand=loss" in LS.BIPAD_LANDSLIDE_URL
+        and os.path.normpath(LS.CACHE_BIPAD) == os.path.normpath(BIPAD.CACHE_BIPAD),
+        f"url={LS.BIPAD_LANDSLIDE_URL}, cache={os.path.basename(LS.CACHE_BIPAD)}",
+    )
+
+    # Verify build_landslides exact-ID dedup keeps verified 0 casualty detail over unexpanded int-FK loss
+    unexp_raw = dict(verified_zero_raw, loss=491281)
+    ls_unexp = LS.parse_bipad_incident(unexp_raw)
+    with tempfile.TemporaryDirectory() as tmpd:
+        res_dedup = LS.build_landslides(
+            offline=True,
+            out_path=os.path.join(tmpd, "landslides.json"),
+            review_queue_path=os.path.join(tmpd, "rq.json"),
+            geojson_path=os.path.join(tmpd, "ls.geojson"),
+            extra_records=[ls_unexp, ls_ver],
+        )
+    rec_96552 = next((e for e in res_dedup["events"] if e["id"] == "bipad_96552"), None)
+    check(
+        "build_landslides preserves expanded verified-zero casualty fields over unexpanded FK duplicate",
+        ls_unexp is not None
+        and ls_unexp["fatalities"] is None
+        and rec_96552 is not None
+        and rec_96552["fatalities"] == 0
+        and rec_96552["injuries"] == 0
+        and rec_96552["households_affected"] == 0,
+        f"rec_96552={(rec_96552 or {}).get('fatalities')}/{(rec_96552 or {}).get('injuries')}/{(rec_96552 or {}).get('households_affected')}",
+    )
+
+    # River station filtering (null waterLevel + null waterLevelOn dropped) & rain intervals
+    empty_riv = BIPAD.parse_river({"id": 1, "title": "Empty", "waterLevel": None, "waterLevelOn": None})
+    valid_riv = BIPAD.parse_river({
+        "id": 2, "title": "Lohare Khola", "basin": "Karnali",
+        "waterLevel": 2.478, "warningLevel": 4.0, "dangerLevel": None,
+        "waterLevelOn": "2026-11-22T08:50:00+05:45", "status": "BELOW WARNING LEVEL",
+        "point": {"type": "Point", "coordinates": [81.5842, 28.7845]},
+    })
+    rain_rec = BIPAD.parse_rain({
+        "id": 3, "title": "Dumkauli", "measuredOn": "2026-11-23T06:00:00+05:45",
+        "point": {"type": "Point", "coordinates": [84.2285, 27.6807]},
+        "averages": [
+            {"interval": 1, "value": 2.5, "status": {"warning": False, "danger": False}},
+            {"interval": 24, "value": 42.0, "status": {"warning": False, "danger": False}},
+        ],
+    })
+    with tempfile.TemporaryDirectory() as tmpd:
+        missing_snap = BIPAD.fetch_bipad_snapshot(
+            offline=True, cache_path=os.path.join(tmpd, "missing_bipad.json")
+        )
+    check(
+        "BIPAD filters null river telemetry, parses rain intervals & degrades cleanly offline",
+        empty_riv is None
+        and valid_riv is not None
+        and valid_riv["waterLevel"] == 2.478
+        and valid_riv["dangerLevel"] is None
+        and rain_rec["rain_1h_mm"] == 2.5
+        and rain_rec["rain_24h_mm"] == 42.0
+        and rain_rec["rain_6h_mm"] is None
+        and missing_snap["provenance"]["data_class"] == "unavailable"
+        and missing_snap["provenance"]["status"] == "unavailable",
+        f"riv_ok={valid_riv is not None}, rain24={rain_rec['rain_24h_mm']}, offline={missing_snap['provenance']['data_class']}",
+    )
+
+
+def test_landslides_5type_and_duplicate_matcher():
+    """Verify strict 5-type landslide partitioning, null-not-0 schema validation,
+    and flag-only duplicate-candidate matching (never auto-merged)."""
+    raw_five = [
+        # 1. landslide_event (dated verified BIPAD)
+        {
+            "id": "bipad_1001", "provider_id": "bipad_ndrrma", "source": "BIPAD Portal (NDRRMA)",
+            "title": "Sindhupalchok highway landslide", "event_date_utc": "2026-08-12T04:00:00Z",
+            "lon": 85.8800, "lat": 27.8000, "district": "Sindhupalchok", "province": "Bagmati Province",
+            "trigger": "heavy rainfall", "fatalities": 0, "injuries": 2, "verified": True,
+            "evidence_url": "https://bipadportal.gov.np/api/v1/incident/1001/",
+        },
+        # 2. landslide_scar (undated OSM — must force null date & null casualties even if 0 passed!)
+        {
+            "id": "osm_n5001", "provider_id": "osm_overpass", "source": "OpenStreetMap",
+            "title": "Mapped scar near Araniko Highway", "event_date_utc": "2020-01-01",
+            "lon": 85.8810, "lat": 27.8005, "district": "Sindhupalchok", "province": "Bagmati Province",
+            "fatalities": 0, "injuries": 0, "verified": True,
+            "evidence_url": "https://www.openstreetmap.org/node/5001",
+        },
+        # 3. susceptibility_zone
+        {
+            "id": "static_2001", "provider_id": "traya_static", "source": "TRĀYA Susceptibility Screening",
+            "title": "Steep colluvial corridor", "event_date_utc": None,
+            "lon": 86.1600, "lat": 27.7400, "district": "Dolakha", "province": "Bagmati Province",
+            "trigger": "terrain susceptibility", "fatalities": None, "verified": False,
+        },
+        # 4. hazard_report (unverified community report — 0 must coerce to None)
+        {
+            "id": "comm_3001", "provider_id": "community_field", "source": "Community Report",
+            "title": "Unverified slope crack report", "event_date_utc": "2026-08-13",
+            "lon": 84.4200, "lat": 28.2200, "district": "Lamjung", "province": "Gandaki Province",
+            "trigger": "rainfall", "fatalities": 0, "verified": False,
+        },
+        # 5. coseismic_failure (earthquake-triggered)
+        {
+            "id": "usgs_4001", "provider_id": "usgs_ground_failure", "source": "USGS Ground Failure",
+            "title": "Coseismic rockslide cluster", "event_date_utc": "2026-08-15T10:00:00Z",
+            "lon": 82.1200, "lat": 28.9500, "district": "Jajarkot", "province": "Karnali Province",
+            "trigger": "earthquake shaking", "fatalities": 3, "verified": False,
+        },
+    ]
+    normed = [LS.normalize_record(r) for r in raw_five]
+    types_got = [r["feature_type"] for r in normed if r is not None]
+    val_errs = [LS.validate_landslide_record(r) for r in normed if r is not None]
+    scar = normed[1]
+    report = normed[3]
+    check(
+        "5-type landslide partitioning enforces schema & null-not-0 invariants",
+        types_got == [
+            "landslide_event",
+            "landslide_scar",
+            "susceptibility_zone",
+            "hazard_report",
+            "coseismic_failure",
+        ]
+        and all(len(e) == 0 for e in val_errs)
+        and scar["event_date_utc"] is None
+        and scar["date_precision"] == "unknown"
+        and scar["fatalities"] is None
+        and scar["verified"] is False
+        and report["fatalities"] is None,
+        f"types={types_got}",
+    )
+
+    # Confirm validator rejects illegal unverified fatalities=0
+    bad_rec = dict(report, fatalities=0)
+    bad_errs = LS.validate_landslide_record(bad_rec)
+    check(
+        "validate_landslide_record rejects unverified record with fatalities=0",
+        any("null-not-0" in e for e in bad_errs),
+        str(bad_errs),
+    )
+
+    # Duplicate-candidate matcher tests
+    coolr_near = LS.normalize_record({
+        "id": "coolr_9001", "provider_id": "nasa_coolr", "source": "NASA COOLR",
+        "title": "Sindhupalchok Araniko highway landslide", "event_date_utc": "2026-08-13T08:00:00Z",
+        "lon": 85.8830, "lat": 27.8020, "district": "Sindhupalchok", "province": "Bagmati Province",
+        "trigger": "rainfall", "fatalities": 1, "verified": False,
+    })
+    coolr_old = LS.normalize_record({
+        "id": "coolr_9002", "provider_id": "nasa_coolr", "source": "NASA COOLR",
+        "title": "Old historical slide same slope", "event_date_utc": "2026-07-01T00:00:00Z",
+        "lon": 85.8805, "lat": 27.8002, "district": "Sindhupalchok", "province": "Bagmati Province",
+        "trigger": "rainfall", "verified": False,
+    })
+    osm_twin = LS.normalize_record({
+        "id": "osm_n5002", "provider_id": "osm_overpass", "source": "OpenStreetMap",
+        "title": "Adjacent OSM scar", "event_date_utc": None,
+        "lon": 85.8812, "lat": 27.8006, "district": "Sindhupalchok", "province": "Bagmati Province",
+    })
+    cands = LS.find_duplicate_candidates(
+        [normed[0], scar, coolr_near, coolr_old, osm_twin],
+        max_km=1.5,
+        max_days=3,
+        undated_cross_source_max_km=0.35,
+    )
+    pair_reasons = {(c["record_a_id"], c["record_b_id"]): c["reason"] for c in cands}
+    ok_dups = (
+        pair_reasons.get(("bipad_1001", "coolr_9001")) == "dated_cross_source_spatiotemporal_proximity"
+        and pair_reasons.get(("bipad_1001", "osm_n5001")) == "undated_cross_source_spatial_proximity"
+        and ("bipad_1001", "coolr_9002") not in pair_reasons
+        and ("osm_n5001", "osm_n5002") not in pair_reasons
+        and all(c["review_status"] == "pending_review" and c["auto_merged"] is False for c in cands)
+    )
+    check(
+        "duplicate-candidate matcher flags dated & undated cross-source pairs without auto-merging",
+        ok_dups,
+        f"{len(cands)} candidates: {sorted(pair_reasons.items())}",
+    )
+
+
+def test_road_cut_hospital_isolation():
+    """Verify road-cut hospital isolation detects downstream_bridge_cut and
+    cross_river_bridge_cut, filters veterinary clinics & bridge=no, deduplicates
+    hydropower MW within 250 m, and preserves published GLOF hazard classes."""
+    with tempfile.TemporaryDirectory() as tmpd:
+        ov_dir = os.path.join(tmpd, "overpass")
+        os.makedirs(ov_dir, exist_ok=True)
+        lakes_fc = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [86.10, 27.80]},
+                    "properties": {
+                        "id": "GL_SYNTH_1",
+                        "name": "Synthetic Alpine Lake",
+                        "district": "Dolakha",
+                        "prov": "Bagmati Province",
+                        "hazard": "very high",
+                        "hazard_enum": "high",
+                        "impact": "high",
+                        "risk": "very high",
+                        "priority": True,
+                        "pfv_Mm3": 25.0,
+                        "ice_cored": True,
+                    },
+                }
+            ],
+        }
+        routes = {
+            "GL_SYNTH_1": {
+                "km": 15.0,
+                "path": [[86.10, 27.80], [86.25, 27.80]],
+                "exp": [],
+            }
+        }
+        districts_doc = {
+            "districts": [
+                {"name": "Dolakha", "name_ne": "दोलखा", "prov": "Bagmati Province", "prov_ne": "बागमती प्रदेश"}
+            ]
+        }
+        places_ov = {
+            "elements": [
+                # Upstream of bridge & hospital -> downstream_bridge_cut
+                {"type": "node", "id": 1, "lon": 86.12, "lat": 27.801, "tags": {"name": "Upper Village", "place": "village"}},
+                # South bank across river from hospital at north bank -> cross_river_bridge_cut
+                {"type": "node", "id": 2, "lon": 86.19, "lat": 27.798, "tags": {"name": "South Bank Hamlet", "place": "hamlet"}},
+            ]
+        }
+        health_ov = {
+            "elements": [
+                # Real human hospital on north bank downstream of bridge
+                {"type": "node", "id": 10, "lon": 86.19, "lat": 27.801, "tags": {"name": "Valley District Hospital", "amenity": "hospital"}},
+                # Veterinary facility right next to Upper Village — MUST be excluded!
+                {"type": "node", "id": 11, "lon": 86.1201, "lat": 27.801, "tags": {"name": "Animal Veterinary Hospital", "amenity": "hospital"}},
+            ]
+        }
+        bridges_ov = {
+            "elements": [
+                {"type": "node", "id": 20, "lon": 86.15, "lat": 27.800, "tags": {"name": "Main Valley Bridge", "highway": "primary", "bridge": "yes"}},
+                # Explicitly tagged bridge=no — MUST be excluded!
+                {"type": "node", "id": 21, "lon": 86.16, "lat": 27.800, "tags": {"name": "Not A Bridge", "highway": "primary", "bridge": "no"}},
+            ]
+        }
+        hydro_ov = {
+            "elements": [
+                # Plant + generator 100 m apart -> must count 100.0 MW once, not 200.0 MW
+                {"type": "node", "id": 30, "lon": 86.1700, "lat": 27.800, "tags": {"name": "Valley HPP", "power": "plant", "plant:output:electricity": "100 MW"}},
+                {"type": "node", "id": 31, "lon": 86.1708, "lat": 27.800, "tags": {"name": "Valley HPP Unit", "power": "generator", "generator:output:electricity": "100 MW"}},
+            ]
+        }
+
+        def _wj(p, obj):
+            with open(p, "w", encoding="utf-8") as fh:
+                json.dump(obj, fh)
+
+        lakes_p = os.path.join(tmpd, "lakes_core.json")
+        routes_p = os.path.join(tmpd, "routes.json")
+        expo_p = os.path.join(tmpd, "exposure.json")
+        dist_p = os.path.join(tmpd, "districts.json")
+        out_p = os.path.join(tmpd, "exposure_isolation.json")
+        _wj(lakes_p, lakes_fc)
+        _wj(routes_p, routes)
+        _wj(expo_p, [])
+        _wj(dist_p, districts_doc)
+        _wj(os.path.join(ov_dir, "places.json"), places_ov)
+        _wj(os.path.join(ov_dir, "health.json"), health_ov)
+        _wj(os.path.join(ov_dir, "bridges.json"), bridges_ov)
+        _wj(os.path.join(ov_dir, "hydropower.json"), hydro_ov)
+
+        res = EI.build_exposure_isolation(
+            lakes_path=lakes_p,
+            routes_path=routes_p,
+            exposure_path=expo_p,
+            districts_path=dist_p,
+            overpass_dir=ov_dir,
+            out_path=out_p,
+        )
+
+    lk = res["lakes"]["GL_SYNTH_1"]
+    corr = lk["corridor_exposure_screening"]
+    iso = lk["road_cut_hospital_isolation"]
+    mechs = {ex["name"]: ex["mechanism"] for ex in iso["isolated_settlement_examples"]}
+    ok = (
+        lk["hazard_susceptibility_static"]["hazard"] == "very high"
+        and res["uncertainty_and_coverage_limits"]["published_hazard_classes_modified"] is False
+        and corr["hospitals"] == 1
+        and corr["health_facilities"] == 1
+        and corr["bridges"] == 1
+        and corr["vehicular_bridges"] == 1
+        and math.isclose(corr["hydropower_mw_tagged"], 100.0, rel_tol=1e-6)
+        and iso["upstream_settlements_potentially_isolated"] == 2
+        and mechs.get("Upper Village") == "downstream_bridge_cut"
+        and mechs.get("South Bank Hamlet") == "cross_river_bridge_cut"
+    )
+    check(
+        "road-cut hospital isolation identifies bridge/cross-river cuts, filters non-human health & deduplicates MW",
+        ok,
+        f"isolated={iso['upstream_settlements_potentially_isolated']}, mechs={mechs}, mw={corr['hydropower_mw_tagged']}",
+    )
+
+
+def test_cascade_graph_evaluation():
+    """Verify rule-based cascade graph evaluation across baseline (undated scar
+    exclusion), rainfall+landslide+river Chain 1, seismic Chain 2, and thermal Chain 3."""
+    now = datetime(2026, 11, 23, 12, 0, 0, tzinfo=timezone.utc)
+    lakes_fc = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [86.4772, 27.8603]},
+                "properties": {
+                    "id": "GL_27.86029_86.47725",
+                    "name": "Tsho Rolpa",
+                    "lon": 86.4772,
+                    "lat": 27.8603,
+                    "district": "Dolakha",
+                    "prov": "Bagmati Province",
+                    "hazard": "very high",
+                    "priority": True,
+                    "ice_cored": True,
+                },
+            }
+        ],
+    }
+    expo_iso = {
+        "lakes": {
+            "GL_27.86029_86.47725": {
+                "lake_id": "GL_27.86029_86.47725",
+                "traversed_districts": ["Dolakha", "Ramechhap"],
+                "hazard_susceptibility_static": {
+                    "hazard": "very high",
+                    "priority": True,
+                    "ice_cored": True,
+                },
+                "road_cut_hospital_isolation": {"corridor_disruption_risk": "high"},
+            }
+        },
+        "districts": [
+            {
+                "name": "Dolakha",
+                "prov": "Bagmati Province",
+                "unique_bridges_at_crossings": 89,
+                "hydropower_mw_exposed": 456.0,
+                "unique_settlements_potentially_isolated": 13,
+                "district_isolation_risk": "high",
+                "top_corridor_lake_ids": ["GL_27.86029_86.47725"],
+            }
+        ],
+    }
+    quiet_rivers = {"basins": [{"id": "koshi", "name": "Koshi", "district": "Dolakha", "status_now": "normal", "status_14d": "normal"}]}
+    quiet_hm = {
+        "nodes": [{"id": "n1", "district": "Dolakha", "dh_obs": {"max_ratio": 0.1}, "dh_combined": {"max_ratio": 0.2}}],
+        "priority_lakes": [{"id": "GL_27.86029_86.47725", "district": "Dolakha", "warm_rain_on_ice": False}],
+    }
+    scars_only = {
+        "counts_by_type": {"landslide_scar": 50},
+        "events": [
+            {"id": f"osm_n{i}", "feature_type": "landslide_scar", "event_date_utc": None, "district": "Dolakha"}
+            for i in range(50)
+        ],
+    }
+
+    # 1. Baseline quiet: undated OSM scars must NOT trigger Chain 1
+    g_base = CAS.evaluate_cascades(quiet_rivers, quiet_hm, scars_only, lakes_fc, expo_iso, now_utc=now)
+    c3_scn = next((s for s in g_base["active_scenarios"] if s["chain_id"] == "glof_infra_isolation"), None)
+    check(
+        "cascade graph excludes undated OSM scars and labels standing GLOF as static_susceptibility_watch",
+        g_base["chains"]["rain_landslide_dam_road"]["dynamic_active"] is False
+        and g_base["chains"]["quake_coseismic_isolation"]["dynamic_active"] is False
+        and g_base["chains"]["glof_infra_isolation"]["dynamic_active"] is False
+        and c3_scn is not None
+        and c3_scn["status"] == "static_susceptibility_watch"
+        and all(e["evidence_type"] in {"observed", "forecast", "modelled_static"} for e in g_base["edges"]),
+        f"active_dynamic_scenarios={g_base['summary']['n_active_dynamic_scenarios']}, highest={g_base['summary']['highest_severity']}",
+    )
+
+    # 2. Chain 1 active: DH exceedance + recent dated landslide + elevated river -> critical
+    hot_rivers = {"basins": [{"id": "koshi", "name": "Koshi", "district": "Dolakha", "status_now": "q5_warning", "status_14d": "q5_warning"}]}
+    hot_hm = {
+        "nodes": [{"id": "n1", "district": "Dolakha", "dh_obs": {"max_ratio": 1.3}, "dh_combined": {"max_ratio": 1.5}}],
+        "priority_lakes": [{"id": "GL_27.86029_86.47725", "district": "Dolakha", "warm_rain_on_ice": True}],
+    }
+    dated_ls = {
+        "counts_by_type": {"landslide_event": 1, "landslide_scar": 50},
+        "events": [
+            {"id": "bipad_777", "feature_type": "landslide_event", "event_date_utc": "2026-11-21T06:00:00Z", "district": "Dolakha"}
+        ],
+    }
+    recent_eq = [
+        {"id": "usgs_eq1", "source": "USGS FDSN", "mag": 5.8, "lon": 86.40, "lat": 27.80, "place": "Dolakha", "time_utc": "2026-11-22T02:00:00Z"}
+    ]
+    g_hot = CAS.evaluate_cascades(
+        hot_rivers, hot_hm, dated_ls, lakes_fc, expo_iso, live_usgs=recent_eq, now_utc=now
+    )
+    edges_by_id = {e["rule_id"]: e for e in g_hot["edges"]}
+    check(
+        "cascade graph activates all 3 dynamic chains with rule evidence & bilingual summaries",
+        g_hot["chains"]["rain_landslide_dam_road"]["dynamic_active"] is True
+        and g_hot["chains"]["rain_landslide_dam_road"]["severity"] == "critical"
+        and g_hot["chains"]["quake_coseismic_isolation"]["dynamic_active"] is True
+        and g_hot["chains"]["glof_infra_isolation"]["dynamic_active"] is True
+        and all(edges_by_id[rid]["active"] is True for rid in ("RLDR-01", "RLDR-02", "RLDR-03", "QCI-01", "QCI-02", "GII-02"))
+        and all(ch.get("summary_en") and ch.get("summary_ne") for ch in g_hot["chains"].values()),
+        f"active_edges={g_hot['summary']['n_active_edges']}/{g_hot['summary']['n_edges']}, dynamic_scenarios={g_hot['summary']['n_active_dynamic_scenarios']}",
+    )
+
+    # 3. BIPAD `dhm_rivers` WARNING/DANGER gauges activate RLDR-01; BELOW WARNING LEVEL does not
+    bipad_river_warn = {
+        "provenance": {"retrieved_at_utc": "2026-11-23T11:30:00Z"},
+        "alerts": [],
+        "landslide_incidents": [],
+        "dhm_rivers": [
+            {"id": 1, "title": "Normal Gauge", "basin": "Koshi", "status": "BELOW WARNING LEVEL"},
+            {"id": 2, "title": "Tama Koshi Gauge", "basin": "Koshi", "status": "WARNING LEVEL"},
+        ],
+    }
+    watch_hm = {
+        "nodes": [{"id": "n1", "district": "Dolakha", "dh_obs": {"max_ratio": 0.65}, "dh_combined": {"max_ratio": 0.70}}],
+        "priority_lakes": [{"id": "GL_27.86029_86.47725", "district": "Dolakha", "warm_rain_on_ice": False}],
+    }
+    g_bipad_rv = CAS.evaluate_cascades(
+        quiet_rivers, watch_hm, scars_only, lakes_fc, expo_iso, bipad=bipad_river_warn, now_utc=now
+    )
+    rv_edges = {e["rule_id"]: e for e in g_bipad_rv["edges"]}
+    rv_nodes = {n["id"]: n for n in g_bipad_rv["nodes"]}
+    check(
+        "cascade graph wires BIPAD dhm_rivers WARNING/DANGER gauges into river_warnings and RLDR-01",
+        rv_nodes["c1_debris_dam_valley_flood"]["metrics"]["n_bipad_river_warnings"] == 1
+        and rv_edges["RLDR-01"]["active"] is True
+        and "Tama Koshi Gauge" in rv_edges["RLDR-01"]["supporting_evidence"].get("bipad_river_warnings", []),
+        f"warnings={rv_nodes['c1_debris_dam_valley_flood']['metrics']['n_bipad_river_warnings']}, RLDR-01={rv_edges['RLDR-01']['active']}",
+    )
+
+    # 4. Distant M>=4.5 earthquake (>100 km from high-hazard lakes/steep corridors) must NOT emit
+    #    a contradictory active_dynamic SCN-QUAKE-COSEISMIC-ISOLATION with active_rule_ids=[]
+    distant_eq = [
+        {"id": "usgs_far", "source": "USGS FDSN", "mag": 5.2, "lon": 80.50, "lat": 26.50, "place": "Far southwest", "time_utc": "2026-11-22T02:00:00Z"}
+    ]
+    g_far_eq = CAS.evaluate_cascades(
+        quiet_rivers, quiet_hm, scars_only, lakes_fc, expo_iso, live_usgs=distant_eq, now_utc=now
+    )
+    far_c2_scn = next((s for s in g_far_eq["active_scenarios"] if s["chain_id"] == "quake_coseismic_isolation"), None)
+    far_c2_ch = g_far_eq["chains"]["quake_coseismic_isolation"]
+    check(
+        "distant M>=4.5 quake (>100 km) does not emit active_dynamic scenario with empty active_rule_ids",
+        far_c2_scn is None
+        and far_c2_ch["dynamic_active"] is False
+        and far_c2_ch["severity"] == "baseline"
+        and "No active seismic-coseismic isolation cascade" in far_c2_ch["summary_en"],
+        f"scenario={far_c2_scn is not None}, sev={far_c2_ch['severity']}",
+    )
+
+    # 5. build_cascades() reads bipad_official.json provenance.retrieved_at_utc
+    with tempfile.TemporaryDirectory() as tmpd:
+        with open(os.path.join(tmpd, "bipad_official.json"), "w", encoding="utf-8") as fh:
+            json.dump(bipad_river_warn, fh)
+        built = CAS.build_cascades(offline=True, out_path=os.path.join(tmpd, "cascades.json"), data_dir=tmpd)
+        bipad_src = next((s for s in built["provenance"]["sources"] if s.get("provider_id") == "bipad_ndrrma"), {})
+        check(
+            "build_cascades populates bipad_ndrrma updated_utc from provenance.retrieved_at_utc",
+            bipad_src.get("updated_utc") == "2026-11-23T11:30:00Z",
+            f"updated_utc={bipad_src.get('updated_utc')!r}",
+        )
+
+
+def test_ui_contrast_severity_and_csp_alignment():
+    """Verify WCAG 2.1 AA light-theme --ok contrast, cascade severity UI mapping,
+    and STAC_THUMB_HOSTS <-> CSP img-src alignment."""
+    import re
+
+    root = C.ROOT
+    with open(os.path.join(root, "assets", "style.css"), encoding="utf-8") as fh:
+        css = fh.read()
+    with open(os.path.join(root, "assets", "app.js"), encoding="utf-8") as fh:
+        app_js = fh.read()
+    with open(os.path.join(root, "index.html"), encoding="utf-8") as fh:
+        index_html = fh.read()
+    with open(os.path.join(root, "src", "template.html"), encoding="utf-8") as fh:
+        tmpl_html = fh.read()
+
+    # 1. Light-theme --ok contrast over --ok-bg on --panel (#ffffff) and --panel2 (#f4f7fb)
+    m_light = re.search(r'html\[data-theme="light"\]\s*\{([^}]+)\}', css)
+    light_block = m_light.group(1) if m_light else ""
+    m_ok = re.search(r"--ok\s*:\s*#([0-9a-fA-F]{6})", light_block)
+    m_ok_bg = re.search(r"--ok-bg\s*:\s*rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)", light_block)
+    ok_contrast_pass = False
+    c_panel = c_panel2 = 0.0
+    if m_ok and m_ok_bg:
+        hx = m_ok.group(1)
+        fg = tuple(int(hx[i:i + 2], 16) for i in (0, 2, 4))
+        bg_c = (int(m_ok_bg.group(1)), int(m_ok_bg.group(2)), int(m_ok_bg.group(3)))
+        alpha = float(m_ok_bg.group(4))
+
+        def _lin(ch: float) -> float:
+            v = ch / 255.0
+            return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+        def _cr(rgb1: tuple[float, float, float], rgb2: tuple[float, float, float]) -> float:
+            l1 = 0.2126 * _lin(rgb1[0]) + 0.7152 * _lin(rgb1[1]) + 0.0722 * _lin(rgb1[2])
+            l2 = 0.2126 * _lin(rgb2[0]) + 0.7152 * _lin(rgb2[1]) + 0.0722 * _lin(rgb2[2])
+            return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+
+        def _blend(base: tuple[int, int, int]) -> tuple[float, float, float]:
+            return (
+                bg_c[0] * alpha + base[0] * (1.0 - alpha),
+                bg_c[1] * alpha + base[1] * (1.0 - alpha),
+                bg_c[2] * alpha + base[2] * (1.0 - alpha),
+            )
+
+        c_panel = _cr(fg, _blend((255, 255, 255)))
+        c_panel2 = _cr(fg, _blend((244, 247, 251)))
+        ok_contrast_pass = c_panel >= 4.5 and c_panel2 >= 4.5
+    check(
+        "light-theme --ok over --ok-bg meets WCAG 2.1 AA >= 4.5:1 on --panel and --panel2",
+        ok_contrast_pass,
+        f"panel={c_panel:.2f}:1, panel2={c_panel2:.2f}:1",
+    )
+
+    # 2. Cascade UI severity mapping covers all cascades.py levels without legacy 'alert' check
+    ok_sev_ui = (
+        "severity === 'alert'" not in app_js
+        and "badgeCascadeSeverity" in app_js
+        and "cascadeCardSeverityClass" in app_js
+        and "s === 'critical'" in app_js
+        and "s === 'high'" in app_js
+        and "s === 'moderate' || s === 'watch'" in app_js
+    )
+    check(
+        "tabCascades maps critical/high/moderate/watch/baseline without legacy severity==='alert'",
+        ok_sev_ui,
+        "explicit cascade severity helpers verified in assets/app.js",
+    )
+
+    # 3. STAC_THUMB_HOSTS entries are all covered by CSP img-src in index.html & src/template.html
+    m_hosts = re.search(r"const\s+STAC_THUMB_HOSTS\s*=\s*\[([^\]]+)\]", app_js)
+    thumb_hosts = re.findall(r"['\"]([^'\"]+)['\"]", m_hosts.group(1)) if m_hosts else []
+    m_csp = re.search(r"img-src\s+([^;\"]+)", index_html)
+    img_src_tokens = m_csp.group(1).split() if m_csp else []
+
+    def _host_allowed(host: str) -> bool:
+        for tok in img_src_tokens:
+            if tok == f"https://{host}":
+                return True
+            if tok.startswith("https://*."):
+                suffix = tok[len("https://*"):]  # e.g. ".amazonaws.com"
+                if host.endswith(suffix):
+                    return True
+        return False
+
+    unaligned = [h for h in thumb_hosts if not _host_allowed(h)]
+    check(
+        "STAC_THUMB_HOSTS aligns with CSP img-src in byte-identical index.html and src/template.html",
+        bool(thumb_hosts) and not unaligned and index_html == tmpl_html,
+        f"hosts={thumb_hosts}, unaligned={unaligned}",
+    )
+
+
+def test_copernicus_sentinel1_sar_parsing():
+    """Verify Sentinel-1 GRD all-weather SAR STAC item parsing preserves polarizations & HTTPS URLs."""
+    s1_item = {
+        "id": "S1D_IW_GRDH_1SDV_20261123T001050",
+        "properties": {
+            "datetime": "2026-11-23T00:10:50.001609Z",
+            "sat:orbit_state": "descending",
+            "sar:instrument_mode": "IW",
+            "sar:polarizations": ["VV", "VH"],
+            "platform": "sentinel-1d",
+        },
+        "assets": {
+            "thumbnail": {"href": "https://example.org/thumb.png"},
+        },
+    }
+    parsed = COP.parse_sentinel1_item(s1_item, lon=86.4772, lat=27.8603)
+    check(
+        "Copernicus Sentinel-1 GRD parser extracts IW VV/VH SAR metadata & HTTPS browser URL",
+        parsed["collection"] == "sentinel-1-grd"
+        and parsed["platform"] == "sentinel-1d"
+        and parsed["orbit_state"] == "descending"
+        and parsed["instrument_mode"] == "IW"
+        and parsed["polarizations"] == ["VV", "VH"]
+        and parsed["all_weather_capability"] is True
+        and str(parsed.get("copernicus_browser_url") or "").startswith("https://"),
+        f"platform={parsed['platform']}, mode={parsed['instrument_mode']}, pols={parsed['polarizations']}",
+    )
+
+
+# ---------------------------------------------------------------------------
+# 8. Full-mode scientific tests (requires numpy, scipy, pyreadr, lit/*.rds)
 # ---------------------------------------------------------------------------
 def test_peak_discharge_scaling():
     """Qp* is dimensionless, so scaling breach depth h must move Qp by g^0.5 h^2.5
@@ -782,6 +1571,13 @@ def main(argv=None) -> int:
         test_travel_times,
         test_lakes_core_compact_roundtrip,
         test_hydromet_hourly_and_rain_basis,
+        test_provenance_envelope_and_manifest,
+        test_bipad_record_normalization,
+        test_landslides_5type_and_duplicate_matcher,
+        test_road_cut_hospital_isolation,
+        test_cascade_graph_evaluation,
+        test_ui_contrast_severity_and_csp_alignment,
+        test_copernicus_sentinel1_sar_parsing,
     )
 
     print(f"unit tests ({'stdlib --unit-only' if args.unit_only else 'full mode'})")

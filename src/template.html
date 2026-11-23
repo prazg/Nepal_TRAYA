@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://server.arcgisonline.com https://tiles.maps.eox.at https://*.tile.opentopomap.org https://tile.openstreetmap.org https://gibs.earthdata.nasa.gov https://sentinel-cogs.s3.us-west-2.amazonaws.com https://*.amazonaws.com https://earthquake.usgs.gov https://*.usgs.gov; connect-src 'self' https://earthquake.usgs.gov https://*.usgs.gov https://api.open-meteo.com https://flood-api.open-meteo.com https://earth-search.aws.element84.com https://www.gdacs.org; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://server.arcgisonline.com https://tiles.maps.eox.at https://*.tile.opentopomap.org https://tile.openstreetmap.org https://gibs.earthdata.nasa.gov https://sentinel-cogs.s3.us-west-2.amazonaws.com https://*.amazonaws.com https://earth-search.aws.element84.com https://earthquake.usgs.gov https://*.usgs.gov; connect-src 'self' https://earthquake.usgs.gov https://*.usgs.gov https://api.open-meteo.com https://flood-api.open-meteo.com https://earth-search.aws.element84.com https://www.gdacs.org; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="dark light">
 <title>Nepal TRĀYA (त्राय) — 7-Day Open-Data Multi-Hazard Risk Observatory</title>
@@ -47,7 +47,7 @@
           <h1>Nepal TRĀYA <span class="deva brand-deva" lang="ne">त्राय</span></h1>
           <span class="brand-scope" data-i18n="brandScope">7-Day Risk Observatory</span>
         </div>
-        <div class="brand-sub" data-i18n="brandSub">Open-Data Multi-Hazard Screening — GLOFs · River Floods · Earthquakes · Landslides · Satellite EO</div>
+        <div class="brand-sub" data-i18n="brandSub">Open-Data Multi-Hazard Screening — GLOFs · River Floods · Earthquakes · Landslides · Cascades · SAR EO</div>
       </div>
     </div>
 
@@ -63,6 +63,7 @@
       </div>
       <div class="actions-bar">
         <button type="button" class="btn pri" id="btnRefreshLive" data-i18n="btnRefreshLive" title="Re-fetch live USGS earthquakes, Open-Meteo GloFAS rivers, and Open-Meteo rainfall right now">↻ Refresh live</button>
+        <button type="button" class="btn health-btn" id="btnSourceHealth" aria-haspopup="dialog" aria-controls="sourceHealthModal" title="Inspect dataset provenance, 6-state data classifications, SLA freshness, and KPI baseline scorecard"><span class="dot" aria-hidden="true"></span><span id="sourceHealthBtnLbl" data-i18n="btnSourceHealth">Source Health</span></button>
         <button type="button" class="btn" id="btnLang" data-i18n="btnLang" title="Switch interface language between English and Nepali">नेपाली</button>
         <button type="button" class="btn" id="btnKpi" data-i18n="btnKpi" aria-expanded="true" title="Toggle summary cards">KPIs</button>
         <button type="button" class="btn" id="btnTheme" data-i18n="btnTheme" title="Switch dark and light theme">◐ Theme</button>
@@ -120,19 +121,19 @@
       <span class="k-sub" id="k-ls-sub" data-i18n="kpiLsSub">Dahal &amp; Hasegawa (2008) liquid-rain I–D</span>
     </button>
     <button type="button" class="kpi" data-goto="live">
-      <span class="k-lbl" data-i18n="kpiEqLbl">Seismic &amp; Active Faults</span>
+      <span class="k-lbl" data-i18n="kpiEqLbl">Official Alerts &amp; Seismic</span>
       <span class="k-val" id="k-eq">—</span>
-      <span class="k-sub" id="k-eq-sub" data-i18n="kpiEqSub">USGS Nepal live feed + GEM surface traces</span>
+      <span class="k-sub" id="k-eq-sub" data-i18n="kpiEqSub">NDRRMA BIPAD · USGS live + GEM traces</span>
     </button>
     <button type="button" class="kpi" data-goto="sat">
-      <span class="k-lbl" data-i18n="kpiSatLbl">Cryosphere &amp; Sentinel-2 EO</span>
+      <span class="k-lbl" data-i18n="kpiSatLbl">Cryosphere &amp; SAR / S2 EO</span>
       <span class="k-val" id="k-sat">20 lakes</span>
-      <span class="k-sub" id="k-sat-sub" data-i18n="kpiSatSub">0 °C freezing level &amp; cloud-free STAC scenes</span>
+      <span class="k-sub" id="k-sat-sub" data-i18n="kpiSatSub">0 °C isotherm · Sentinel-1 SAR &amp; S2</span>
     </button>
-    <button type="button" class="kpi" data-goto="valid">
-      <span class="k-lbl" data-i18n="kpiValLbl">Validation &amp; 7-Day Cycle</span>
-      <span class="k-val" id="k-val">29/29 checks</span>
-      <span class="k-sub" id="k-val-sub" data-i18n="kpiValSub">Screening tool — not an operational warning</span>
+    <button type="button" class="kpi" data-goto="cascades">
+      <span class="k-lbl" data-i18n="kpiCascLbl">Cascades &amp; Isolation</span>
+      <span class="k-val" id="k-casc">3 chains</span>
+      <span class="k-sub" id="k-casc-sub" data-i18n="kpiCascSub">1 km corridor · hospital access · Tsho Rolpa</span>
     </button>
   </section>
 
@@ -206,7 +207,7 @@
         <label class="row"><input type="checkbox" id="lRivers" checked><span class="layer-sym sym-river" aria-hidden="true">■</span><span data-i18n="lRivers">GloFAS river stations (10)</span></label>
         <label class="row"><input type="checkbox" id="lFaults"><span class="layer-sym sym-fault" aria-hidden="true">╱</span><span data-i18n="lFaults">Active faults — surface (GEM)</span></label>
         <label class="row"><input type="checkbox" id="lNodes"><span class="layer-sym sym-node" aria-hidden="true">▲</span><span data-i18n="lNodes">Rainfall–landslide nodes (24)</span></label>
-        <label class="row"><input type="checkbox" id="lLandslides"><span class="layer-sym sym-ls" aria-hidden="true">◇</span><span data-i18n="lLandslides">Catalogued landslides (OSM)</span></label>
+        <label class="row"><input type="checkbox" id="lLandslides"><span class="layer-sym sym-ls" aria-hidden="true">◇</span><span data-i18n="lLandslides">Landslide inventory (5-type)</span></label>
         <label class="row"><input type="checkbox" id="lEq" checked><span class="layer-sym sym-eq" aria-hidden="true">◎</span><span data-i18n="lEq">Live earthquakes (USGS)</span></label>
         <label class="row"><input type="checkbox" id="lMmi" checked><span class="layer-sym sym-mmi" aria-hidden="true">◯</span><span data-i18n="lMmi">ShakeMap MMI contours</span></label>
         <label class="row"><input type="checkbox" id="lEqHist"><span class="layer-sym sym-eqh" aria-hidden="true">◌</span><span data-i18n="lEqHist">Historical earthquakes M≥6</span></label>
@@ -298,8 +299,9 @@
         <button type="button" role="tab" id="tab-watch" data-tab="watch" aria-selected="true" tabindex="0" data-i18n="tabWatch">Glacial Lakes</button>
         <button type="button" role="tab" id="tab-floods" data-tab="floods" aria-selected="false" tabindex="-1" data-i18n="tabFloods">Flood Watch (GloFAS)</button>
         <button type="button" role="tab" id="tab-landslides" data-tab="landslides" aria-selected="false" tabindex="-1" data-i18n="tabLandslides">Landslide Watch</button>
-        <button type="button" role="tab" id="tab-live" data-tab="live" aria-selected="false" tabindex="-1" data-i18n="tabLive">Earthquakes &amp; Faults</button>
-        <button type="button" role="tab" id="tab-sat" data-tab="sat" aria-selected="false" tabindex="-1" data-i18n="tabSat">Satellite &amp; Cryosphere</button>
+        <button type="button" role="tab" id="tab-cascades" data-tab="cascades" aria-selected="false" tabindex="-1" data-i18n="tabCascades">Cascades &amp; Isolation</button>
+        <button type="button" role="tab" id="tab-live" data-tab="live" aria-selected="false" tabindex="-1" data-i18n="tabLive">Official Alerts &amp; Quakes</button>
+        <button type="button" role="tab" id="tab-sat" data-tab="sat" aria-selected="false" tabindex="-1" data-i18n="tabSat">Satellite &amp; SAR EO</button>
         <button type="button" role="tab" id="tab-glof" data-tab="glof" aria-selected="false" tabindex="-1" data-i18n="tabGlof">Recorded GLOFs</button>
         <button type="button" role="tab" id="tab-charts" data-tab="charts" aria-selected="false" tabindex="-1" data-i18n="tabCharts">Analytics</button>
         <button type="button" role="tab" id="tab-valid" data-tab="valid" aria-selected="false" tabindex="-1" data-i18n="tabValid">Validation &amp; Limits</button>
@@ -386,6 +388,22 @@
       <li data-i18n="emergPrep2">Earthquake: Drop, Cover, and Hold On away from masonry walls and windows. After strong shaking (M≥5), stay alert for aftershocks, landslides on steep slopes, and sudden glacial/river surges.</li>
       <li data-i18n="emergPrep3">Monsoon Landslide: Watch for new ground cracks, bulging slopes, tilting trees, or muddy spring water after heavy 24–72 h rain; relocate early to safer open ground.</li>
     </ul>
+  </div>
+</div>
+
+<!-- 8. TRĀYA 2.0 Source Health, 6-State Provenance & KPI Baseline Modal -->
+<div id="sourceHealthModal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="sourceHealthTitle">
+  <div class="modal-dialog modal-wide">
+    <div class="modal-head">
+      <div>
+        <h2 id="sourceHealthTitle" data-i18n="shTitle">Source Health, Provenance &amp; KPI Scorecard</h2>
+        <div class="muted" id="sourceHealthSub" data-i18n="shSubtitle">6-state epistemic data classification, SLA freshness (NPT), fallback transparency &amp; dataset licences</div>
+      </div>
+      <button type="button" class="btn sm" id="btnCloseSourceHealth" data-i18n="emergClose">Close</button>
+    </div>
+    <div id="sourceHealthBody" aria-live="polite">
+      <p class="loading" data-i18n="shLoading">Loading provenance manifest &amp; KPI baseline…</p>
+    </div>
   </div>
 </div>
 

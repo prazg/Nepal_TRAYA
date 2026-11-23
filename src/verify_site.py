@@ -56,6 +56,7 @@ CANONICAL_PROVINCES = {
 REQUIRED_DATA_JSON = [
     "summary.json",
     "lakes.json",
+    "lakes_core.json",
     "routes.json",
     "exposure.json",
     "eq_history_m6.json",
@@ -63,10 +64,49 @@ REQUIRED_DATA_JSON = [
     "faults.json",
     "rivers_watch.json",
     "landslides.json",
+    "landslide_review_queue.json",
     "hydromet_weekly.json",
     "gdacs_alerts.json",
+    "sensitivity.json",
     "validation.json",
     "districts.json",
+    "bipad_official.json",
+    "exposure_isolation.json",
+    "cascades.json",
+    "eo_sar.json",
+    "tsho_rolpa_pilot.json",
+    "manifest.json",
+    "kpi_baseline.json",
+]
+
+VALID_PROVENANCE_DATA_CLASSES = {
+    "live_observation",
+    "forecast",
+    "historical",
+    "static_assessment",
+    "cached",
+    "unavailable",
+}
+
+VALID_PROVENANCE_STATUSES = {"available", "stale", "unavailable"}
+VALID_HEALTH_STATES = {"healthy", "degraded", "stale"}
+
+VALID_LANDSLIDE_TYPES = {
+    "landslide_event",
+    "landslide_scar",
+    "susceptibility_zone",
+    "hazard_report",
+    "coseismic_failure",
+}
+
+VALID_CASCADE_EVIDENCE_TYPES = {"observed", "forecast", "modelled_static"}
+
+REQUIRED_GOVERNANCE_DOCS = [
+    ("DATA_LICENSES.md", ("ODbL 1.0", "CC BY-SA 4.0", "BIPAD")),
+    ("ROADMAP.md", ("Wave A", "Wave B", "Wave C", "Wave D")),
+    ("docs/MODEL_CARDS.md", ("MC-1", "MC-2", "MC-3", "MC-4", "MC-5", "MC-6")),
+    ("docs/INSTITUTIONAL_INTEGRATION_SPEC.md", ("DHM", "NEMRC", "BIPAD", "Department of Roads")),
+    ("docs/TSHO_ROLPA_2D_STUDY_PLAN.md", ("Tsho Rolpa", "LISFLOOD-FP", "BASEMENT")),
 ]
 
 REQUIRED_HOTLINES = [
@@ -123,7 +163,7 @@ def warn(name: str, detail: str = "") -> None:
 # 1. GitHub Actions Workflows (Node 24 compliance & hardening)
 # ===========================================================================
 def check_workflows() -> None:
-    print("\n[1/5] GitHub Actions Workflows (Node 24 & Hardening)")
+    print("\n[1/6] GitHub Actions Workflows (Node 24 & Hardening)")
     wf_dir = ROOT / ".github" / "workflows"
     if not wf_dir.is_dir():
         record(False, "workflows directory exists", f"missing {wf_dir}")
@@ -164,6 +204,10 @@ def check_workflows() -> None:
             pages_issues.append("missing .nojekyll")
         if "assets" not in ptext:
             pages_issues.append("missing assets/ in staging")
+        if "schemas" not in ptext:
+            pages_issues.append("missing schemas/ in staging")
+        if "data/*.geojson" not in ptext:
+            pages_issues.append("missing data/*.geojson in staging")
         if "group: pages-deploy" not in ptext:
             pages_issues.append("missing concurrency group: pages-deploy")
         if re.search(r"cancel-in-progress\s*:\s*true\b", ptext):
@@ -192,6 +236,14 @@ def check_workflows() -> None:
             weekly_issues.append("missing .nojekyll")
         if "assets" not in wtext:
             weekly_issues.append("missing assets/ in staging")
+        if "schemas" not in wtext:
+            weekly_issues.append("missing schemas/ in staging")
+        if "data/*.geojson" not in wtext:
+            weekly_issues.append("missing data/*.geojson in staging")
+        if "cache/bipad_snapshot.json" not in wtext:
+            weekly_issues.append("missing cache/bipad_snapshot.json in git add candidates")
+        if "cache/eo_sar.json" not in wtext:
+            weekly_issues.append("missing cache/eo_sar.json in git add candidates")
         if "data/*.json" not in wtext or re.search(r"cp\s+-r\s+[^\n]*\bdata\b", wtext):
             weekly_issues.append("must stage data/*.json only (do not copy legacy data/*.js)")
         if "git pull --rebase --autostash" not in wtext:
@@ -209,7 +261,7 @@ def check_workflows() -> None:
 # 2. Byte-identical index.html <-> src/template.html
 # ===========================================================================
 def check_template_sync() -> None:
-    print("\n[2/5] HTML Template Synchronisation")
+    print("\n[2/6] HTML Template Synchronisation")
     index_path = ROOT / "index.html"
     tmpl_path = ROOT / "src" / "template.html"
 
@@ -373,7 +425,7 @@ def _resolve_local_href(href: str) -> Path:
 
 
 def check_html() -> None:
-    print("\n[3/5] HTML Security, CSP, Emergency Hotlines & Suite Links")
+    print("\n[3/6] HTML Security, CSP, Emergency Hotlines & Suite Links")
     index_path = ROOT / "index.html"
     if not index_path.is_file():
         record(False, "index.html exists", "missing index.html")
@@ -576,19 +628,69 @@ def _extract_records(obj: Any, list_keys: tuple[str, ...]) -> list[dict[str, Any
     return []
 
 
+def _validate_provenance_envelope(env: Any, label: str) -> list[str]:
+    """Validate canonical 6-state TRĀYA 2.0 ProvenanceEnvelope contract."""
+    errs: list[str] = []
+    if not isinstance(env, dict):
+        return [f"{label}: provenance must be an object"]
+    for req_k in ("source", "dataset", "retrieved_at_utc", "license_ref"):
+        val = env.get(req_k)
+        if not isinstance(val, str) or not val.strip():
+            errs.append(f"{label}: missing/empty {req_k}")
+    dc = env.get("data_class")
+    if dc not in VALID_PROVENANCE_DATA_CLASSES:
+        errs.append(f"{label}: invalid data_class={dc!r}")
+    st = env.get("status")
+    if st not in VALID_PROVENANCE_STATUSES:
+        errs.append(f"{label}: invalid status={st!r}")
+    return errs
+
+
+def _audit_landslide_records_null_integrity(records: list[dict[str, Any]], label: str) -> list[str]:
+    """Verify 5-type landslide partitioning and strict null-not-0 casualty integrity."""
+    violations: list[str] = []
+    for idx, rec in enumerate(records):
+        rid = str(rec.get("id") or f"{label}[{idx}]")
+        ft = rec.get("feature_type")
+        if ft not in VALID_LANDSLIDE_TYPES:
+            violations.append(f"{rid}: invalid feature_type={ft!r}")
+        ev_dt = rec.get("event_date_utc")
+        dp = rec.get("date_precision")
+        if ev_dt is None and dp != "unknown":
+            violations.append(f"{rid}: null event_date_utc requires date_precision='unknown' (got {dp!r})")
+        prov = rec.get("province")
+        if prov is not None and prov not in CANONICAL_PROVINCES:
+            violations.append(f"{rid}: non-canonical province={prov!r}")
+        verified = rec.get("verified") is True
+        if ft == "landslide_scar":
+            if ev_dt is not None or dp != "unknown" or verified:
+                violations.append(f"{rid}: landslide_scar must be undated and unverified")
+            for ck in ("fatalities", "injuries", "households_affected"):
+                if rec.get(ck) is not None:
+                    violations.append(f"{rid}: landslide_scar must have {ck}=null (got {rec.get(ck)!r})")
+        elif not verified:
+            for ck in ("fatalities", "injuries", "households_affected"):
+                if rec.get(ck) == 0:
+                    violations.append(f"{rid}: unverified record has {ck}=0 (violates null-not-0 rule)")
+        if len(violations) >= 12:
+            break
+    return violations
+
+
 def check_data() -> None:
-    print("\n[4/5] Data JSON Payloads & Geographic/Text Hygiene")
+    print("\n[4/6] Data JSON / GeoJSON Payloads, Provenance & Epistemic Hygiene")
     data_dir = ROOT / "data"
     if not data_dir.is_dir():
         record(False, "data/ directory exists", f"missing {data_dir}")
         return
 
     json_files = sorted(data_dir.glob("*.json"))
+    geojson_files = sorted(data_dir.glob("*.geojson"))
     parsed: dict[str, Any] = {}
     parse_errors: list[str] = []
     bagamati_hits: list[str] = []
 
-    for jf in json_files:
+    for jf in json_files + geojson_files:
         try:
             raw = jf.read_text(encoding="utf-8", errors="strict")
             parsed[jf.name] = json.loads(raw)
@@ -601,7 +703,7 @@ def check_data() -> None:
     record(
         not parse_errors and not missing_req,
         "all required data/*.json files exist and parse cleanly",
-        f"{len(parsed)} JSON files parsed"
+        f"{len(json_files)} JSON + {len(geojson_files)} GeoJSON files parsed"
         if (not parse_errors and not missing_req)
         else "; ".join(
             ([f"missing={missing_req}"] if missing_req else [])
@@ -612,8 +714,8 @@ def check_data() -> None:
     has_core_prov_files = "lakes.json" in parsed and "districts.json" in parsed
     record(
         has_core_prov_files and not bagamati_hits,
-        "canonical 'Bagmati Province' spelling (zero 'Bagamati' in data/*.json)",
-        "clean across all data/*.json"
+        "canonical 'Bagmati Province' spelling (zero 'Bagamati' in data/*.json & *.geojson)",
+        "clean across all data payloads"
         if (has_core_prov_files and not bagamati_hits)
         else (
             f"found 'Bagamati' in: {bagamati_hits}"
@@ -756,9 +858,361 @@ def check_data() -> None:
             else f"count={len(basins)}, invalid_clim={bad_basins}",
         )
 
+    # TRĀYA 2.0: data/manifest.json (6-state ProvenanceEnvelopes & SHA-256 checksums)
+    if "manifest.json" in parsed and isinstance(parsed["manifest.json"], dict):
+        mf = parsed["manifest.json"]
+        mf_issues: list[str] = []
+        if mf.get("overall_health") not in VALID_HEALTH_STATES:
+            mf_issues.append(f"invalid overall_health={mf.get('overall_health')!r}")
+        sources = mf.get("sources")
+        if not isinstance(sources, list) or not sources:
+            mf_issues.append("sources must be a non-empty list")
+        else:
+            for idx, env in enumerate(sources):
+                ds = env.get("dataset") if isinstance(env, dict) else f"source[{idx}]"
+                mf_issues.extend(_validate_provenance_envelope(env, str(ds)))
+        checksums = mf.get("input_checksums")
+        if not isinstance(checksums, dict) or not checksums:
+            mf_issues.append("missing input_checksums")
+        else:
+            bad_sha = [
+                k for k, v in checksums.items()
+                if not isinstance(v, str) or not re.fullmatch(r"[0-9a-f]{64}", v)
+            ]
+            if bad_sha:
+                mf_issues.append(f"invalid SHA-256 checksums for {bad_sha[:4]}")
+        record(
+            not mf_issues,
+            "data/manifest.json valid 6-state ProvenanceEnvelopes, license_ref & SHA-256 checksums",
+            f"{len(sources or [])} envelopes, {len(checksums or {})} checksums, health={mf.get('overall_health')}"
+            if not mf_issues
+            else "; ".join(mf_issues[:6]),
+        )
+    else:
+        record(False, "data/manifest.json valid 6-state ProvenanceEnvelopes, license_ref & SHA-256 checksums", "file missing")
+
+    # TRĀYA 2.0: data/kpi_baseline.json
+    if "kpi_baseline.json" in parsed and isinstance(parsed["kpi_baseline.json"], dict):
+        kpi = parsed["kpi_baseline.json"]
+        kpi_issues: list[str] = []
+        if kpi.get("provenance_completeness_pct") != 100.0:
+            kpi_issues.append(f"provenance_completeness_pct={kpi.get('provenance_completeness_pct')!r} (expected 100.0)")
+        ls_mat = kpi.get("landslide_maturity") or {}
+        if ls_mat.get("null_casualty_integrity_ok") is not True:
+            kpi_issues.append(f"null_casualty_integrity_ok={ls_mat.get('null_casualty_integrity_ok')!r}")
+        exp_cov = kpi.get("exposure_coverage") or {}
+        if exp_cov.get("n_provinces_covered") != 7 or exp_cov.get("n_districts_covered") != 77:
+            kpi_issues.append(
+                f"exposure_coverage={exp_cov.get('n_provinces_covered')}p/{exp_cov.get('n_districts_covered')}d"
+            )
+        cas_sum = kpi.get("cascade_summary") or {}
+        if int(cas_sum.get("total_pathways") or 0) < 3:
+            kpi_issues.append(f"cascade_summary.total_pathways={cas_sum.get('total_pathways')!r}")
+        record(
+            not kpi_issues,
+            "data/kpi_baseline.json completeness, null-casualty integrity & 77-district coverage",
+            f"freshness={kpi.get('feed_freshness_pct')}%, provenance=100.0%, null_integrity=True"
+            if not kpi_issues
+            else "; ".join(kpi_issues[:6]),
+        )
+    else:
+        record(False, "data/kpi_baseline.json completeness, null-casualty integrity & 77-district coverage", "file missing")
+
+    # TRĀYA 2.0: data/bipad_official.json
+    if "bipad_official.json" in parsed and isinstance(parsed["bipad_official.json"], dict):
+        bp = parsed["bipad_official.json"]
+        bp_issues = _validate_provenance_envelope(bp.get("provenance"), "bipad_official")
+        if not isinstance(bp.get("official_notice"), str) or not bp["official_notice"].strip():
+            bp_issues.append("missing official_notice")
+        for list_k in ("alerts", "landslide_incidents", "dhm_rivers", "dhm_rain", "nsc_earthquakes"):
+            if not isinstance(bp.get(list_k), list):
+                bp_issues.append(f"{list_k} must be a list")
+        record(
+            not bp_issues,
+            "data/bipad_official.json valid provenance envelope & official-separation structure",
+            f"class={(bp.get('provenance') or {}).get('data_class')}, "
+            f"alerts={len(bp.get('alerts') or [])}, incidents={len(bp.get('landslide_incidents') or [])}"
+            if not bp_issues
+            else "; ".join(bp_issues[:6]),
+        )
+    else:
+        record(False, "data/bipad_official.json valid provenance envelope & official-separation structure", "file missing")
+
+    # TRĀYA 2.0: data/landslide_inventory.geojson, data/landslide_review_queue.json & null-not-0 integrity
+    ls_doc = parsed.get("landslides.json") if isinstance(parsed.get("landslides.json"), dict) else None
+    ls_gj = parsed.get("landslide_inventory.geojson") if isinstance(parsed.get("landslide_inventory.geojson"), dict) else None
+    ls_rq = parsed.get("landslide_review_queue.json") if isinstance(parsed.get("landslide_review_queue.json"), dict) else None
+
+    gj_issues: list[str] = []
+    if not ls_gj:
+        gj_issues.append("data/landslide_inventory.geojson missing or invalid JSON")
+    else:
+        if ls_gj.get("type") != "FeatureCollection" or not isinstance(ls_gj.get("features"), list):
+            gj_issues.append("must be RFC 7946 FeatureCollection")
+        else:
+            n_feat = len(ls_gj["features"])
+            if ls_doc and n_feat != int(ls_doc.get("n_total") or 0):
+                gj_issues.append(f"feature count {n_feat} != landslides.json n_total {ls_doc.get('n_total')}")
+            bad_geom = [
+                f.get("id") for f in ls_gj["features"]
+                if not isinstance(f, dict)
+                or (f.get("geometry") or {}).get("type") != "Point"
+                or len((f.get("geometry") or {}).get("coordinates") or []) < 2
+            ]
+            if bad_geom:
+                gj_issues.append(f"{len(bad_geom)} invalid Point geometries")
+    record(
+        not gj_issues,
+        "data/landslide_inventory.geojson valid RFC 7946 FeatureCollection matching inventory",
+        f"{len((ls_gj or {}).get('features') or [])} Point features verified"
+        if not gj_issues
+        else "; ".join(gj_issues[:6]),
+    )
+
+    rq_issues: list[str] = []
+    if not ls_rq:
+        rq_issues.append("data/landslide_review_queue.json missing or invalid JSON")
+    else:
+        if ls_rq.get("policy") != "flag_only_never_auto_merge":
+            rq_issues.append(f"unexpected policy={ls_rq.get('policy')!r}")
+        cands = ls_rq.get("candidates")
+        if not isinstance(cands, list):
+            rq_issues.append("candidates must be a list")
+        else:
+            for c in cands:
+                if c.get("auto_merged") is not False or c.get("review_status") != "pending_review":
+                    rq_issues.append(f"candidate {c.get('candidate_id')} violates flag-only pending_review contract")
+                    break
+    record(
+        not rq_issues,
+        "data/landslide_review_queue.json enforces flag-only duplicate review policy",
+        f"{len((ls_rq or {}).get('candidates') or [])} candidate pairs (policy=flag_only_never_auto_merge)"
+        if not rq_issues
+        else "; ".join(rq_issues[:6]),
+    )
+
+    # Null-not-zero casualty & 5-type partitioning integrity across JSON + GeoJSON
+    null_issues: list[str] = []
+    if ls_doc and isinstance(ls_doc.get("events"), list):
+        null_issues.extend(_audit_landslide_records_null_integrity(ls_doc["events"], "landslides.json"))
+    else:
+        null_issues.append("landslides.json missing events list")
+    if ls_gj and isinstance(ls_gj.get("features"), list):
+        gj_props = [f.get("properties") or {} for f in ls_gj["features"] if isinstance(f, dict)]
+        null_issues.extend(_audit_landslide_records_null_integrity(gj_props, "landslide_inventory.geojson"))
+    record(
+        not null_issues,
+        "null-not-zero casualty & 5-type landslide partitioning integrity across JSON + GeoJSON",
+        f"{len((ls_doc or {}).get('events') or [])} records verified (0 null-not-0 violations)"
+        if not null_issues
+        else "; ".join(null_issues[:5]),
+    )
+
+    # TRĀYA 2.0: data/exposure_isolation.json
+    if "exposure_isolation.json" in parsed and isinstance(parsed["exposure_isolation.json"], dict):
+        ei = parsed["exposure_isolation.json"]
+        ei_issues: list[str] = []
+        if ei.get("schema_version") != "exposure_isolation.v1":
+            ei_issues.append(f"unexpected schema_version={ei.get('schema_version')!r}")
+        if ei.get("data_class") != "static_assessment":
+            ei_issues.append(f"data_class={ei.get('data_class')!r} (expected 'static_assessment')")
+        dims = ei.get("dimensions") or {}
+        if not isinstance(dims, dict) or len(dims) < 4:
+            ei_issues.append("must separate 4 conceptual dimensions")
+        unc = ei.get("uncertainty_and_coverage_limits") or {}
+        if unc.get("published_hazard_classes_modified") is not False:
+            ei_issues.append("published_hazard_classes_modified must be False")
+        if unc.get("corridor_not_inundation_boundary") is not True:
+            ei_issues.append("corridor_not_inundation_boundary must be True")
+        ei_dists = ei.get("districts") or []
+        ei_lakes = ei.get("lakes") or {}
+        if len(ei_dists) != 77:
+            ei_issues.append(f"districts={len(ei_dists)} (expected 77)")
+        if len(ei_lakes) < 600:
+            ei_issues.append(f"routed lakes={len(ei_lakes)} (expected >=600)")
+        record(
+            not ei_issues,
+            "data/exposure_isolation.json 4-dimension structure, 77 districts & hazard preservation",
+            f"{len(ei_lakes)} corridors, {len(ei_dists)} districts, published_hazard_untouched=True"
+            if not ei_issues
+            else "; ".join(ei_issues[:6]),
+        )
+    else:
+        record(False, "data/exposure_isolation.json 4-dimension structure, 77 districts & hazard preservation", "file missing")
+
+    # TRĀYA 2.0: data/cascades.json
+    if "cascades.json" in parsed and isinstance(parsed["cascades.json"], dict):
+        cas = parsed["cascades.json"]
+        cas_issues: list[str] = []
+        if cas.get("schema_version") != "cascades.v1":
+            cas_issues.append(f"unexpected schema_version={cas.get('schema_version')!r}")
+        chains = cas.get("chains") or {}
+        req_chains = {"rain_landslide_dam_road", "quake_coseismic_isolation", "glof_infra_isolation"}
+        missing_ch = sorted(req_chains - set(chains.keys()))
+        if missing_ch:
+            cas_issues.append(f"missing chains={missing_ch}")
+        for cid, ch in chains.items():
+            if not (ch.get("summary_en") and ch.get("summary_ne")):
+                cas_issues.append(f"chain {cid} missing bilingual EN/NE summary")
+        edges = cas.get("edges") or []
+        if not edges:
+            cas_issues.append("edges list is empty")
+        for ed in edges:
+            if ed.get("evidence_type") not in VALID_CASCADE_EVIDENCE_TYPES:
+                cas_issues.append(f"edge {ed.get('rule_id')} invalid evidence_type={ed.get('evidence_type')!r}")
+            if not isinstance(ed.get("active"), bool):
+                cas_issues.append(f"edge {ed.get('rule_id')} active must be bool")
+            if not ed.get("trigger_rule") or not ed.get("uncertainty_note"):
+                cas_issues.append(f"edge {ed.get('rule_id')} missing trigger_rule or uncertainty_note")
+        record(
+            not cas_issues,
+            "data/cascades.json 3-chain directed graph, evidence types & bilingual summaries",
+            f"{len(chains)} chains, {len(cas.get('nodes') or [])} nodes, {len(edges)} edges verified"
+            if not cas_issues
+            else "; ".join(cas_issues[:6]),
+        )
+    else:
+        record(False, "data/cascades.json 3-chain directed graph, evidence types & bilingual summaries", "file missing")
+
+    # TRĀYA 2.0: data/eo_sar.json
+    if "eo_sar.json" in parsed and isinstance(parsed["eo_sar.json"], dict):
+        eo = parsed["eo_sar.json"]
+        eo_issues = _validate_provenance_envelope(eo.get("provenance"), "eo_sar")
+        if eo.get("all_weather_sar_capability") is not True:
+            eo_issues.append("all_weather_sar_capability must be True")
+        lakes_eo = eo.get("lakes") or []
+        if not isinstance(lakes_eo, list) or not lakes_eo:
+            eo_issues.append("lakes list must be non-empty")
+        else:
+            ids = {lk.get("id") for lk in lakes_eo if isinstance(lk, dict)}
+            if "GL_27.86029_86.47725" not in ids:
+                eo_issues.append("missing Tsho Rolpa (GL_27.86029_86.47725)")
+            for lk in lakes_eo:
+                for sensor_key in ("sentinel1", "sentinel2"):
+                    sc = lk.get(sensor_key)
+                    if isinstance(sc, dict):
+                        for uk in ("thumbnail_url", "copernicus_browser_url"):
+                            uv = sc.get(uk)
+                            if uv is not None and not str(uv).startswith("https://"):
+                                eo_issues.append(f"insecure URL in {lk.get('id')}.{sensor_key}.{uk}")
+        record(
+            not eo_issues,
+            "data/eo_sar.json valid Sentinel-1/2 EO provenance, Tsho Rolpa coverage & HTTPS URLs",
+            f"class={(eo.get('provenance') or {}).get('data_class')}, lakes={len(lakes_eo)}, "
+            f"s1={eo.get('n_s1_covered')}, s2={eo.get('n_s2_covered')}"
+            if not eo_issues
+            else "; ".join(eo_issues[:6]),
+        )
+    else:
+        record(False, "data/eo_sar.json valid Sentinel-1/2 EO provenance, Tsho Rolpa coverage & HTTPS URLs", "file missing")
+
+    # TRĀYA 2.0: data/tsho_rolpa_pilot.json
+    if "tsho_rolpa_pilot.json" in parsed and isinstance(parsed["tsho_rolpa_pilot.json"], dict):
+        trp = parsed["tsho_rolpa_pilot.json"]
+        tr_issues: list[str] = []
+        if trp.get("schema_version") != "tsho_rolpa_pilot.v1":
+            tr_issues.append(f"unexpected schema_version={trp.get('schema_version')!r}")
+        if trp.get("data_class") != "static_assessment":
+            tr_issues.append(f"data_class={trp.get('data_class')!r} (expected 'static_assessment')")
+        if trp.get("is_2d_inundation_map") is not False:
+            tr_issues.append("is_2d_inundation_map must be False for pre-simulation benchmark")
+        if not isinstance(trp.get("status_note"), str) or "NOT yet a 2D inundation map" not in trp["status_note"]:
+            tr_issues.append("status_note must explicitly disclaim NOT yet a 2D inundation map")
+        if (trp.get("lake_identification") or {}).get("matched_inventory_id") != "GL_27.86029_86.47725":
+            tr_issues.append("matched_inventory_id must resolve to GL_27.86029_86.47725")
+        cps = trp.get("valley_checkpoints") or []
+        scns = trp.get("breach_scenario_framework") or []
+        if len(cps) < 5:
+            tr_issues.append(f"valley_checkpoints={len(cps)} (expected >=5)")
+        if len(scns) != 4:
+            tr_issues.append(f"breach_scenario_framework={len(scns)} (expected 4)")
+        record(
+            not tr_issues,
+            "data/tsho_rolpa_pilot.json pre-simulation framing, checkpoints & breach scenarios",
+            f"GL_27.86029_86.47725, {len(cps)} checkpoints, {len(scns)} breach scenarios, is_2d_inundation_map=False"
+            if not tr_issues
+            else "; ".join(tr_issues[:6]),
+        )
+    else:
+        record(False, "data/tsho_rolpa_pilot.json pre-simulation framing, checkpoints & breach scenarios", "file missing")
+
+    # TRĀYA 2.0: data/summary.json carries all new TRĀYA 2.0 sections
+    if "summary.json" in parsed and isinstance(parsed["summary.json"], dict):
+        summ = parsed["summary.json"]
+        req_v2_keys = (
+            "bipad_official",
+            "landslide_inventory",
+            "eo_sar",
+            "exposure_isolation",
+            "cascades",
+            "tsho_rolpa_pilot",
+        )
+        missing_v2 = [k for k in req_v2_keys if not isinstance(summ.get(k), dict)]
+        record(
+            not missing_v2,
+            "data/summary.json includes all 6 TRĀYA 2.0 product summary blocks",
+            "all 6 TRĀYA 2.0 summary blocks present"
+            if not missing_v2
+            else f"missing: {missing_v2}",
+        )
+
 
 # ===========================================================================
-# 5. ES Modules Static Analysis (Balance, Imports/Exports, XSS Sinks)
+# 5. Formal JSON Schemas & TRĀYA 2.0 Governance / Scientific Documentation
+# ===========================================================================
+def check_schemas_and_docs() -> None:
+    print("\n[5/6] Formal Schemas & Governance / Scientific Documentation")
+
+    # schemas/landslide_event.v1.schema.json
+    schema_path = ROOT / "schemas" / "landslide_event.v1.schema.json"
+    schema_issues: list[str] = []
+    if not schema_path.is_file():
+        schema_issues.append("missing schemas/landslide_event.v1.schema.json")
+    else:
+        try:
+            sch = json.loads(schema_path.read_text(encoding="utf-8", errors="strict"))
+            if not isinstance(sch, dict) or not sch.get("$schema"):
+                schema_issues.append("missing $schema")
+            props = sch.get("properties") or {}
+            ft_enum = set((props.get("feature_type") or {}).get("enum") or [])
+            if ft_enum != VALID_LANDSLIDE_TYPES:
+                schema_issues.append(f"feature_type enum mismatch: {sorted(ft_enum)}")
+            req_fields = set(sch.get("required") or [])
+            for rk in ("id", "feature_type", "provider_id", "event_date_utc", "fatalities", "verified", "license_ref"):
+                if rk not in req_fields:
+                    schema_issues.append(f"missing required schema property: {rk}")
+            if not isinstance(sch.get("allOf"), list) or len(sch["allOf"]) < 3:
+                schema_issues.append("missing allOf null-not-0 conditional invariants")
+        except Exception as exc:
+            schema_issues.append(f"JSON parse error: {exc}")
+    record(
+        not schema_issues,
+        "schemas/landslide_event.v1.schema.json valid 5-type & null-not-0 JSON Schema",
+        "valid JSON Schema 2020-12 (5 feature_types + allOf invariants)"
+        if not schema_issues
+        else "; ".join(schema_issues[:6]),
+    )
+
+    # Governance & scientific documentation suite
+    for rel_path, needles in REQUIRED_GOVERNANCE_DOCS:
+        doc_path = ROOT / rel_path
+        if not doc_path.is_file():
+            record(False, f"{rel_path} present and complete", f"missing {rel_path}")
+            continue
+        text = doc_path.read_text(encoding="utf-8", errors="strict")
+        missing_needles = [n for n in needles if n not in text]
+        ok_doc = len(text.strip()) >= 500 and not missing_needles
+        record(
+            ok_doc,
+            f"{rel_path} present and complete",
+            f"{len(text):,} chars verified"
+            if ok_doc
+            else f"len={len(text)}, missing_keywords={missing_needles}",
+        )
+
+
+# ===========================================================================
+# 6. ES Modules Static Analysis (Balance, Imports/Exports, XSS Sinks)
 # ===========================================================================
 REGEX_PRECEDING_KEYWORDS = {
     "return", "case", "throw", "typeof", "void", "delete",
@@ -1477,7 +1931,7 @@ def is_safe_html_interpolation(expr: str, is_url_attr: bool) -> bool:
 
 
 def check_assets() -> None:
-    print("\n[5/5] ES Modules Static Analysis (Balance, Imports/Exports & XSS Audit)")
+    print("\n[6/6] ES Modules Static Analysis (Balance, Imports/Exports & XSS Audit)")
     assets_dir = ROOT / "assets"
     if not assets_dir.is_dir():
         record(False, "assets/ directory exists", f"missing {assets_dir}")
@@ -1525,8 +1979,8 @@ def check_assets() -> None:
                 ln = code_only[:m.start()].count("\n") + 1
                 xss_findings.append(f"{rel}:{ln} forbidden {desc}")
 
-        # Check referenced data/*.json literals exist on disk
-        for m in re.finditer(r"['\"](?:\./)?(data/[A-Za-z0-9_.-]+\.json)['\"]", code_only):
+        # Check referenced data/*.json & data/*.geojson literals exist on disk
+        for m in re.finditer(r"['\"](?:\./)?(data/[A-Za-z0-9_.-]+\.(?:json|geojson))['\"]", code_only):
             ref_path = m.group(1)
             if not (ROOT / ref_path).is_file():
                 ln = code_only[:m.start()].count("\n") + 1
@@ -1640,6 +2094,7 @@ def main() -> int:
     check_template_sync()
     check_html()
     check_data()
+    check_schemas_and_docs()
     check_assets()
 
     passed = sum(1 for st, _, _ in RESULTS if st == "PASS")

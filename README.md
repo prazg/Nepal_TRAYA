@@ -1,9 +1,9 @@
-# 🇳🇵 Nepal TRĀYA (त्राय) — 7-Day Open-Data Multi-Hazard Risk Observatory & Screening Platform
+# 🇳🇵 Nepal TRĀYA 2.0 (त्राय) — 7-Day Open-Data Multi-Hazard Risk Observatory & Screening Platform
 
-**TRĀYA (त्राय)** derives from the Sanskrit verbal root *√trā* (*"to protect, shelter, or safeguard"*). It is an open-access, **7-day open-data multi-hazard risk observatory and scientific screening platform** for Nepal — integrating peer-reviewed glacial lake outburst flood (GLOF) screening, basin-scale river discharge reanalysis/forecasts, Himalayan seismicity and active-fault context, rainfall-threshold landslide screening, and keyless satellite Earth observation.
+**TRĀYA (त्राय)** derives from the Sanskrit verbal root *√trā* (*"to protect, shelter, or safeguard"*). **TRĀYA 2.0** is an open-access, **7-day open-data multi-hazard risk observatory and scientific screening platform** for Nepal — unifying peer-reviewed glacial lake outburst flood (GLOF) screening, basin-scale river discharge forecasts, Himalayan seismicity and active-fault context, a 5-type national landslide inventory, 1 km corridor exposure & road-cut hospital isolation screening, interpretable rule-based cascade graphs, all-weather Sentinel-1 SAR / Sentinel-2 optical Earth observation, and structurally separated read-only official Government of Nepal statutory context.
 
 > **Important Safety Notice (Non-Operational Platform / गैर-सञ्चालनात्मक सूचना):**  
-> **TRĀYA is an open-data research observatory and screening tool — NOT a deterministic forecast and NOT an operational early warning system (EWS).** Snapshot datasets refresh on a 7-day cycle (timestamped in Nepal Standard Time, `NPT / UTC+05:45`, alongside optional in-browser live API queries). Never rely on this site for life-safety decisions. Always follow Nepal's official statutory agencies below.  
+> **TRĀYA is an open-data research observatory and screening tool — NOT a deterministic forecast and NOT an operational early warning system (EWS).** Snapshot datasets refresh on a 7-day cycle (timestamped in Nepal Standard Time, `NPT / UTC+05:45`, alongside optional in-browser live API queries). Official Government of Nepal statutory records are displayed read-only in a dedicated lane and are never blended into modelled screening tiers. Never rely on this site for life-safety decisions — always follow Nepal's official statutory agencies below.  
 > **चेतावनी:** यो खुला तथ्याङ्कमा आधारित वैज्ञानिक जोखिम अवलोकन तथा स्क्रिनिङ पोर्टल हो — आधिकारिक पूर्वसूचना प्रणाली होइन। वास्तविक आपतकालीन अवस्थाका लागि तलका आधिकारिक सरकारी निकाय र हटलाइनमा सम्पर्क गर्नुहोस्।
 
 ## Nepal Emergency Hotlines & Official Statutory Agencies
@@ -13,84 +13,98 @@
 | **DHM Flood & Hydro-Met Warning** (जल तथा मौसम विज्ञान विभाग) | **`1155`** | [hydrology.gov.np](https://hydrology.gov.np/) |
 | **NDRRMA / National Emergency Operation Centre (NEOC)** (राष्ट्रिय विपद् जोखिम न्यूनीकरण तथा व्यवस्थापन प्राधिकरण) | **`1149`** | [bipadportal.gov.np](https://bipadportal.gov.np/) |
 | **DMG / National Earthquake Monitoring & Research Centre (NEMRC)** (राष्ट्रिय भूकम्प मापन तथा अनुसन्धान केन्द्र) | — | [seismonepal.gov.np](https://seismonepal.gov.np/) |
+| **Department of Roads (DoR)** (सडक विभाग — Strategic Road Network) | — | [dor.gov.np](https://dor.gov.np/) |
 | **Nepal Police** (नेपाल प्रहरी) | **`100`** | — |
 | **Ambulance** (एम्बुलेन्स) | **`102`** | — |
 | **Armed Police Force — Search & Rescue** (सशस्त्र प्रहरी बल) | **`1114`** | — |
 
 ## **Live Observatory: [https://prazg.github.io/Nepal_TRAYA/](https://prazg.github.io/Nepal_TRAYA/)**
 
+### Governance, Science & Strategy Documentation
+
+- **[`DATA_LICENSES.md`](DATA_LICENSES.md)** — Strict separation of MIT source code from every upstream open-data license (`ODbL 1.0`, `CC BY 4.0`, `CC BY-SA 4.0`, Copernicus Open Data, USGS/NASA Public Domain, ICIMOD RDS, HydroSHEDS) and Government of Nepal statutory non-redistribution governance.
+- **[`docs/MODEL_CARDS.md`](docs/MODEL_CARDS.md)** — Transparent scientific model cards (intended use, non-operational warnings, inputs, physics/algorithms, validation, and uncertainty bounds) for all 6 screening models.
+- **[`docs/INSTITUTIONAL_INTEGRATION_SPEC.md`](docs/INSTITUTIONAL_INTEGRATION_SPEC.md)** (`TRAYA-006`) — Agency interoperability specification for DHM, DMG/NEMRC, NDRRMA/BIPAD (documenting verified live BIPAD v1 API schemas), and DoR, including official-vs-modelled UI boundaries and Wave D MOU prerequisites.
+- **[`docs/TSHO_ROLPA_2D_STUDY_PLAN.md`](docs/TSHO_ROLPA_2D_STUDY_PLAN.md)** (`TRAYA-011`) — Reproducible open-source 2D hydrodynamic GLOF case-study protocol (`LISFLOOD-FP` / `BASEMENT`) for Tsho Rolpa, Rolwaling–Tama Koshi, and Upper Tamakoshi HPP checkpoints.
+- **[`ROADMAP.md`](ROADMAP.md)** — TRĀYA 2.0 Waves A–D delivery plan mapping GitHub Issues `#1`–`#10` (`TRAYA-003`, `TRAYA-005`–`TRAYA-013`) across milestones `v2.0-foundation`, `v2.1-nepal-data`, `v2.2-science`, and `v3.0-pilot`.
+- **[`SECURITY.md`](SECURITY.md)** — Coordinated vulnerability disclosure policy and browser/CI security controls.
+
 ---
 
-## Key Platform Capabilities (v2 Architecture)
+## Key Platform Capabilities (TRĀYA 2.0 Architecture)
 
-- **77-District & 7-Province Unified Triage (`data/districts.json`):** Search and inspect cross-hazard context across all **77 Nepalese districts** and **7 canonical provinces** (*Koshi, Madhesh, Bagmati, Gandaki, Lumbini, Karnali, Sudurpashchim*), including high-mountain, mid-hill, and Terai districts where no glacial lakes exist.
-- **Bilingual `EN / नेपाली` Interface & WCAG 2.1 AA Accessibility:** Interactive English and Nepali (`नेपाली`) language switcher, persistent bilingual non-operational disclaimer, one-tap Nepal emergency hotlines (`100 / 102 / 1114 / 1149 / 1155`), high-contrast Dark & Light themes, color-vision-deficiency (CVD) safe map shapes/symbols, keyboard focus management, and mobile-first map layout.
-- **Honest Freshness & Live Client-Side Re-Grading:** Every feed displays its exact Nepal Standard Time (`NPT / UTC+05:45`) timestamp and staleness state (weekly snapshots are never disguised as green "live" sensors). Clicking **Refresh live** fetches fresh USGS, Copernicus GloFAS, Open-Meteo rainfall/freezing-level, and Sentinel-2 L2A STAC observations in the browser and recalculates return-period flood tiers and Dahal–Hasegawa rainfall ratios dynamically.
-- **Lazy JSON Payloads & Zero-CDN Hardened Frontend:** Static ES modules (`assets/*.js`, `assets/*.css`), vendored **Leaflet 1.9.4** (`vendor/leaflet/`), zero external JavaScript or Google Fonts CDNs, strict `<meta http-equiv="Content-Security-Policy">` (zero inline `<script>`, `<style>`, or `on*=` handlers), `<meta name="referrer" content="no-referrer">`, and lazy-loaded `data/*.json` payloads so the initial map paints rapidly on mobile connections.
+- **Official NDRRMA / BIPAD Data Separation (`src/integrations/bipad.py`, `TRAYA-005`):** Ingests read-only public Government of Nepal BIPAD Portal v1 alerts, verified landslide incidents (`hazard=17`, `expand=loss`), DHM rain/river relays, and NSC earthquakes into `data/bipad_official.json` — strictly preserving JSON `null` for missing counts (`None` is never coerced to `0`) and rendering statutory records separately from modelled watches. Direct DHM (`dhm.py`), DMG/NEMRC (`nemrc.py`), and DoR (`roads_authority.py`) institutional adapters carry explicit `requires_institutional_agreement: true` stubs pending formal MOUs (`TRAYA-006`).
+- **6-State `ProvenanceEnvelope`, SHA-256 Manifest & Source Health (`src/integrations/provenance.py`, `TRAYA-003`):** Every feed emits a canonical `2.0.0` provenance envelope classifying its `data_class` (`live_observation`, `forecast`, `historical`, `static_assessment`, `cached`, `unavailable`), freshness `status` (`available`, `stale`, `unavailable`), SLA expiry, and Source Health roll-up (`healthy`, `degraded`, `stale`), backed by SHA-256 input/output checksums in `data/manifest.json`. Weekly snapshots are never disguised as green "live" sensors.
+- **5-Type National Landslide Inventory & Flag-Only Duplicate Review Queue (`src/landslides.py`, `TRAYA-007`):** Conforms to [`schemas/landslide_event.v1.schema.json`](schemas/landslide_event.v1.schema.json), strictly partitioning records into `landslide_event`, `landslide_scar`, `susceptibility_zone`, `hazard_report`, and `coseismic_failure` with a strict `null`-not-`0` rule. Potential cross-source duplicates (`<= 1.5 km` & `<= 3 days` dated; `<= 0.35 km` undated cross-source) are flagged into `data/landslide_review_queue.json` (`auto_merged: false`) alongside QGIS-ready RFC 7946 `data/landslide_inventory.geojson`.
+- **1 km Corridor Exposure & Road-Cut Hospital Isolation (`src/exposure_isolation.py`, `TRAYA-009`):** Keeps Rounce et al. (2016) GLOF hazard classes untouched while separating cleaned 1 km perpendicular corridor exposure (human health facilities, vehicular vs. trail bridges, deduplicated hydropower MW) and functional road-cut hospital isolation across 3 bridge-cut mechanisms (`downstream_bridge_cut`, `cross_river_bridge_cut`, `upper_valley_single_egress_cut`) in `data/exposure_isolation.json`.
+- **Interpretable Rule-Based Directed Cascade Graph (`src/cascades.py`, `TRAYA-010`):** Evaluates 3 auditable physical cascade chains (`rain_landslide_dam_road`, `quake_coseismic_isolation`, `glof_infra_isolation`) with explicit per-edge `evidence_type` (`observed` | `forecast` | `modelled_static`), `trigger_rule`, `uncertainty_note`, strict separation of undated OSM scars from live triggers, and bilingual `EN/नेपाली` plain-language summaries (`data/cascades.json`).
+- **All-Weather Sentinel-1 SAR & Sentinel-2 L2A EO Discovery (`src/integrations/copernicus.py`, `TRAYA-012`):** Discovers cloud-penetrating C-band **Copernicus Sentinel-1 GRD** (`sentinel-1-grd`, IW VV/VH) repeat-pass scenes alongside 10 m **Sentinel-2 L2A** optical quicklooks via Element84 Earth Search STAC (`data/eo_sar.json`) to sustain priority glacial lake observation through June–September monsoon cloud cover.
+- **Tsho Rolpa 2D Hydrodynamic Pilot Study Plan (`docs/TSHO_ROLPA_2D_STUDY_PLAN.md`, `TRAYA-011`):** Reproducible `LISFLOOD-FP` (`fv1`) & `BASEMENT v4` 2D study protocol spanning bathymetry, 1998–2000 lowering history, 4×3 breach/sediment-bulking hydrographs, and 10 Rolwaling–Tama Koshi checkpoints including Upper Tamakoshi HPP (456 MW) and Singati Community Hospital.
+- **77-District Bilingual `EN / नेपाली` Hardened Observatory:** Unified cross-hazard triage across all 77 Nepalese districts and 7 canonical provinces (*Koshi, Madhesh, Bagmati, Gandaki, Lumbini, Karnali, Sudurpashchim*), WCAG 2.1 AA high-contrast Dark/Light themes, CVD-safe map symbols, vendored **Leaflet 1.9.4**, zero external JS/font CDNs, strict `<meta http-equiv="Content-Security-Policy">` (zero inline `<script>`, `<style>`, or `on*=` attributes), and `<meta name="referrer" content="no-referrer">`.
 
 ---
 
 ## Multi-Hazard Scientific Architecture
 
-### 1. Glacial Lake Outburst Floods (1,429 Screened Glacial Lakes)
+*(Full assumptions, validation tables, and uncertainty bounds are documented in [`docs/MODEL_CARDS.md`](docs/MODEL_CARDS.md).)*
 
-For every mapped glacial lake in the Nepal Cryosphere Inventory (with all 1,429 lakes attributed to canonical Nepalese provinces):
+### 1. Glacial Lake Outburst Floods (1,429 Screened Glacial Lakes)
 
 | Step | Scientific Question | Published Method & Open Dataset |
 | --- | --- | --- |
 | **Mass movement** | Can an ice avalanche or rockfall reach the lake? | Slope thresholds (45–60° glacierised; >30° non-glacierised) and volume-dependent reach angle ($\tan\alpha = 1.111 - 0.118\log_{10}V$) over a D8 route on a depression-filled **Copernicus DEM GLO-30** — Rounce et al. (2016), after Alean (1985), Bolch et al. (2011), Huggel et al. (2004) |
-| **Dam stability** | Can the moraine self-destruct? | Steep lakefront area (SLA > 10° depression angle within 1 km of shoreline) and permafrost-belt context ($\ge$4,800 m; Gruber, 2012) — Fujita et al. (2013) |
-| **Water & lowering** | How much water could drain? | Bayesian depth–area posterior on 24 Himalayan bathymetric surveys + half-ellipsoid basin across 10%, 30%, 50%, and 100% breach fractions — Veh et al. (2020); independently, Potential Flood Volume ($\mathrm{PFV} = \min[H_p, D_m] \cdot A$) — Fujita et al. (2013) |
+| **Dam stability** | Can the moraine self-destruct? | Steep lakefront area (SLA > 10° depression angle within 1 km of shoreline, $\ge 4$ contiguous cells) and permafrost-belt context ($\ge 4,800\text{ m}$; Gruber, 2012) — Fujita et al. (2013) |
+| **Water & lowering** | How much water could drain? | Bayesian depth–area posterior on 24 Himalayan bathymetric surveys + half-ellipsoid basin across continuous Beta and 10%, 30%, 50%, 100% breach fractions — Veh et al. (2020); independently, Potential Flood Volume ($\mathrm{PFV} = \min[H_p, D_m] \cdot A$, $D_m = 55A^{0.25}$) — Fujita et al. (2013) |
 | **Peak flood** | How large a peak discharge ($Q_p$)? | Dimensionless peak-discharge relation fitted piecewise ($t_{\nu=10}$ noise) to 63 natural dam breaks — Walder & O'Connor (1997), O'Connor & Beebee (2009), Veh et al. (2020) |
-| **Downstream** | Who and what are in the path, and when? | 120 km downstream routing on **HydroRIVERS v1.0**, corridor exposure within 1 km from **OpenStreetMap**, population bracket from **WorldPop 2020** (constrained & unconstrained), surge arrival bracket (2, 5, 10 m s⁻¹) |
-| **Classification** | How do hazard and exposure combine? | Side-by-side display of both readings (general & enumerated) of the Rounce et al. (2016) 4×4 hazard, impact, and risk framework |
+| **Downstream & isolation** | Who and what are in the path, and which hospitals face road-cut isolation? | 120 km routing on **HydroRIVERS v1.0**, exact perpendicular 1 km corridor exposure from **OpenStreetMap**, **WorldPop 2020** constrained/unconstrained population bracket, surge arrival bracket (2, 5, 10 m s⁻¹), and 3-mechanism road-cut hospital isolation screening (`src/exposure_isolation.py`) |
+| **Classification** | How do hazard and exposure combine? | Side-by-side display of both readings (general & enumerated) of the Rounce et al. (2016) 4×4 hazard, impact, and risk framework (`977/1,429 = 68.4%` sensitivity transparently exposed) |
 
 ### 2. Fluvial Flood Watch — Copernicus EMS GloFAS (10 Major River Basins)
 
-- **30-day reanalysis + 30-day ensemble discharge forecasts** (median, interquartile p25–p75, ensemble max) across Nepal's 10 major river outlets (**Mahakali, Karnali, Bheri, Babai, West Rapti, Kali Gandaki, Narayani, Bagmati, Saptakoshi, Kankai**) via the open-access **Open-Meteo Flood API** (Harrigan et al., 2020; Alfieri et al., 2013).
-- Graded against **Gumbel EV1 flood return levels** ($Q_{50}, Q_{90}, Q_{99}, Q_2, Q_5, Q_{20}$) fitted to the available **GloFAS-ERA5 daily reanalysis** annual-maxima record. The exact reanalysis record length (`years`, e.g., the 21-year baseline record in `cache/glofas_climatology.json`) and snapped ~0.05° (~5 km) GloFAS grid cell coordinates (`grid_lat`, `grid_lon`) are disclosed transparently per basin in `data/rivers_watch.json` and the UI.
+- **30-day reanalysis + 30-day ensemble discharge forecasts** (`median`, `p25–p75`, `max`) across Nepal's 10 DHM-referenced river outlets (**Mahakali, Karnali, Bheri, Babai, West Rapti, Kali Gandaki, Narayani, Bagmati, Saptakoshi, Kankai**) via the **Open-Meteo Flood API** (Harrigan et al., 2020; Alfieri et al., 2013), with 3×3 mainstem snapping and sanity bounds (`0/10` off-mainstem warnings).
+- Graded against **Gumbel EV1 flood return levels** ($Q_{50}, Q_{90}, Q_{99}, Q_2, Q_5, Q_{20}$) fitted to **29 valid years (`1997–2025`)** of GloFAS-ERA5 annual maxima (`cache/glofas_climatology.json`), displayed strictly alongside — never merged with — official DHM river telemetry relayed via BIPAD.
 
 ### 3. Earthquakes & Active Himalayan Tectonics
 
-- **GEM Global Active Faults Database** (Styron & Pagani, 2020; incorporating HimaTibetMap): regional active fault surface traces and kinematics with per-lake fault proximity (`fault_km`). *(Note: 2D surface traces are regional context and do not represent full 3D Main Himalayan Thrust décollement geometry.)*
-- **USGS Real-Time & Historical Seismicity:** Nepal-bounding-box FDSN live queries (paused automatically when the browser tab is hidden), automatic **USGS ShakeMap MMI contours**, **USGS Ground-Failure** coseismic landslide & liquefaction alerts (Nowicki Jessee et al., 2018; Zhu et al., 2017), and sanitized historical $M \ge 6.0$ seismicity (`data/eq_history_m6.json`, plus full $M \ge 4.0$ archive in `cache/usgs_catalogue.json`).
+- **GEM Global Active Faults Database** (Styron & Pagani, 2020; incorporating HimaTibetMap): 70 Quaternary active surface fault traces (4 non-fault folds excluded) and per-lake proximity (`fault_km`). *(Does not represent the buried 3D Main Himalayan Thrust décollement.)*
+- **USGS Real-Time & Historical Seismicity:** Nepal-region FDSN live queries (paused automatically when tab is hidden), automatic **USGS ShakeMap MMI contours**, **USGS Ground-Failure** coseismic landslide & liquefaction alerts (Nowicki Jessee et al., 2018), sanitized historical $M \ge 6.0$ events (`data/eq_history_m6.json`), and read-only NSC/NEMRC records relayed via BIPAD (with explicit freshness audit).
 
 ### 4. Rainfall- & Earthquake-Triggered Landslides
 
-- **Nepal Himalaya Intensity–Duration Screening:** Rolling 24 h, 72 h, and 168 h precipitation across **24 Nepalese physiographic sentinel nodes** (High Himalaya, Middle Mountains/Mahabharat, Siwalik/Churia) evaluated against **Dahal & Hasegawa (2008)** ($I = 73.90\,D^{-0.79}\text{ mm h}^{-1}$) and **Guzzetti et al. (2008)** ($I = 2.20\,D^{-0.44}$), alongside 0–7 cm topsoil moisture.
-- **Documented Landslide Inventories:** **OpenStreetMap** mapped landslide scars and **NASA Global Landslide Catalog / COOLR** records (Kirschbaum et al., 2010; 2015), with exact per-source record counts surfaced dynamically in `data/landslides.json` and `data/summary.json`.
+- **Nepal Himalaya Intensity–Duration Screening:** Rolling 24 h, 72 h, and 168 h **liquid rainfall** (`rain_sum`) across **24 physiographic sentinel nodes** evaluated against **Dahal & Hasegawa (2008)** ($I = 73.90\,D^{-0.79}\text{ mm h}^{-1}$; $E_c = 144.0 / 181.4 / 216.8\text{ mm}$) and **Guzzetti et al. (2008)** ($I = 2.20\,D^{-0.44}$), alongside 0–7 cm soil moisture.
+- **5-Type National Landslide Inventory:** Combines NDRRMA BIPAD verified landslide incidents (`hazard=17`), NASA COOLR reports, OpenStreetMap mapped landslide scars, USGS coseismic failures, and static/community records under `schemas/landslide_event.v1.schema.json` with flag-only duplicate queuing (`data/landslide_review_queue.json`).
 
-### 5. Satellite Earth Observation & Cryosphere Thermal Regime
+### 5. Satellite Earth Observation, SAR & Cryosphere Thermal Regime
 
-- **Copernicus Sentinel-2 L2A STAC Discovery** (Element84 Earth Search on AWS Open Data): cloud-screened optical quicklooks, scene IDs, cloud cover percentages, and direct Copernicus Browser links for priority and ice-cored lakes — plus on-demand in-browser STAC queries for any of the 1,429 lakes.
-- **EOX Sentinel-2 Cloudless (10 m)** global optical mosaic basemap (CC-BY-4.0) plus offline *"No basemap"* fallback.
-- **NASA EOSDIS GIBS Live Overlays:** Keyless WMTS layers for **GPM IMERG Precipitation Rate**, **MODIS Terra NDSI Snow Cover**, and **VIIRS SNPP True Colour**.
-- **0 °C Freezing-Level Isotherm:** Tracks atmospheric freezing-level altitude (`freezinglevel_height`) relative to glacial lake elevation to flag warm rain-on-snow / hanging-ice melt episodes.
-- **UN OCHA / EC JRC GDACS:** Regional multi-hazard disaster alerts across the Hindu Kush Himalaya.
+- **Copernicus Sentinel-1 SAR (`sentinel-1-grd`) & Sentinel-2 L2A (`sentinel-2-l2a`) STAC Discovery** (Element84 Earth Search): cloud-penetrating C-band IW VV/VH SAR metadata (`data/eo_sar.json`) paired with 10 m optical quicklooks, cloud percentages, and Copernicus Browser links for priority and ice-cored glacial lakes.
+- **EOX Sentinel-2 Cloudless (10 m)** mosaic (CC BY 4.0) + offline *"No basemap"* fallback + **NASA EOSDIS GIBS** keyless WMTS overlays (GPM IMERG precipitation, MODIS Terra NDSI snow cover, VIIRS SNPP True Colour).
+- **0 °C Freezing-Level Isotherm (`warm_rain_on_ice`):** Flags priority glacial lakes experiencing $\ge 10\text{ mm}$ 12-day liquid rain while the 0 °C isotherm rises $\ge 300\text{ m}$ above lake elevation.
+- **UN OCHA / EC JRC GDACS:** Regional Hindu Kush Himalaya multi-hazard alerts.
 
 ---
 
 ## Automated 7-Day Refresh vs. Full GIS Rebuild
 
-TRĀYA separates routine weekly data refreshes from heavy GIS/DEM modeling so CI runs rapidly, reliably, and without heavyweight native geospatial builds:
+TRĀYA separates routine weekly data refreshes from heavy GIS/DEM modeling so CI runs rapidly, reliably, and without native geospatial build dependencies:
 
 ### Tier 1 — Automated 7-Day Weekly Refresh & Verification (Python 3.12 Stdlib ONLY)
 
 Zero third-party `pip` packages are required. Both GitHub Actions workflows run natively on **Node 24** actions (`checkout@v7`, `setup-python@v7`, `cache@v6`, `configure-pages@v6`, `upload-pages-artifact@v5`, `deploy-pages@v5`):
 
-- **`.github/workflows/weekly-refresh.yml`** runs every Monday at `03:15 UTC` (`09:00 NPT`) and on demand via `workflow_dispatch` (with optional `refresh_osm` toggle):
-  1. Executes `python src/refresh_weekly.py` (orchestrating pure-stdlib `src/seismic.py`, `src/faults.py`, `src/floods.py`, `src/landslides.py`, `src/hydromet.py`, `src/alerts.py`, and rebuilding lazy `data/*.json` payloads).
+- **`.github/workflows/weekly-refresh.yml`** runs every Monday at `03:15 UTC` (`09:00 NPT`) and on demand via `workflow_dispatch`:
+  1. Executes `python src/refresh_weekly.py` (orchestrating pure-stdlib `src/integrations/*.py`, `src/seismic.py`, `src/faults.py`, `src/floods.py`, `src/landslides.py`, `src/hydromet.py`, `src/alerts.py`, `src/exposure_isolation.py`, `src/cascades.py`, and rebuilding `data/*.json` + `data/manifest.json`).
   2. Executes `python src/test_pipeline.py --unit-only` (pure-stdlib unit tests).
-  3. Executes `python src/verify_site.py` (enforces Node 24 workflows, byte-identical `index.html` ↔ `src/template.html`, CSP & zero-inline HTML security, Nepal hotlines & statutory links, `.prazg-suite-bar`, 77 districts / 7 canonical provinces, zero blank lake provinces, zero `?` mojibake, and ES module balance/import/XSS checks).
-  4. Commits refreshed data/caches (`git pull --rebase --autostash` before push) and deploys `index.html`, `assets/`, `data/`, `vendor/`, and `.nojekyll` to GitHub Pages.
-- **`.github/workflows/pages.yml`** deploys pushes to `main` (with `cancel-in-progress: false` so pushes never interrupt a scheduled refresh) and runs `python src/verify_site.py` as a mandatory pre-deploy gate.
+  3. Executes `python src/verify_site.py` (enforces Node 24 workflows, byte-identical `index.html === src/template.html`, strict CSP & zero-inline HTML security, Nepal hotlines & statutory links, `.prazg-suite-bar`, 77 districts / 7 canonical provinces, zero blank lake provinces, zero `?` mojibake, and ES module static/XSS checks).
+  4. Commits refreshed data/caches (`git pull --rebase --autostash`) and deploys to GitHub Pages.
+- **`.github/workflows/pages.yml`** deploys pushes to `main` (`cancel-in-progress: false`) behind the mandatory `python src/verify_site.py` gate.
 
 ```bash
 # Run locally with Python 3.12 stdlib only (no virtual environment or pip install needed):
-python src/refresh_weekly.py            # 7-day open-data refresh & JSON payload rebuild
-python src/refresh_weekly.py --refresh-osm  # optional: also refresh Overpass OSM exposure/admin
-python src/test_pipeline.py --unit-only # pure-stdlib unit tests
-python src/verify_site.py               # full CI verification gate (<2s)
+python src/refresh_weekly.py               # 7-day open-data refresh & JSON payload rebuild
+python src/refresh_weekly.py --offline     # zero-network deterministic rebuild from cache/
+python src/refresh_weekly.py --refresh-osm # optional: also refresh Overpass OSM exposure/admin
+python src/test_pipeline.py --unit-only    # pure-stdlib unit tests
+python src/verify_site.py                  # full CI verification gate (<2s)
 ```
 
 ### Tier 2 — Full GIS / Copernicus DEM / GLOF Modeling Rebuild (`requirements.txt`)
@@ -106,7 +120,7 @@ cd src
 python fetch_inputs.py --core           # lakes, glaciers, HydroRIVERS, WorldPop, calibration data
 python build.py                         # full GIS + multi-hazard assembly
 python test_pipeline.py                 # full unit test suite (including numpy/terrain tests)
-python validate.py                      # external & internal scientific validation suite
+python validate.py                      # external & internal scientific validation suite (29 checks)
 
 # Optional: rebuild cache/terrain.json from raw Copernicus DEM GLO-30 tiles (~1.4 GB)
 python fetch_inputs.py --dem
@@ -126,20 +140,20 @@ python make_figures.py                  # paper/generated/fig_*.pdf
 
 ## Known Limitations (Read Before Using Any Number)
 
-1. **Nothing here is a probability or operational alert.** No estimate is made of the likelihood of dam failure, slope failure, flood occurrence, or earthquake occurrence in any period.
-2. **Small potential flood volumes (<5 Mm³) are under-detected at 30 m resolution.** $\mathrm{PFV} = 0$ is a statement about the 30 m DEM, not a statement that a lake is safe.
-3. **Peak discharge carries a factor-of-two typical error** and a 95% interval spanning ~2 orders of magnitude. Always report the interval.
-4. **No 2D hydrodynamic inundation footprint is computed.** The 1 km river corridor is an exposure screening buffer, not a flood extent.
-5. **Buried ice in moraines** is flagged only where documented in peer-reviewed literature; hazard classes elsewhere are lower bounds.
-6. **Decision-tree sensitivity:** 68% of lakes shift hazard class between the general and literal-enumerated readings of Rounce et al. (2016) Sect. 4.2 — both readings are exposed in the UI for direct inspection.
-7. **Regional hydromet & flood grids:** GloFAS (~0.05° / ~5 km grid) and Dahal & Hasegawa (2008) represent regional hydrological/meteorological regimes, not site-specific geotechnical or flash-flood models. Return-period precision depends on the reanalysis sample length (`years`) reported per basin.
-8. **OpenStreetMap coverage is uneven** and **routed exposure stops at the Nepalese border**, so downstream asset counts are lower bounds.
+1. **Nothing here is a probability or operational alert.** No estimate is made of the likelihood of dam failure, slope failure, flood occurrence, cascade propagation, or earthquake occurrence in any period.
+2. **Small potential flood volumes (<5 Mm³) are under-detected at 30 m resolution.** Only `0/4` small (<5 Mm³) published PFVs are recovered on Copernicus DEM GLO-30; $\mathrm{PFV} = 0$ is a 30 m DEM limit, not a safety certificate.
+3. **Peak discharge carries a factor-of-two typical error** and a 95% predictive interval spanning 2–3 orders of magnitude. Always report the full interval.
+4. **No 2D hydrodynamic inundation footprint is computed yet.** The 1 km corridor is an exposure screening buffer, not a flood extent (see [`docs/TSHO_ROLPA_2D_STUDY_PLAN.md`](docs/TSHO_ROLPA_2D_STUDY_PLAN.md) for the reproducible 2D pilot protocol).
+5. **Buried ice in moraines** is documented for only 5 lakes from peer-reviewed literature; hazard classes for the remaining 1,424 lakes are lower bounds.
+6. **Decision-tree sensitivity:** `977/1,429` lakes (`68.4%`) shift hazard class between the general and enumerated readings of Rounce et al. (2016) Sect. 4.2 — both are displayed side-by-side.
+7. **Regional hydromet & flood grids:** GloFAS (~5 km) and Open-Meteo NWP (~9–11 km) smooth localized orographic cloudbursts and omit hydropower/barrage gate operations; official BIPAD river and earthquake endpoints can contain null or stale rows (surfaced via `ProvenanceEnvelope`).
+8. **OpenStreetMap coverage is uneven & stops at the border:** Downstream asset counts and road-cut isolation metrics are strict **lower bounds** (e.g., Tsho Rolpa shows `n_hydropower = 0` in OSM despite Upper Tamakoshi 456 MW at Gonggar and Khimti I 60 MW downstream).
 
 ---
 
 ## Nepal Open-Science Observatory Suite
 
-TRĀYA is part of an interconnected open-science observatory suite for Nepal by `@prazg`:
+TRĀYA is part of an interconnected open-science observatory suite for Nepal by `@prazg` (linked persistently in `.prazg-suite-bar`):
 
 | Observatory / Portal | Scope | Live URL |
 | --- | --- | --- |
@@ -155,40 +169,42 @@ TRĀYA is part of an interconnected open-science observatory suite for Nepal by 
 ## Repository Layout
 
 ```text
-index.html                              static observatory shell (byte-identical to src/template.html)
-assets/                                 modular ES modules (*.js) & accessible theme stylesheets (*.css)
-vendor/leaflet/                         vendored Leaflet 1.9.4 (zero external JS/CSS CDN needed)
-data/*.json                             lazy-loaded JSON payloads (summary, lakes, districts, routes,
-                                        exposure, eq_history_m6, glof_history, faults, rivers_watch,
-                                        landslides, hydromet_weekly, gdacs_alerts, validation, model_fit)
-cache/*.json                            cached upstream snapshots & Copernicus DEM terrain metrics
-src/config.py                           centralised scientific thresholds, stations & citations
-src/refresh_weekly.py                   pure-stdlib 7-day refresh & JSON builder orchestrator
-src/floods.py                           Copernicus GloFAS mainstem forecasts & EV1 climatology (stdlib)
-src/hydromet.py                         Open-Meteo 24-node rainfall, 0 °C isotherm & Sentinel-2 STAC (stdlib)
-src/landslides.py                       Dahal & Hasegawa (2008) screening & OSM/NASA COOLR records (stdlib)
-src/faults.py, src/seismic.py           GEM Active Faults & USGS FDSN seismicity catalogue (stdlib)
-src/alerts.py                           UN/EC GDACS regional multi-hazard alerts (stdlib)
-src/verify_site.py                      pure-stdlib CI & local pre-deploy verification gate
-src/test_pipeline.py                    unit tests (--unit-only runs in pure stdlib)
-src/terrain.py, src/build_terrain.py    Copernicus DEM GLO-30 slope, D8 routing, reach angle, SLA, PFV
-src/models_glof.py, src/hazard.py       Bayesian depth/volume, dam-break Qp & Rounce (2016) classification
-src/routing.py, src/exposure.py         HydroRIVERS v1.0 network routing & OSM/WorldPop exposure
-src/admin.py, src/build.py              77-district / 7-province admin index & full GIS assembly
-src/validate.py, src/sensitivity.py     published benchmark reproduction & sensitivity analysis
-src/make_figures.py, src/make_tables.py manuscript PDF figures & LaTeX table generators
-requirements.txt                        full GIS/DEM rebuild dependencies
-requirements-paper.txt                  manuscript figure/table dependencies (-r requirements.txt + matplotlib)
-SECURITY.md                             vulnerability disclosure policy
-.github/workflows/pages.yml             Node 24 Pages deploy with pre-deploy verify_site.py gate
-.github/workflows/weekly-refresh.yml    Node 24 scheduled 7-day stdlib refresh, verification & deploy
+index.html                                  static observatory shell (byte-identical to src/template.html)
+assets/                                     modular ES modules (*.js) & accessible theme stylesheets (*.css)
+vendor/leaflet/                             vendored Leaflet 1.9.4 (BSD-2-Clause; zero external CDN)
+schemas/landslide_event.v1.schema.json      JSON Schema for 5-type national landslide inventory
+data/*.json, data/*.geojson                 lazy-loaded payloads (summary, manifest, lakes, districts, routes,
+                                            exposure, exposure_isolation, cascades, bipad_official, eo_sar,
+                                            landslides, landslide_review_queue, landslide_inventory.geojson,
+                                            rivers_watch, hydromet_weekly, eq_history_m6, glof_history,
+                                            faults, gdacs_alerts, validation, model_fit)
+cache/*.json                                cached upstream snapshots & Copernicus DEM terrain metrics
+src/integrations/provenance.py              6-state ProvenanceEnvelope, SHA-256 manifest & Source Health (stdlib)
+src/integrations/bipad.py                   NDRRMA BIPAD Portal API v1 read-only official client (stdlib)
+src/integrations/copernicus.py              Sentinel-1 SAR GRD & Sentinel-2 L2A STAC discovery (stdlib)
+src/integrations/{usgs,openmeteo,osm,icimod}.py  open-data provenance wrappers (stdlib)
+src/integrations/{dhm,nemrc,roads_authority}.py  institutional adapter stubs (requires MOU; stdlib)
+src/landslides.py                           5-type landslide inventory, null-not-0 & review queue (stdlib)
+src/exposure_isolation.py                   1 km corridor exposure & road-cut hospital isolation (stdlib)
+src/cascades.py                             interpretable 3-chain directed cascade graph engine (stdlib)
+src/refresh_weekly.py                       pure-stdlib 7-day refresh & JSON builder orchestrator
+src/floods.py, src/hydromet.py              GloFAS EV1 river watch & Dahal–Hasegawa hydromet (stdlib)
+src/faults.py, src/seismic.py, src/alerts.py GEM faults, USGS seismicity & GDACS alerts (stdlib)
+src/verify_site.py, src/test_pipeline.py    pure-stdlib CI verification gate & unit tests
+src/terrain.py, src/models_glof.py, src/hazard.py, src/routing.py, src/exposure.py, src/build.py  Tier 2 GIS/GLOF stack
+DATA_LICENSES.md                            MIT code vs. upstream dataset licenses & GoN governance
+ROADMAP.md                                  TRĀYA 2.0 Waves A–D roadmap & GitHub Issues #1–#10
+docs/MODEL_CARDS.md                         6 transparent scientific model cards
+docs/INSTITUTIONAL_INTEGRATION_SPEC.md      DHM / DMG-NEMRC / NDRRMA-BIPAD / DoR spec (TRAYA-006)
+docs/TSHO_ROLPA_2D_STUDY_PLAN.md            reproducible Tsho Rolpa 2D GLOF study plan (TRAYA-011)
+SECURITY.md                                 coordinated vulnerability disclosure policy
+.github/workflows/{pages,weekly-refresh}.yml Node 24-native CI/CD workflows
 ```
 
-## Security, Licences & Attribution
+## Security, Licenses & Attribution
 
 - **Security disclosures:** See [`SECURITY.md`](SECURITY.md) (report privately via GitHub Security Advisories or `prajwal.ghimire@crick.ac.uk`).
-- **Licence:** Code in `src/` and `assets/` is MIT (see [`LICENSE`](LICENSE)). Derived data products in `data/` attribute their open upstream providers:
-  Copernicus DEM GLO-30 (© DLR/ESA), RGI 7.0 & Nepal Cryosphere Inventory (CC-BY-4.0), HydroRIVERS v1.0 (HydroSHEDS), OpenStreetMap (© OSM contributors, ODbL 1.0), WorldPop 2020 (CC-BY-4.0), USGS Earthquake Hazards Program (public domain), GEM Global Active Faults (CC-BY-SA-4.0), Copernicus EMS GloFAS & Open-Meteo (CC-BY-4.0), NASA COOLR / EOSDIS GIBS (NASA Open Data), Copernicus Sentinel-2 L2A & EOX Sentinel-2 cloudless (CC-BY-4.0), UN/EC GDACS, ICIMOD HMAGLOFDB v4.0, and Veh, Korup & Walz (2020) supplementary data (CC-BY-4.0, Zenodo 3523213).
+- **Code & Data Licensing:** Original source code in `src/`, `assets/`, and `docs/` is **MIT** ([`LICENSE`](LICENSE)); vendored Leaflet 1.9.4 is **BSD-2-Clause**. Upstream open and Government of Nepal statutory datasets retain their own licenses and governance rules — see the complete license and attribution table in **[`DATA_LICENSES.md`](DATA_LICENSES.md)**.
 
 Built by **Prajwal Ghimire**  
 Copyright © Prajwal Ghimire.  

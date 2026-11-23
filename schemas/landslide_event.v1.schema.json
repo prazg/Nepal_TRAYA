@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prazg.github.io/Nepal_TRAYA/schemas/landslide_event.v1.schema.json",
+  "title": "TRĀYA 2.0 Canonical Landslide & Slope-Failure Record (v1)",
+  "description": "Formal schema strictly partitioning slope-failure records into five canonical feature types and enforcing null-not-0 semantics for unknown dates and casualty/impact counts (reserving 0 strictly for verified zero-casualty official records).",
+  "type": "object",
+  "required": [
+    "id",
+    "feature_type",
+    "provider_id",
+    "source",
+    "data_class",
+    "title",
+    "title_ne",
+    "event_date_utc",
+    "date_precision",
+    "lon",
+    "lat",
+    "district",
+    "province",
+    "trigger",
+    "fatalities",
+    "injuries",
+    "households_affected",
+    "verified",
+    "evidence_url",
+    "license_ref"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Globally unique stable record identifier prefixed by provider (e.g., bipad_96552, coolr_12345, osm_n1812714613)."
+    },
+    "feature_type": {
+      "type": "string",
+      "enum": [
+        "landslide_event",
+        "landslide_scar",
+        "susceptibility_zone",
+        "hazard_report",
+        "coseismic_failure"
+      ],
+      "description": "Strict 5-class partition separating dated events, undated geomorphic scars, static susceptibility zones, unverified community/field observations, and earthquake-triggered slope failures."
+    },
+    "provider_id": {
+      "type": "string",
+      "enum": [
+        "bipad_ndrrma",
+        "nasa_coolr",
+        "osm_overpass",
+        "usgs_ground_failure",
+        "traya_static",
+        "community_field"
+      ],
+      "description": "Canonical machine identifier for the upstream data provider."
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable attribution string for the upstream source."
+    },
+    "data_class": {
+      "type": "string",
+      "enum": [
+        "official_observed",
+        "observed_catalog",
+        "mapped_inventory",
+        "community_report",
+        "static_assessment",
+        "observed_coseismic"
+      ],
+      "description": "Epistemic class distinguishing statutory official observations, curated catalogs, undated mapped inventories, community reports, and static assessments."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Concise English or primary title of the event or mapped feature."
+    },
+    "title_ne": {
+      "type": ["string", "null"],
+      "description": "Optional Nepali (Devanagari) title when provided by upstream source (e.g., BIPAD titleNe); null if unavailable."
+    },
+    "event_date_utc": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      "description": "ISO-8601 UTC event date/timestamp for dated events; MUST be null when unknown or for undated scars."
+    },
+    "date_precision": {
+      "type": "string",
+      "enum": ["day", "month", "year", "unknown"],
+      "description": "Temporal precision of event_date_utc; MUST be 'unknown' whenever event_date_utc is null."
+    },
+    "lon": {
+      "type": "number",
+      "minimum": 79.5,
+      "maximum": 88.8,
+      "description": "WGS84 longitude in decimal degrees (Nepal region bounds)."
+    },
+    "lat": {
+      "type": "number",
+      "minimum": 26.0,
+      "maximum": 31.0,
+      "description": "WGS84 latitude in decimal degrees (Nepal region bounds)."
+    },
+    "district": {
+      "type": ["string", "null"],
+      "description": "Canonical Nepal district name (77-district OSM admin_level=6 lookup); null if outside boundary."
+    },
+    "province": {
+      "type": ["string", "null"],
+      "enum": [
+        "Koshi Province",
+        "Madhesh Province",
+        "Bagmati Province",
+        "Gandaki Province",
+        "Lumbini Province",
+        "Karnali Province",
+        "Sudurpashchim Province",
+        null
+      ],
+      "description": "Canonical Nepal province name (7 provinces); null if outside boundary."
+    },
+    "trigger": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Physical trigger or classification (e.g., rainfall, earthquake, mapped scar, unknown)."
+    },
+    "fatalities": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Confirmed fatalities. Unknown values MUST be null; 0 is strictly reserved for verified zero-casualty official records (verified=true)."
+    },
+    "injuries": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Confirmed injuries. Unknown values MUST be null; 0 is strictly reserved for verified zero-casualty official records (verified=true)."
+    },
+    "households_affected": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Confirmed affected households/families. Unknown values MUST be null; 0 is strictly reserved for verified official records (verified=true)."
+    },
+    "verified": {
+      "type": "boolean",
+      "description": "True strictly for officially verified statutory/agency records (e.g., BIPAD NDRRMA verified=true)."
+    },
+    "evidence_url": {
+      "type": ["string", "null"],
+      "pattern": "^https://.+",
+      "description": "Nullable HTTPS URL pointing to the upstream evidence record."
+    },
+    "license_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Upstream data license or terms reference."
+    },
+    "date": {
+      "type": ["string", "null"],
+      "description": "Backward-compatible YYYY-MM-DD alias of event_date_utc for legacy UI consumers."
+    },
+    "url": {
+      "type": "string",
+      "description": "Backward-compatible string URL alias of evidence_url (empty string when null) for legacy UI consumers."
+    },
+    "admin": {
+      "type": "string",
+      "description": "Backward-compatible administrative division string for legacy UI consumers."
+    },
+    "category": {
+      "type": "string",
+      "description": "Backward-compatible landslide category string (e.g., landslide, debris_flow, rockfall, cliff)."
+    },
+    "size": {
+      "type": "string",
+      "description": "Optional qualitative event size descriptor when reported upstream."
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "event_date_utc": { "type": "null" } },
+        "required": ["event_date_utc"]
+      },
+      "then": {
+        "properties": { "date_precision": { "const": "unknown" } }
+      },
+      "else": {
+        "properties": { "date_precision": { "enum": ["day", "month", "year"] } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "feature_type": { "const": "landslide_scar" } },
+        "required": ["feature_type"]
+      },
+      "then": {
+        "properties": {
+          "event_date_utc": { "type": "null" },
+          "date_precision": { "const": "unknown" },
+          "fatalities": { "type": "null" },
+          "injuries": { "type": "null" },
+          "households_affected": { "type": "null" },
+          "verified": { "const": false }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "feature_type": { "const": "landslide_event" } },
+        "required": ["feature_type"]
+      },
+      "then": {
+        "properties": {
+          "event_date_utc": { "type": "string" },
+          "date_precision": { "enum": ["day", "month", "year"] }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "verified": { "const": false } },
+        "required": ["verified"]
+      },
+      "then": {
+        "properties": {
+          "fatalities": { "not": { "const": 0 } },
+          "injuries": { "not": { "const": 0 } },
+          "households_affected": { "not": { "const": 0 } }
+        }
+      }
+    }
+  ]
+}
