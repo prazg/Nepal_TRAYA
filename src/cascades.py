@@ -135,39 +135,25 @@ def _parse_iso_utc(val: Any) -> dt.datetime | None:
 
 
 def fetch_live_usgs_m45(days: int = 14) -> list[dict[str, Any]]:
-    """Optional live USGS FDSN M>=4.5 query over Nepal region (stdlib only)."""
-    start = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    params = {
-        "format": "geojson",
-        "starttime": start,
-        "minmagnitude": QUAKE_MIN_MAG,
-        "minlatitude": AL.USGS_NEPAL_BBOX[1],
-        "maxlatitude": AL.USGS_NEPAL_BBOX[3],
-        "minlongitude": AL.USGS_NEPAL_BBOX[0],
-        "maxlongitude": AL.USGS_NEPAL_BBOX[2],
-        "orderby": "time",
-        "limit": 100,
-    }
-    url = f"{C.USGS_QUERY}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        gj = json.loads(resp.read().decode("utf-8"))
+    """Live multi-agency M>=4.5 seismic query (USGS FDSN -> CDN fallback + EMSC fusion)."""
+    raw_events = AL.fetch_usgs_recent_nepal(days=days, min_mag=QUAKE_MIN_MAG)
     out: list[dict[str, Any]] = []
-    for f in gj.get("features") or []:
-        p = f.get("properties") or {}
-        coords = (f.get("geometry") or {}).get("coordinates") or []
-        if len(coords) < 2 or p.get("mag") is None:
+    for ev in raw_events:
+        if ev.get("mag") is None or ev.get("lon") is None or ev.get("lat") is None:
             continue
-        ts = _parse_iso_utc(p.get("time"))
+        ts = _parse_iso_utc(ev.get("time"))
+        srcs = ev.get("sources") or [ev.get("source") or "USGS"]
+        src_label = " + ".join(str(s) for s in srcs)
+        ev_id = str(ev.get("id") or "")
         out.append(
             {
-                "id": f"usgs_{f.get('id')}",
-                "source": "USGS FDSN",
-                "mag": round(float(p["mag"]), 2),
-                "lon": round(float(coords[0]), 4),
-                "lat": round(float(coords[1]), 4),
-                "depth_km": round(float(coords[2]), 1) if len(coords) > 2 and coords[2] is not None else None,
-                "place": str(p.get("place") or "Nepal region"),
+                "id": ev_id if ev_id.startswith(("usgs_", "emsc_")) else f"usgs_{ev_id}",
+                "source": src_label,
+                "mag": round(float(ev["mag"]), 2),
+                "lon": round(float(ev["lon"]), 4),
+                "lat": round(float(ev["lat"]), 4),
+                "depth_km": round(abs(float(ev["depth_km"])), 1) if ev.get("depth_km") is not None else None,
+                "place": str(ev.get("place") or "Nepal region"),
                 "time_utc": ts.strftime("%Y-%m-%dT%H:%M:%SZ") if ts else None,
             }
         )

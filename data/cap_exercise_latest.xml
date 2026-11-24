@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
-  <identifier>urn:traya:cap:exercise:scn-quake-coseismic-isolation:20261123T230930Z</identifier>
+  <identifier>urn:traya:cap:exercise:scn-rain-landslide-road:20261124T104956Z</identifier>
   <sender>traya-exercise-sandbox@prazg.github.io</sender>
-  <sent>2026-11-24T04:54:30+05:45</sent>
+  <sent>2026-11-24T16:34:56+05:45</sent>
   <status>Exercise</status>
   <msgType>Alert</msgType>
   <source>Nepal TRĀYA 2.0 (data/cascades.json)</source>
@@ -15,18 +15,18 @@
   <info>
     <language>en</language>
     <category>Geo</category>
-    <event>Earthquake &amp; Coseismic Slope-Hazard Screening (Exercise)</event>
+    <event>Rainfall, Landslide &amp; Road-Isolation Screening (Exercise)</event>
     <responseType>Monitor</responseType>
     <responseType>Prepare</responseType>
     <urgency>Expected</urgency>
     <severity>Moderate</severity>
     <certainty>Possible</certainty>
-    <effective>2026-11-24T04:54:30+05:45</effective>
-    <expires>2026-11-25T04:54:30+05:45</expires>
+    <effective>2026-11-24T16:34:56+05:45</effective>
+    <expires>2026-11-25T16:34:56+05:45</expires>
     <senderName>Nepal TRAYA Exercise Sandbox (Not Official Warning)</senderName>
-    <headline>[EXERCISE] Coseismic Landslide &amp; Corridor Screening: Bhojpur, Dhankuta +8</headline>
-    <description>EXERCISE DRAFT ONLY (NOT AN OFFICIAL WARNING). TRĀYA multi-hazard screening detected recent M &gt;= 4.5 seismicity near steep mountain corridors and high-hazard glacial lakes across Bhojpur, Dhankuta, Khotang, Okhaldhunga, Panchthar, Sankhuwasabha, Solukhumbu, Taplejung, Terhathum, Udayapur. Active seismic-coseismic screening cascade: 1 recent M&gt;=4.5 earthquake(s) (max M4.6) within 100 km of 240 high-hazard glacial lakes across Bhojpur, Dhankuta, Khotang, Okhaldhunga, Panchthar, Sankhuwasabha, Solukhumbu, Taplejung, Terhathum, Udayapur, exposing 435 corridor bridges and 294 potentially isolated settlements. Verify all seismic bulletins with DMG/NEMRC and NDRRMA.</description>
-    <instruction>Stay clear of loose rock slopes, cracked hillsides, and narrow river gorges after shaking. Inspect access trails and bridges cautiously. For official Nepal bulletins and emergencies contact DHM 1155, NDRRMA/NEOC 1149, APF Rescue 1114, Nepal Police 100, or Ambulance 102.</instruction>
+    <headline>[EXERCISE] Landslide &amp; Corridor Access Screening: Gorkha, Gulmi +1</headline>
+    <description>EXERCISE DRAFT ONLY (NOT AN OFFICIAL WARNING). TRĀYA screening notes recent dated landslide activity or heavy rainfall signals with road and bridge corridor exposure in Gorkha, Gulmi, Kalikot. Active rainfall-landslide-road cascade across Gorkha, Gulmi, Kalikot: 0 observed / 0 forecast Dahal–Hasegawa watch nodes, 4 recent dated landslide(s), 0 elevated river basin(s), and 0 BIPAD DHM river warning(s), overlapping 227 corridor bridges. Confirm highway status with DoR and NDRRMA BIPAD.</description>
+    <instruction>Avoid unnecessary night travel on steep mountain highways and watch for falling debris or muddy stream surges. Verify road status before travel. For official warnings and help call DHM 1155, NDRRMA/NEOC 1149, APF Rescue 1114, Nepal Police 100, or Ambulance 102.</instruction>
     <web>https://prazg.github.io/Nepal_TRAYA/</web>
     <contact>Official Nepal Statutory Hotlines: DHM 1155 | NDRRMA/NEOC 1149 | APF Rescue 1114 | Nepal Police 100 | Ambulance 102</contact>
     <parameter>
@@ -47,11 +47,11 @@
     </parameter>
     <parameter>
       <valueName>traya_scenario_id</valueName>
-      <value>SCN-QUAKE-COSEISMIC-ISOLATION</value>
+      <value>SCN-RAIN-LANDSLIDE-ROAD</value>
     </parameter>
     <parameter>
       <valueName>sms_draft</valueName>
-      <value>[EXERCISE-NOT OFFICIAL] Quake-Slope Watch: Bhojpur, Dhankuta +8. Avoid steep slopes &amp; gorges. Official: 1155/1149/1114/100/102.</value>
+      <value>[EXERCISE-NOT OFFICIAL] Landslide-Road Watch: Gorkha, Gulmi +1. Use caution on hill roads. Official: 1155/1149/1114/100/102.</value>
     </parameter>
     <parameter>
       <valueName>sms_segments</valueName>
@@ -59,67 +59,39 @@
     </parameter>
     <parameter>
       <valueName>ivr_duration_sec</valueName>
-      <value>32.9</value>
+      <value>32.4</value>
     </parameter>
     <area>
-      <areaDesc>Nepal districts: Bhojpur, Dhankuta, Khotang, Okhaldhunga, Panchthar, Sankhuwasabha, Solukhumbu, Taplejung, Terhathum, Udayapur</areaDesc>
+      <areaDesc>Nepal districts: Gorkha, Gulmi, Kalikot</areaDesc>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Bhojpur</value>
+        <value>Gorkha</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Dhankuta</value>
+        <value>Gulmi</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Khotang</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Okhaldhunga</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Panchthar</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Sankhuwasabha</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Solukhumbu</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Taplejung</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Terhathum</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Udayapur</value>
+        <value>Kalikot</value>
       </geocode>
     </area>
   </info>
   <info>
     <language>ne</language>
     <category>Geo</category>
-    <event>भूकम्प तथा भूकम्प-प्रेरित पहिरो स्क्रिनिङ (अभ्यास)</event>
+    <event>वर्षा, पहिरो तथा सडक अवरोध स्क्रिनिङ (अभ्यास)</event>
     <responseType>Monitor</responseType>
     <responseType>Prepare</responseType>
     <urgency>Expected</urgency>
     <severity>Moderate</severity>
     <certainty>Possible</certainty>
-    <effective>2026-11-24T04:54:30+05:45</effective>
-    <expires>2026-11-25T04:54:30+05:45</expires>
+    <effective>2026-11-24T16:34:56+05:45</effective>
+    <expires>2026-11-25T16:34:56+05:45</expires>
     <senderName>नेपाल त्राय अभ्यास परीक्षण प्रणाली (आधिकारिक चेतावनी होइन)</senderName>
-    <headline>[अभ्यास] भूकम्प-प्रेरित पहिरो र करिडोर निगरानी: भोजपुर, धनकुटा (+८)</headline>
-    <description>यो अभ्यास मस्यौदा मात्र हो, आधिकारिक सरकारी चेतावनी होइन। त्राय बहु-प्रकोप स्क्रिनिङले भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर का पहाडी करिडोर र उच्च-जोखिम हिमताल नजिक हालैको भूकम्पीय गतिविधि पहिचान गरेको छ। कृपया राष्ट्रिय भूकम्प मापन केन्द्र (NEMRC) र NDRRMA को आधिकारिक सूचना अवश्य हेर्नुहोस्।</description>
-    <instruction>भूकम्पपछि चर्किएका भिराला जमिन, ढुङ्गा खस्ने पाखा र साँघुरा नदी किनारबाट सुरक्षित टाढा रहनुहोस्। सडक र पुल पार गर्नुअघि सावधानी अपनाउनुहोस्। आधिकारिक सूचना र आपतकालीन सहयोगका लागि DHM 1155, NEOC 1149, सशस्त्र प्रहरी उद्धार 1114, प्रहरी 100 वा एम्बुलेन्स 102 मा फोन गर्नुहोस्।</instruction>
+    <headline>[अभ्यास] पहिरो तथा सडक पहुँच निगरानी: गोरखा, गुल्मी (+१)</headline>
+    <description>यो अभ्यास मस्यौदा मात्र हो, आधिकारिक सरकारी चेतावनी होइन। त्राय स्क्रिनिङमा गोरखा, गुल्मी, कालिकोट जिल्लामा हालैका पहिरो घटना वा वर्षा सूचक र पहाडी सडक-पुल करिडोर जोखिम देखिएको छ। यात्रा गर्नुअघि सडक विभाग (DoR), DHM र NDRRMA को आधिकारिक सूचना जाँच गर्नुहोस्।</description>
+    <instruction>पहिरो सम्भावित पहाडी राजमार्गमा रात्रिकालीन र अनावश्यक यात्रा नगर्नुहोस्। लेदोसहितको खोला तथा भिरालो पाखाबाट सुरक्षित रहनुहोस्। आधिकारिक सूचना र आपतकालीन सहयोगका लागि DHM 1155, NEOC 1149, सशस्त्र प्रहरी 1114, प्रहरी 100 वा एम्बुलेन्स 102 मा फोन गर्नुहोस्।</instruction>
     <web>https://prazg.github.io/Nepal_TRAYA/</web>
     <contact>Official Nepal Statutory Hotlines: DHM 1155 | NDRRMA/NEOC 1149 | APF Rescue 1114 | Nepal Police 100 | Ambulance 102</contact>
     <parameter>
@@ -140,11 +112,11 @@
     </parameter>
     <parameter>
       <valueName>traya_scenario_id</valueName>
-      <value>SCN-QUAKE-COSEISMIC-ISOLATION</value>
+      <value>SCN-RAIN-LANDSLIDE-ROAD</value>
     </parameter>
     <parameter>
       <valueName>sms_draft</valueName>
-      <value>[अभ्यास-आधिकारिक होइन] भोजपुर, धनकुटा (+८): भूकम्प-पहिरो निगरानी। भिरालो र नदी किनारबाट टाढा रहनुहोस्। सूचना: 1155/1149/1114/100/102</value>
+      <value>[अभ्यास-आधिकारिक होइन] गोरखा, गुल्मी (+१): पहिरो-सडक निगरानी। पहाडी सडकमा सावधानी अपनाउनुहोस्। सूचना: 1155/1149/1114/100/102</value>
     </parameter>
     <parameter>
       <valueName>sms_segments</valueName>
@@ -152,67 +124,39 @@
     </parameter>
     <parameter>
       <valueName>ivr_duration_sec</valueName>
-      <value>32.8</value>
+      <value>31.4</value>
     </parameter>
     <area>
-      <areaDesc>नेपाल जिल्लाहरू: भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर</areaDesc>
+      <areaDesc>नेपाल जिल्लाहरू: गोरखा, गुल्मी, कालिकोट</areaDesc>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Bhojpur</value>
+        <value>Gorkha</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Dhankuta</value>
+        <value>Gulmi</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Khotang</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Okhaldhunga</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Panchthar</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Sankhuwasabha</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Solukhumbu</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Taplejung</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Terhathum</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Udayapur</value>
+        <value>Kalikot</value>
       </geocode>
     </area>
   </info>
   <info>
     <language>mai</language>
     <category>Geo</category>
-    <event>भूकम्प आ पहिरो जोखिम निगरानी (अभ्यास)</event>
+    <event>वर्षा, पहिरो आ सड़क अवरोध निगरानी (अभ्यास)</event>
     <responseType>Monitor</responseType>
     <responseType>Prepare</responseType>
     <urgency>Expected</urgency>
     <severity>Moderate</severity>
     <certainty>Possible</certainty>
-    <effective>2026-11-24T04:54:30+05:45</effective>
-    <expires>2026-11-25T04:54:30+05:45</expires>
+    <effective>2026-11-24T16:34:56+05:45</effective>
+    <expires>2026-11-25T16:34:56+05:45</expires>
     <senderName>नेपाल त्राय अभ्यास परीक्षण प्रणाली (आधिकारिक चेतावनी नहि)</senderName>
-    <headline>[अभ्यास] भूकम्प आ पहिरो निगरानी: भोजपुर, धनकुटा (+८)</headline>
-    <description>ई अभ्यास मस्यौदा मात्र अछि, आधिकारिक सरकारी चेतावनी नहि अछि। त्राय जोखिम अवलोकन मे भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर जिला सभक पहाड़ी क्षेत्र आ हिमताल लग हालक भूकम्प दर्ज भेल अछि। आधिकारिक जानकारीक लेल राष्ट्रीय भूकम्प मापन केन्द्र आ NDRRMA केर सूचना अवश्य देखू।</description>
-    <instruction>भूकम्पक बाद कमजोर पहाड़ी ढलान, पत्थर खसबाक स्थान आ नदी किनार सँ सुरक्षित दूर रहू। सड़क आ पुल पार करबाक समय विशेष सावधानी राखू। सरकारी सूचना आ आपतकालीन सहायताक लेल DHM 1155, NEOC 1149, सशस्त्र प्रहरी 1114, पुलिस 100 वा एम्बुलेन्स 102 पर फोन करू।</instruction>
+    <headline>[अभ्यास] पहिरो आ सड़क पहुँच निगरानी: गोरखा, गुल्मी (+१)</headline>
+    <description>ई अभ्यास मस्यौदा मात्र अछि, आधिकारिक सरकारी चेतावनी नहि अछि। त्राय स्क्रिनिङ मे गोरखा, गुल्मी, कालिकोट जिला मे हालक पहिरो वा वर्षा सूचक संग सड़क आ पुल जोखिम देखल गेल अछि। यात्रा सँ पहिने सड़क विभाग, DHM आ NDRRMA केर आधिकारिक सूचना अवश्य देखू।</description>
+    <instruction>पहिरो संभावित पहाड़ी सड़क पर रातिक यात्रा आ अनावश्यक आवागमन सँ बचू। कमजोर ढलान आ तेज बहाव सँ दूर रहू। आधिकारिक जानकारी आ आपतकालीन सहायताक लेल DHM 1155, NEOC 1149, सशस्त्र प्रहरी 1114, पुलिस 100 वा एम्बुलेन्स 102 पर फोन करू।</instruction>
     <web>https://prazg.github.io/Nepal_TRAYA/</web>
     <contact>Official Nepal Statutory Hotlines: DHM 1155 | NDRRMA/NEOC 1149 | APF Rescue 1114 | Nepal Police 100 | Ambulance 102</contact>
     <parameter>
@@ -233,11 +177,11 @@
     </parameter>
     <parameter>
       <valueName>traya_scenario_id</valueName>
-      <value>SCN-QUAKE-COSEISMIC-ISOLATION</value>
+      <value>SCN-RAIN-LANDSLIDE-ROAD</value>
     </parameter>
     <parameter>
       <valueName>sms_draft</valueName>
-      <value>[अभ्यास-सरकारी नहि] भोजपुर, धनकुटा (+८): भूकम्प-पहिरो निगरानी। ढलान आ नदी किनार सँ दूर रहू। सूचना: 1155/1149/1114/100/102</value>
+      <value>[अभ्यास-सरकारी नहि] गोरखा, गुल्मी (+१): पहिरो-सड़क निगरानी। पहाड़ी सड़क पर सावधानी राखू। सूचना: 1155/1149/1114/100/102</value>
     </parameter>
     <parameter>
       <valueName>sms_segments</valueName>
@@ -248,64 +192,36 @@
       <value>32.8</value>
     </parameter>
     <area>
-      <areaDesc>नेपाल जिल्लाहरू: भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर</areaDesc>
+      <areaDesc>नेपाल जिल्लाहरू: गोरखा, गुल्मी, कालिकोट</areaDesc>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Bhojpur</value>
+        <value>Gorkha</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Dhankuta</value>
+        <value>Gulmi</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Khotang</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Okhaldhunga</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Panchthar</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Sankhuwasabha</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Solukhumbu</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Taplejung</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Terhathum</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Udayapur</value>
+        <value>Kalikot</value>
       </geocode>
     </area>
   </info>
   <info>
     <language>bho</language>
     <category>Geo</category>
-    <event>भूकम्प आ पहिरो खतरा निगरानी (अभ्यास)</event>
+    <event>बरसात, पहिरो आ सड़क रुकावट निगरानी (अभ्यास)</event>
     <responseType>Monitor</responseType>
     <responseType>Prepare</responseType>
     <urgency>Expected</urgency>
     <severity>Moderate</severity>
     <certainty>Possible</certainty>
-    <effective>2026-11-24T04:54:30+05:45</effective>
-    <expires>2026-11-25T04:54:30+05:45</expires>
+    <effective>2026-11-24T16:34:56+05:45</effective>
+    <expires>2026-11-25T16:34:56+05:45</expires>
     <senderName>नेपाल त्राय अभ्यास परीक्षण प्रणाली (सरकारी चेतावनी ना ह)</senderName>
-    <headline>[अभ्यास] भूकम्प आ पहिरो निगरानी: भोजपुर, धनकुटा (+८)</headline>
-    <description>ई खाली अभ्यास संदेश ह, आधिकारिक सरकारी चेतावनी ना ह। त्राय जोखिम जांच में भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर जिला सब के पहाड़ी इलाका आ हिमताल लगे हाल में भूकम्प दर्ज भइल बा। आधिकारिक जानकारी खातिर राष्ट्रीय भूकम्प मापन केन्द्र आ NDRRMA के सूचना जरूर देखीं।</description>
-    <instruction>भूकम्प के बाद दरार पड़ल पहाड़, चट्टान खसे वाला जगह आ नदी किनार से सुरक्षित दूर रहीं। सड़क आ पुल पार करत समय सावधानी बरतीं। सरकारी सूचना आ आपातकालीन मदद खातिर DHM 1155, NEOC 1149, सशस्त्र पुलिस 1114, पुलिस 100 भा एम्बुलेन्स 102 पर फोन करीं।</instruction>
+    <headline>[अभ्यास] पहिरो आ सड़क निगरानी: गोरखा, गुल्मी (+१)</headline>
+    <description>ई खाली अभ्यास संदेश ह, आधिकारिक सरकारी चेतावनी ना ह। त्राय जांच में गोरखा, गुल्मी, कालिकोट जिला में हाल के पहिरो भा बरसात के संकेत आ पहाड़ी सड़क-पुल जोखिम देखल गइल बा। यात्रा से पहिले सड़क विभाग, DHM आ NDRRMA के सरकारी सूचना जरूर देखीं।</description>
+    <instruction>पहिरो वाला पहाड़ी रास्ता पर रात में आ बेवजह यात्रा से बचीं। कमजोर पहाड़ी ढलान आ तेज नाला से दूर रहीं। आधिकारिक सूचना आ आपातकालीन मदद खातिर DHM 1155, NEOC 1149, सशस्त्र पुलिस 1114, पुलिस 100 भा एम्बुलेन्स 102 पर फोन करीं।</instruction>
     <web>https://prazg.github.io/Nepal_TRAYA/</web>
     <contact>Official Nepal Statutory Hotlines: DHM 1155 | NDRRMA/NEOC 1149 | APF Rescue 1114 | Nepal Police 100 | Ambulance 102</contact>
     <parameter>
@@ -326,11 +242,11 @@
     </parameter>
     <parameter>
       <valueName>traya_scenario_id</valueName>
-      <value>SCN-QUAKE-COSEISMIC-ISOLATION</value>
+      <value>SCN-RAIN-LANDSLIDE-ROAD</value>
     </parameter>
     <parameter>
       <valueName>sms_draft</valueName>
-      <value>[अभ्यास-सरकारी ना ह] भोजपुर, धनकुटा (+८): भूकम्प-पहिरो निगरानी। ढलान आ नदी किनार से दूर रहीं। सूचना: 1155/1149/1114/100/102</value>
+      <value>[अभ्यास-सरकारी ना ह] गोरखा, गुल्मी (+१): पहिरो-सड़क निगरानी। पहाड़ी सड़क पर सावधानी बरतीं। सूचना: 1155/1149/1114/100/102</value>
     </parameter>
     <parameter>
       <valueName>sms_segments</valueName>
@@ -338,67 +254,39 @@
     </parameter>
     <parameter>
       <valueName>ivr_duration_sec</valueName>
-      <value>33.7</value>
+      <value>34.2</value>
     </parameter>
     <area>
-      <areaDesc>नेपाल जिल्लाहरू: भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर</areaDesc>
+      <areaDesc>नेपाल जिल्लाहरू: गोरखा, गुल्मी, कालिकोट</areaDesc>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Bhojpur</value>
+        <value>Gorkha</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Dhankuta</value>
+        <value>Gulmi</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Khotang</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Okhaldhunga</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Panchthar</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Sankhuwasabha</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Solukhumbu</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Taplejung</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Terhathum</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Udayapur</value>
+        <value>Kalikot</value>
       </geocode>
     </area>
   </info>
   <info>
     <language>thr</language>
     <category>Geo</category>
-    <event>भुइँचाल व पहिरो जोखिम निगरानी (अभ्यास)</event>
+    <event>बर्खा, पहिरो व सडक अवरोध निगरानी (अभ्यास)</event>
     <responseType>Monitor</responseType>
     <responseType>Prepare</responseType>
     <urgency>Expected</urgency>
     <severity>Moderate</severity>
     <certainty>Possible</certainty>
-    <effective>2026-11-24T04:54:30+05:45</effective>
-    <expires>2026-11-25T04:54:30+05:45</expires>
+    <effective>2026-11-24T16:34:56+05:45</effective>
+    <expires>2026-11-25T16:34:56+05:45</expires>
     <senderName>नेपाल त्राय अभ्यास परीक्षण प्रणाली (सरकारी चेतावनी नाइ हो)</senderName>
-    <headline>[अभ्यास] भुइँचाल व पहिरो निगरानी: भोजपुर, धनकुटा (+८)</headline>
-    <description>यी केवल अभ्यास सन्देश हो, सरकारी चेतावनी नाइ हो। त्राय जोखिम जाँचमे भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर जिल्लामनक पहाडी क्षेत्र व हिमताल लग्गे हाल भुइँचाल अभिलेख हुइल बा। सरकारी जानकारीक लाग राष्ट्रिय भूकम्प मापन केन्द्र व NDRRMA के सूचना जरुर हेरू।</description>
-    <instruction>भुइँचाल पाछे चर्कल पहाड, ढुङ्गा खस्ने ठाउँ व नदी किनारसे सुरक्षित दूर रहू। सडक व पुल पार करबेर होसियार रहू। सरकारी जानकारी व आपतकालीन मददक लाग DHM 1155, NEOC 1149, सशस्त्र प्रहरी 1114, प्रहरी 100 वा एम्बुलेन्स 102 मे फोन करू।</instruction>
+    <headline>[अभ्यास] पहिरो व सडक निगरानी: गोरखा, गुल्मी (+१)</headline>
+    <description>यी केवल अभ्यास सन्देश हो, सरकारी चेतावनी नाइ हो। त्राय जाँचमे गोरखा, गुल्मी, कालिकोट जिल्लामे हालक पहिरो वा बर्खा सूचक सँगे पहाडी सडक व पुल जोखिम देखल गइल बा। यात्रा करसे पहिले सडक विभाग, DHM व NDRRMA के सरकारी सूचना जरुर हेरू।</description>
+    <instruction>पहिरो लग्ने पहाडी बाटोमे रातिक व अनावश्यक यात्रा नाइ करू। कमजोर पाखा व लेदो खोलासे दूर रहू। सरकारी जानकारी व आपतकालीन मददक लाग DHM 1155, NEOC 1149, सशस्त्र प्रहरी 1114, प्रहरी 100 वा एम्बुलेन्स 102 मे फोन करू।</instruction>
     <web>https://prazg.github.io/Nepal_TRAYA/</web>
     <contact>Official Nepal Statutory Hotlines: DHM 1155 | NDRRMA/NEOC 1149 | APF Rescue 1114 | Nepal Police 100 | Ambulance 102</contact>
     <parameter>
@@ -419,11 +307,11 @@
     </parameter>
     <parameter>
       <valueName>traya_scenario_id</valueName>
-      <value>SCN-QUAKE-COSEISMIC-ISOLATION</value>
+      <value>SCN-RAIN-LANDSLIDE-ROAD</value>
     </parameter>
     <parameter>
       <valueName>sms_draft</valueName>
-      <value>[अभ्यास-सरकारी नाइ] भोजपुर, धनकुटा (+८): भुइँचाल-पहिरो निगरानी। भिरालो व नदी किनारसे दूर रहू। सूचना: 1155/1149/1114/100/102</value>
+      <value>[अभ्यास-सरकारी नाइ] गोरखा, गुल्मी (+१): पहिरो-सडक निगरानी। पहाडी सडकमे होसियार रहू। सूचना: 1155/1149/1114/100/102</value>
     </parameter>
     <parameter>
       <valueName>sms_segments</valueName>
@@ -431,67 +319,39 @@
     </parameter>
     <parameter>
       <valueName>ivr_duration_sec</valueName>
-      <value>31.8</value>
+      <value>32.3</value>
     </parameter>
     <area>
-      <areaDesc>नेपाल जिल्लाहरू: भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर</areaDesc>
+      <areaDesc>नेपाल जिल्लाहरू: गोरखा, गुल्मी, कालिकोट</areaDesc>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Bhojpur</value>
+        <value>Gorkha</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Dhankuta</value>
+        <value>Gulmi</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Khotang</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Okhaldhunga</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Panchthar</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Sankhuwasabha</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Solukhumbu</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Taplejung</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Terhathum</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Udayapur</value>
+        <value>Kalikot</value>
       </geocode>
     </area>
   </info>
   <info>
     <language>taj</language>
     <category>Geo</category>
-    <event>भूकम्प (सागुल) र पहिरो निगरानी (अभ्यास)</event>
+    <event>नाम्सा (वर्षा), पहिरो र सडक अवरोध निगरानी (अभ्यास)</event>
     <responseType>Monitor</responseType>
     <responseType>Prepare</responseType>
     <urgency>Expected</urgency>
     <severity>Moderate</severity>
     <certainty>Possible</certainty>
-    <effective>2026-11-24T04:54:30+05:45</effective>
-    <expires>2026-11-25T04:54:30+05:45</expires>
+    <effective>2026-11-24T16:34:56+05:45</effective>
+    <expires>2026-11-25T16:34:56+05:45</expires>
     <senderName>नेपाल त्राय अभ्यास परीक्षण प्रणाली (सरकारी चेतावनी आहिन)</senderName>
-    <headline>[अभ्यास] भूकम्प (सागुल) र पहिरो निगरानी: भोजपुर, धनकुटा (+८)</headline>
-    <description>चु अभ्यास सन्देश जेन हिन्ना, सरकारी चेतावनी आहिन। त्राय जोखिम जाँचरि भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर जिल्लाकादेरि गाङ्ला ग्याम र हिमताल छ्यउरि हाल भूकम्प (सागुल) रेकर्ड ताबा मुला। सरकारी सूचनाला लागि राष्ट्रिय भूकम्प मापन केन्द्र र NDRRMA ला सूचना च्यागो।</description>
-    <instruction>भूकम्प लिच्छा चर्कबा गाङ्, युङ्बा ख्लाबा ग्ला र स्योङ् छ्यउरि था निगो। सडक र साँघु तारिमा होसियार टिगो। सरकारी सूचना र आपतकालीन सहयोगला लागि DHM 1155, NEOC 1149, सशस्त्र प्रहरी 1114, प्रहरी 100 अथवा एम्बुलेन्स 102 रि फोन ल्हागो।</instruction>
+    <headline>[अभ्यास] पहिरो र सडक निगरानी: गोरखा, गुल्मी (+१)</headline>
+    <description>चु अभ्यास सन्देश जेन हिन्ना, सरकारी चेतावनी आहिन। त्राय जाँचरि गोरखा, गुल्मी, कालिकोट जिल्लाकादेरि हालला पहिरो वा वर्षा सूचक र पहाडी सडक-साँघु जोखिम म्राङ्बा मुला। यात्रा ल्हाबा ङाच्छा सडक विभाग, DHM र NDRRMA ला सरकारी सूचना च्यागो।</description>
+    <instruction>पहिरो ख्लाबा पहाडी ग्यामर म्हुन (रात) र अनावश्यक यात्रा था ल्हागो। कमजोर भिरालो ग्ला र स्योङ् छ्यउरि था निगो। सरकारी सूचना र सहयोगला लागि DHM 1155, NEOC 1149, सशस्त्र प्रहरी 1114, प्रहरी 100 अथवा एम्बुलेन्स 102 रि फोन ल्हागो।</instruction>
     <web>https://prazg.github.io/Nepal_TRAYA/</web>
     <contact>Official Nepal Statutory Hotlines: DHM 1155 | NDRRMA/NEOC 1149 | APF Rescue 1114 | Nepal Police 100 | Ambulance 102</contact>
     <parameter>
@@ -512,11 +372,11 @@
     </parameter>
     <parameter>
       <valueName>traya_scenario_id</valueName>
-      <value>SCN-QUAKE-COSEISMIC-ISOLATION</value>
+      <value>SCN-RAIN-LANDSLIDE-ROAD</value>
     </parameter>
     <parameter>
       <valueName>sms_draft</valueName>
-      <value>[अभ्यास-सरकारी आहिन] भोजपुर, धनकुटा (+८): भूकम्प-पहिरो निगरानी। भिरालो र स्योङ् छ्यउरि था निगो। सूचना: 1155/1149/1114/100/102</value>
+      <value>[अभ्यास-सरकारी आहिन] गोरखा, गुल्मी (+१): पहिरो-सडक निगरानी। पहाडी सडकग्यामर होसियार टिगो। सूचना: 1155/1149/1114/100/102</value>
     </parameter>
     <parameter>
       <valueName>sms_segments</valueName>
@@ -524,49 +384,21 @@
     </parameter>
     <parameter>
       <valueName>ivr_duration_sec</valueName>
-      <value>29.5</value>
+      <value>28.2</value>
     </parameter>
     <area>
-      <areaDesc>नेपाल जिल्लाहरू: भोजपुर, धनकुटा, खोटाङ, ओखलढुङ्गा, पाँचथर, सङ्खुवासभा, सोलुखुम्बु, ताप्लेजुङ, तेह्रथुम, उदयपुर</areaDesc>
+      <areaDesc>नेपाल जिल्लाहरू: गोरखा, गुल्मी, कालिकोट</areaDesc>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Bhojpur</value>
+        <value>Gorkha</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Dhankuta</value>
+        <value>Gulmi</value>
       </geocode>
       <geocode>
         <valueName>NEPAL_DISTRICT</valueName>
-        <value>Khotang</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Okhaldhunga</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Panchthar</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Sankhuwasabha</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Solukhumbu</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Taplejung</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Terhathum</value>
-      </geocode>
-      <geocode>
-        <valueName>NEPAL_DISTRICT</valueName>
-        <value>Udayapur</value>
+        <value>Kalikot</value>
       </geocode>
     </area>
   </info>

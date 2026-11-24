@@ -500,6 +500,9 @@ def check_html() -> None:
             csp_issues.append("CSP missing script-src directive")
         elif "'unsafe-inline'" in m_script.group(1).lower():
             csp_issues.append("CSP script-src must not allow 'unsafe-inline'")
+        m_conn = re.search(r"connect-src\s+([^;]+)", csp, re.I)
+        if not m_conn or "https://www.seismicportal.eu" not in m_conn.group(1):
+            csp_issues.append("CSP connect-src must include https://www.seismicportal.eu for live EMSC seismic fallback")
     record(
         not csp_issues,
         "strict Content-Security-Policy meta tag present",

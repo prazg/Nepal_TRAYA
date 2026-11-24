@@ -336,6 +336,8 @@ const S = {
   live: [],
   liveFetchedAt: null,
   liveStatus: 'loading',
+  liveSources: [],
+  liveSourceNote: '',
   mmi: null,
   gf: null,
   eqWindow: 'week',
@@ -1713,6 +1715,18 @@ function updateNetworkPill() {
   el.innerHTML = `<span class="dot"></span>${esc(netTxt)}${esc(qTxt)}`;
 }
 
+const SEISMIC_LINK_HOSTS = ['*.usgs.gov', 'www.emsc-csem.org', 'www.seismicportal.eu'];
+
+function formatQuakeSource(p) {
+  const srcs = Array.isArray(p.sources) && p.sources.length
+    ? p.sources
+    : [p.source || 'USGS'];
+  const ag = p.agency && !srcs.includes(p.agency) && p.agency !== 'US' && p.agency !== 'USGS'
+    ? ` (${p.agency})`
+    : '';
+  return `${srcs.join(' + ')}${ag}`;
+}
+
 function drawEq() {
   gEq.clearLayers();
   if (!document.getElementById('lEq').checked) return;
@@ -1720,17 +1734,19 @@ function drawEq() {
     const c = f.geometry && f.geometry.coordinates;
     const p = f.properties || {};
     if (!c || c.length < 2) return;
-    const u = safeUrl(p.url, ['*.usgs.gov']);
+    const u = safeUrl(p.url, SEISMIC_LINK_HOSTS);
+    const srcLabel = formatQuakeSource(p);
+    const linkTxt = (u && u.includes('emsc-csem.org')) ? 'EMSC event page ↗' : 'USGS event page ↗';
     L.marker([c[1], c[0]], {
       icon: makeQuakeIcon(Number(p.mag) || 2.5),
       keyboard: true,
-      title: `M ${fmt(p.mag, 1)} ${p.place || ''}`,
+      title: `M ${fmt(p.mag, 1)} ${p.place || ''} [${srcLabel}]`,
     })
       .bindPopup(
         `<b>◎ M ${fmt(p.mag, 1)}</b> ${esc(p.place || '')}`
         + `<br>${esc(fmtNpt(p.time))} (${esc(fmtAge(p.time))})`
-        + `<br>Depth: ${fmt(c[2], 1)} km`
-        + (u ? `<br><a href="${esc(u)}" target="_blank" rel="noopener noreferrer">USGS event page ↗</a>` : '')
+        + `<br>Depth: ${fmt(c[2], 1)} km · Source: <b>${esc(srcLabel)}</b>`
+        + (u ? `<br><a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(linkTxt)}</a>` : '')
       )
       .addTo(gEq);
   });
@@ -1775,13 +1791,15 @@ function updateEqPill() {
   const pill = document.getElementById('pill-eq');
   const keq = document.getElementById('k-eq');
   const isNe = isDevanagariLang();
+  const maxM = S.live.length
+    ? Math.max(...S.live.map(f => Number((f.properties && f.properties.mag) || 0)))
+    : null;
+  const srcTag = S.liveSources.length ? S.liveSources.join('+') : 'USGS+EMSC';
 
   if (S.liveStatus === 'live') {
-    const maxM = S.live.length
-      ? Math.max(...S.live.map(f => Number((f.properties && f.properties.mag) || 0)))
-      : null;
     if (pill) {
-      pill.className = 'pill live';
+      pill.className = 'pill live is-clickable';
+      pill.title = `Live seismic feeds (${srcTag})${S.liveFetchedAt ? ` · updated ${fmtNpt(S.liveFetchedAt)}` : ''} — click to inspect`;
       pill.innerHTML = isNe
         ? `<span class="dot"></span>${fmt(S.live.length)} भूकम्प${maxM ? ` (अधिकतम M${maxM.toFixed(1)})` : ''} · ${esc(t('liveFresh'))}`
         : `<span class="dot"></span>${S.live.length} quake${S.live.length === 1 ? '' : 's'}${maxM ? ` (max M${maxM.toFixed(1)})` : ''} · ${esc(t('liveFresh'))}`;
@@ -1791,16 +1809,30 @@ function updateEqPill() {
         ? `${fmt(S.live.length)} प्रत्यक्ष (${S.eqWindow})`
         : `${S.live.length} live (${S.eqWindow})`;
     }
+  } else if (S.liveStatus === 'cached') {
+    if (pill) {
+      pill.className = 'pill stale is-clickable';
+      pill.title = `Showing cached seismic snapshot (${S.liveSourceNote || 'live feeds temporarily unreachable'}) — click to retry`;
+      pill.innerHTML = isNe
+        ? `<span class="dot"></span>${fmt(S.live.length)} भूकम्प${maxM ? ` (M${maxM.toFixed(1)})` : ''} · ${esc(t('dcCached'))}`
+        : `<span class="dot"></span>${S.live.length} quake${S.live.length === 1 ? '' : 's'}${maxM ? ` (M${maxM.toFixed(1)})` : ''} · ${esc(t('dcCached'))}`;
+    }
+    if (keq) {
+      keq.textContent = isNe
+        ? `${fmt(S.live.length)} क्यास (${S.eqWindow})`
+        : `${S.live.length} cached (${S.eqWindow})`;
+    }
   } else if (S.liveStatus === 'offline') {
     if (pill) {
-      pill.className = 'pill err';
+      pill.className = 'pill err is-clickable';
+      pill.title = `Live seismic feeds offline (${S.liveSourceNote || 'network error'}) — click to retry`;
       pill.innerHTML = isNe
         ? `<span class="dot"></span>भूकम्प: ${esc(t('liveOffline'))}`
         : `<span class="dot"></span>quakes: ${esc(t('liveOffline'))}`;
     }
     if (keq) keq.textContent = t('liveOffline');
   } else if (pill) {
-    pill.className = 'pill';
+    pill.className = 'pill is-clickable';
     pill.innerHTML = isNe
       ? '<span class="dot"></span>भूकम्प: लोड हुँदै…'
       : '<span class="dot"></span>quakes: fetching…';
@@ -1993,33 +2025,260 @@ function evaluateCompoundHazards() {
 }
 
 /* ==========================================================================
-   10. Live Browser Feeds (USGS Nepal FDSN + GloFAS + Open-Meteo Rainfall)
+   10. Live Browser Feeds (Multi-Agency USGS + EMSC Seismic, GloFAS, Open-Meteo)
    ========================================================================== */
 let eqAbort = null;
 let eqDetailSeq = 0;
 
+const NEPAL_SEISMIC_BBOX = { minLat: 24.2, maxLat: 32.6, minLon: 77.9, maxLon: 90.3 };
+
+function eqWindowConfig(win) {
+  if (win === 'day') return { days: 1, minMag: 2.0 };
+  if (win === 'month') return { days: 30, minMag: 2.5 };
+  return { days: 7, minMag: 2.5 };
+}
+
 function usgsFdsnUrl(win) {
-  const now = Date.now();
-  const cfg = win === 'day'
-    ? { days: 1, minMag: 2.0 }
-    : win === 'month'
-      ? { days: 30, minMag: 3.5 }
-      : { days: 7, minMag: 2.5 };
-  const startIso = new Date(now - cfg.days * 86400000).toISOString().slice(0, 19);
+  const cfg = eqWindowConfig(win);
+  const startIso = `${new Date(Date.now() - cfg.days * 86400000).toISOString().slice(0, 19)}Z`;
   return 'https://earthquake.usgs.gov/fdsnws/event/1/query'
-    + `?format=geojson&minlatitude=24.2&maxlatitude=32.6&minlongitude=77.9&maxlongitude=90.3`
-    + `&minmagnitude=${cfg.minMag}&orderby=time&starttime=${encodeURIComponent(startIso)}`;
+    + `?format=geojson&minlatitude=${NEPAL_SEISMIC_BBOX.minLat}&maxlatitude=${NEPAL_SEISMIC_BBOX.maxLat}`
+    + `&minlongitude=${NEPAL_SEISMIC_BBOX.minLon}&maxlongitude=${NEPAL_SEISMIC_BBOX.maxLon}`
+    + `&minmagnitude=${cfg.minMag}&orderby=time&limit=200&starttime=${encodeURIComponent(startIso)}`;
+}
+
+function usgsCdnFeedUrl(win) {
+  if (win === 'day') return 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson';
+  if (win === 'month') return 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_month.geojson';
+  return 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson';
+}
+
+function emscFdsnUrl(win) {
+  const cfg = eqWindowConfig(win);
+  const startIso = `${new Date(Date.now() - cfg.days * 86400000).toISOString().slice(0, 19)}Z`;
+  return 'https://www.seismicportal.eu/fdsnws/event/1/query'
+    + `?format=json&minlat=${NEPAL_SEISMIC_BBOX.minLat}&maxlat=${NEPAL_SEISMIC_BBOX.maxLat}`
+    + `&minlon=${NEPAL_SEISMIC_BBOX.minLon}&maxlon=${NEPAL_SEISMIC_BBOX.maxLon}`
+    + `&minmag=${cfg.minMag}&limit=200&start=${encodeURIComponent(startIso)}`;
+}
+
+function titleCaseRegion(str) {
+  const s = String(str || '').trim();
+  if (!s) return 'Nepal Region';
+  if (s === s.toUpperCase()) {
+    return s.split(/\s+/).map(w => (
+      ['OF', 'AND', 'IN', 'NEAR'].includes(w)
+        ? w.toLowerCase()
+        : w.split('-').map(seg => seg.charAt(0) + seg.slice(1).toLowerCase()).join('-')
+    )).join(' ').replace(/\bReg\./g, 'Region');
+  }
+  return s;
+}
+
+function inSeismicBbox(lon, lat) {
+  return typeof lon === 'number' && Number.isFinite(lon)
+    && typeof lat === 'number' && Number.isFinite(lat)
+    && lon >= NEPAL_SEISMIC_BBOX.minLon && lon <= NEPAL_SEISMIC_BBOX.maxLon
+    && lat >= NEPAL_SEISMIC_BBOX.minLat && lat <= NEPAL_SEISMIC_BBOX.maxLat;
+}
+
+function normalizeUsgsFeature(f, cutoffMs, minMag) {
+  const c = f && f.geometry && f.geometry.coordinates;
+  const p = (f && f.properties) || {};
+  if (!Array.isArray(c) || c.length < 2) return null;
+  const lon = Number(c[0]);
+  const lat = Number(c[1]);
+  if (!inSeismicBbox(lon, lat)) return null;
+  const mag = p.mag != null ? Number(p.mag) : null;
+  if (mag != null && Number.isFinite(mag) && mag < minMag) return null;
+  const tMs = typeof p.time === 'number' ? p.time : Date.parse(p.time);
+  if (!Number.isFinite(tMs) || (cutoffMs && tMs < cutoffMs)) return null;
+  const depth = typeof c[2] === 'number' && Number.isFinite(c[2]) ? Math.abs(c[2]) : null;
+  return {
+    type: 'Feature',
+    id: String(f.id || `usgs_${tMs}`),
+    geometry: { type: 'Point', coordinates: [lon, lat, depth] },
+    properties: {
+      ...p,
+      time: tMs,
+      mag: Number.isFinite(mag) ? mag : null,
+      place: String(p.place || 'Nepal region').trim(),
+      url: safeUrl(p.url, SEISMIC_LINK_HOSTS),
+      detail: safeUrl(p.detail, ['*.usgs.gov']),
+      source: 'USGS',
+      sources: ['USGS'],
+      agency: String(p.net || 'USGS').toUpperCase(),
+    },
+  };
+}
+
+function normalizeEmscFeature(f, cutoffMs, minMag) {
+  const p = (f && f.properties) || {};
+  const c = (f && f.geometry && f.geometry.coordinates) || [];
+  const lon = Number(p.lon != null ? p.lon : c[0]);
+  const lat = Number(p.lat != null ? p.lat : c[1]);
+  if (!inSeismicBbox(lon, lat)) return null;
+  const mag = p.mag != null ? Number(p.mag) : null;
+  if (mag != null && Number.isFinite(mag) && mag < minMag) return null;
+  const tMs = typeof p.time === 'number' ? p.time : Date.parse(p.time);
+  if (!Number.isFinite(tMs) || (cutoffMs && tMs < cutoffMs)) return null;
+  // EMSC GeoJSON z coordinate is negative elevation (-depth_km); properties.depth is positive km
+  const rawDepth = p.depth != null ? Number(p.depth) : Number(c[2]);
+  const depth = Number.isFinite(rawDepth) ? Math.abs(rawDepth) : null;
+  const srcId = String(p.source_id || '').trim();
+  const emscUrl = srcId
+    ? `https://www.emsc-csem.org/Earthquake_information/earthquake.php?id=${encodeURIComponent(srcId)}`
+    : '';
+  const auth = String(p.auth || 'EMSC').trim().toUpperCase();
+  return {
+    type: 'Feature',
+    id: `emsc_${String(f.id || p.unid || srcId || tMs)}`,
+    geometry: { type: 'Point', coordinates: [lon, lat, depth] },
+    properties: {
+      time: tMs,
+      mag: Number.isFinite(mag) ? mag : null,
+      place: titleCaseRegion(p.flynn_region || p.place || 'Nepal Region'),
+      url: safeUrl(emscUrl, SEISMIC_LINK_HOSTS),
+      detail: '',
+      source: 'EMSC',
+      sources: ['EMSC'],
+      agency: auth,
+    },
+  };
+}
+
+function mergeSeismicEvents(usgsList, emscList) {
+  const merged = usgsList.map(f => ({
+    ...f,
+    properties: {
+      ...f.properties,
+      sources: [...(f.properties.sources || ['USGS'])],
+    },
+  }));
+  for (const em of emscList) {
+    const ec = em.geometry.coordinates;
+    const ep = em.properties;
+    let matched = false;
+    for (const ex of merged) {
+      const xc = ex.geometry.coordinates;
+      const xp = ex.properties;
+      if (Math.abs((ep.time || 0) - (xp.time || 0)) <= 90000 && hav(ec[0], ec[1], xc[0], xc[1]) <= 65) {
+        if (!xp.sources.includes('EMSC')) xp.sources.push('EMSC');
+        if (!xp.url && ep.url) xp.url = ep.url;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) merged.push(em);
+  }
+  merged.sort((a, b) => ((b.properties && b.properties.time) || 0) - ((a.properties && a.properties.time) || 0));
+  return merged;
+}
+
+async function fetchJsonWithRetry(url, controller, timeoutMs = 12000, retries = 1) {
+  let lastErr = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const resp = await fetch(url, {
+        cache: 'no-store',
+        signal: combinedSignal(controller, timeoutMs),
+      });
+      if (resp.status === 204) return { features: [] };
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const txt = await resp.text();
+      if (!txt.trim()) return { features: [] };
+      return JSON.parse(txt);
+    } catch (err) {
+      if (err && err.name === 'AbortError' && controller && controller.signal.aborted) throw err;
+      lastErr = err;
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 450));
+      }
+    }
+  }
+  throw lastErr || new Error('network error');
+}
+
+async function fetchUsgsLive(win, controller, cutoffMs, minMag) {
+  try {
+    const gj = await fetchJsonWithRetry(usgsFdsnUrl(win), controller, 11000, 1);
+    const list = (gj.features || []).map(f => normalizeUsgsFeature(f, cutoffMs, minMag)).filter(Boolean);
+    return { ok: true, label: 'USGS', list };
+  } catch (fdsnErr) {
+    if (fdsnErr && fdsnErr.name === 'AbortError' && controller && controller.signal.aborted) throw fdsnErr;
+    const gj = await fetchJsonWithRetry(usgsCdnFeedUrl(win), controller, 12000, 0);
+    const list = (gj.features || []).map(f => normalizeUsgsFeature(f, cutoffMs, minMag)).filter(Boolean);
+    return { ok: true, label: 'USGS CDN', list };
+  }
+}
+
+async function fetchEmscLive(win, controller, cutoffMs, minMag) {
+  const gj = await fetchJsonWithRetry(emscFdsnUrl(win), controller, 11000, 1);
+  const list = (gj.features || []).map(f => normalizeEmscFeature(f, cutoffMs, minMag)).filter(Boolean);
+  return { ok: true, label: 'EMSC', list };
+}
+
+async function loadCachedEqFallback(win) {
+  const cfg = eqWindowConfig(win);
+  const cutoffMs = Date.now() - cfg.days * 86400000;
+  try {
+    const gdacs = S.gdacs || await ensureLazy('gdacs');
+    const block = (gdacs && gdacs.usgs_recent) || {};
+    const raw = Array.isArray(block.events) ? block.events : [];
+    const feats = raw
+      .filter(ev => ev && typeof ev.lon === 'number' && typeof ev.lat === 'number')
+      .map(ev => {
+        const tMs = typeof ev.time === 'number' ? ev.time : Date.parse(ev.time);
+        if (!Number.isFinite(tMs)) return null;
+        const mag = ev.mag != null ? Number(ev.mag) : null;
+        if (mag != null && mag < cfg.minMag) return null;
+        if (tMs < cutoffMs) return null;
+        const srcs = Array.isArray(ev.sources) && ev.sources.length ? ev.sources : [ev.source || 'USGS'];
+        return {
+          type: 'Feature',
+          id: String(ev.id || `cached_${tMs}`),
+          geometry: { type: 'Point', coordinates: [ev.lon, ev.lat, ev.depth_km != null ? Math.abs(Number(ev.depth_km)) : null] },
+          properties: {
+            time: tMs,
+            mag,
+            place: String(ev.place || 'Nepal region'),
+            url: safeUrl(ev.url, SEISMIC_LINK_HOSTS),
+            detail: '',
+            source: srcs[0],
+            sources: srcs,
+            agency: String(ev.agency || srcs[0]),
+          },
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b.properties.time || 0) - (a.properties.time || 0));
+    return {
+      ok: Boolean(block.updated_utc || raw.length),
+      updatedUtc: block.updated_utc || (gdacs && gdacs.updated_utc) || null,
+      list: feats,
+    };
+  } catch {
+    return { ok: false, updatedUtc: null, list: [] };
+  }
 }
 
 async function loadEq(force = false) {
   if (document.hidden && !force) return { ok: true, skipped: true };
-  const win = document.getElementById('eqWindow').value;
+  const winSel = document.getElementById('eqWindow');
+  const win = (winSel && winSel.value) || S.eqWindow || 'week';
   S.eqWindow = win;
-  S.liveStatus = 'loading';
-  updateEqPill();
+  const cfg = eqWindowConfig(win);
+  const cutoffMs = Date.now() - cfg.days * 86400000;
+
+  // Keep existing events visible during background refresh instead of flashing empty
+  if (!S.live.length || S.liveStatus === 'offline') {
+    S.liveStatus = 'loading';
+    updateEqPill();
+  }
 
   if (eqAbort) eqAbort.abort();
-  eqAbort = new AbortController();
+  const controller = new AbortController();
+  eqAbort = controller;
 
   // Clear stale ShakeMap/ground-failure overlays on window change
   S.mmi = null;
@@ -2027,32 +2286,30 @@ async function loadEq(force = false) {
   gMmi.clearLayers();
   const mySeq = ++eqDetailSeq;
 
-  try {
-    const resp = await fetch(usgsFdsnUrl(win), {
-      cache: 'no-store',
-      signal: combinedSignal(eqAbort, 15000),
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const gj = await resp.json();
-    S.live = (gj.features || [])
-      .filter(f => {
-        const c = f && f.geometry && f.geometry.coordinates;
-        return Array.isArray(c)
-          && c.length >= 2
-          && typeof c[0] === 'number' && Number.isFinite(c[0])
-          && typeof c[1] === 'number' && Number.isFinite(c[1])
-          && c[0] >= -180 && c[0] <= 180
-          && c[1] >= -90 && c[1] <= 90;
-      })
-      .map(f => {
-        const c = f.geometry.coordinates;
-        const depth = typeof c[2] === 'number' && Number.isFinite(c[2]) ? c[2] : null;
-        return {
-          ...f,
-          geometry: { ...f.geometry, coordinates: [c[0], c[1], depth] },
-        };
-      })
-      .sort((a, b) => ((b.properties && b.properties.time) || 0) - ((a.properties && a.properties.time) || 0));
+  const [rUsgs, rEmsc] = await Promise.allSettled([
+    fetchUsgsLive(win, controller, cutoffMs, cfg.minMag),
+    fetchEmscLive(win, controller, cutoffMs, cfg.minMag),
+  ]);
+
+  if (controller.signal.aborted) return { ok: false, aborted: true };
+
+  const usgsOk = rUsgs.status === 'fulfilled' && rUsgs.value && rUsgs.value.ok;
+  const emscOk = rEmsc.status === 'fulfilled' && rEmsc.value && rEmsc.value.ok;
+
+  if (usgsOk || emscOk) {
+    const usgsList = usgsOk ? rUsgs.value.list : [];
+    const emscList = emscOk ? rEmsc.value.list : [];
+    const activeLabels = [];
+    if (usgsOk) activeLabels.push(rUsgs.value.label);
+    if (emscOk) activeLabels.push(rEmsc.value.label);
+
+    S.live = mergeSeismicEvents(usgsList, emscList);
+    S.liveSources = activeLabels;
+    S.liveSourceNote = !usgsOk
+      ? 'EMSC live (USGS connection reset/timeout)'
+      : !emscOk
+        ? `${rUsgs.value.label} live (EMSC unavailable)`
+        : `${activeLabels.join(' + ')} fused live`;
     S.liveFetchedAt = new Date().toISOString();
     S.liveStatus = 'live';
 
@@ -2060,7 +2317,7 @@ async function loadEq(force = false) {
     const keqSub = document.getElementById('k-eq-sub');
     if (keqSub) {
       const nFaults = (S.summary && S.summary.active_faults && S.summary.active_faults.n_traces) || 70;
-      keqSub.textContent = `NDRRMA BIPAD · USGS + ${fmt(nFaults)} GEM traces`;
+      keqSub.textContent = `${activeLabels.join(' · ')} · BIPAD + ${fmt(nFaults)} GEM traces`;
     }
 
     drawEq();
@@ -2068,19 +2325,39 @@ async function loadEq(force = false) {
     if (S.tab === 'live') renderTab();
     if (S.selKind === 'district' && S.selDistrict) renderDistrictByName(S.selDistrict, false);
 
-    const big = S.live.find(f => f.properties && Number(f.properties.mag) >= 4.5);
-    if (big) loadEventDetail(big, mySeq);
-    return { ok: true, count: S.live.length };
-  } catch (err) {
-    if (err && err.name === 'AbortError') return { ok: false, aborted: true };
-    S.liveStatus = 'offline';
-    S.live = [];
-    updateEqPill();
-    drawEq();
-    evaluateCompoundHazards();
-    if (S.tab === 'live') renderTab();
-    return { ok: false, error: err ? err.message : 'network error' };
+    const bigUsgs = S.live.find(f => f.properties && Number(f.properties.mag) >= 4.5 && f.properties.detail);
+    if (bigUsgs) loadEventDetail(bigUsgs, mySeq);
+    return { ok: true, count: S.live.length, sources: activeLabels, note: S.liveSourceNote };
   }
+
+  // Both live APIs failed: fall back gracefully to bundled snapshot instead of wiping S.live
+  const errUsgs = rUsgs.status === 'rejected' && rUsgs.reason ? rUsgs.reason.message : 'failed';
+  const errEmsc = rEmsc.status === 'rejected' && rEmsc.reason ? rEmsc.reason.message : 'failed';
+  const cached = await loadCachedEqFallback(win);
+  if (controller.signal.aborted) return { ok: false, aborted: true };
+
+  if (cached.ok) {
+    S.live = cached.list;
+    S.liveSources = ['Cached snapshot'];
+    S.liveSourceNote = `Cached snapshot (${cached.updatedUtc ? fmtNpt(cached.updatedUtc) : 'weekly'}) — USGS: ${errUsgs}; EMSC: ${errEmsc}`;
+    S.liveStatus = 'cached';
+  } else {
+    S.liveStatus = 'offline';
+    S.liveSources = [];
+    S.liveSourceNote = `USGS: ${errUsgs}; EMSC: ${errEmsc}`;
+    S.live = [];
+  }
+  updateEqPill();
+  drawEq();
+  evaluateCompoundHazards();
+  if (S.tab === 'live') renderTab();
+  return {
+    ok: cached.ok,
+    cached: cached.ok,
+    count: S.live.length,
+    sources: S.liveSources,
+    error: S.liveSourceNote,
+  };
 }
 
 async function loadEventDetail(f, seq) {
@@ -2455,10 +2732,15 @@ async function refreshAllLiveInBrowser() {
 
     const parts = [];
     if (rEq.status === 'fulfilled' && rEq.value && rEq.value.ok) {
-      parts.push(`USGS (${rEq.value.count} quakes) ✓`);
-    } else {
+      const srcStr = (rEq.value.sources || []).join('+');
+      parts.push(
+        rEq.value.cached
+          ? `Quakes (${rEq.value.count}, cached snapshot)`
+          : `Quakes (${rEq.value.count} · ${srcStr || 'USGS+EMSC'}) ✓`
+      );
+    } else if (!(rEq.status === 'fulfilled' && rEq.value && rEq.value.aborted)) {
       const msg = rEq.status === 'rejected' ? rEq.reason.message : (rEq.value && rEq.value.error) || 'offline';
-      parts.push(`USGS ✕ (${msg})`);
+      parts.push(`Quakes ✕ (${msg})`);
     }
     if (rFl.status === 'fulfilled' && rFl.value && rFl.value.ok) {
       parts.push(`GloFAS (${rFl.value.count} basins) ✓`);
@@ -2655,6 +2937,12 @@ function renderOfficialAuthorityPanel(opts = {}) {
       </tr>`;
     }).join('');
 
+    const newestNscDate = quakes.length && quakes[0].eventOn ? String(quakes[0].eventOn).slice(0, 10) : null;
+    const nscAgeDays = quakes.length && quakes[0].eventOn ? ageHours(quakes[0].eventOn) / 24 : 0;
+    const nscStaleNote = (newestNscDate && nscAgeDays > 30)
+      ? `<div class="band">BIPAD API last synced NSC bulletin on <b>${esc(newestNscDate)}</b>; see live USGS + EMSC seismicity below and <a href="https://seismonepal.gov.np/" target="_blank" rel="noopener noreferrer">seismonepal.gov.np ↗</a> for newer local events.</div>`
+      : '';
+
     bodyHtml = `
       <div class="official-grid">
         <div class="official-subcard">
@@ -2665,6 +2953,7 @@ function renderOfficialAuthorityPanel(opts = {}) {
         </div>
         <div class="official-subcard">
           <h5><span>${esc(t('bipadEqHead'))}</span><span class="mono">${fmt(quakes.length)}</span></h5>
+          ${nscStaleNote}
           ${nscRows
             ? `<div class="tbl-scroll"><table><thead><tr><th scope="col">Time (NPT)</th><th scope="col">ML</th><th scope="col">Epicentre</th></tr></thead><tbody>${nscRows}</tbody></table></div>`
             : '<p class="muted">0 NSC earthquake bulletins in current BIPAD snapshot.</p>'}
@@ -3906,6 +4195,22 @@ function wireTabInteractions(b) {
       renderTab();
     });
   });
+  b.querySelectorAll('button[data-eq-win]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.dataset.eqWin || 'week';
+      const sel = document.getElementById('eqWindow');
+      if (sel) sel.value = val;
+      S.eqWindow = val;
+      loadEq(true);
+    });
+  });
+  const eqRefreshInline = b.querySelector('#btnRefreshEqInline');
+  if (eqRefreshInline) {
+    eqRefreshInline.addEventListener('click', () => {
+      eqRefreshInline.disabled = true;
+      loadEq(true).finally(() => { eqRefreshInline.disabled = false; });
+    });
+  }
   const copySmsBtn = b.querySelector('#btnCopyCapSms');
   if (copySmsBtn) {
     copySmsBtn.addEventListener('click', () => {
@@ -5049,26 +5354,39 @@ function tabLive() {
   </div>` : '';
 
   const eqTbl = S.live.length
-    ? `<table><thead><tr>
+    ? `<div class="tbl-scroll"><table><thead><tr>
         <th scope="col">Time (NPT)</th><th scope="col">M</th><th scope="col">Depth km</th>
-        <th scope="col">Place</th><th scope="col">Lakes ≤50 km</th><th scope="col">USGS</th>
+        <th scope="col">Place</th><th scope="col">Source</th><th scope="col">Lakes ≤50 km</th><th scope="col">Link</th>
       </tr></thead><tbody>
       ${S.live.slice(0, 100).map(f => {
         const c = f.geometry.coordinates;
         const p = f.properties || {};
         const nNear = S.lakes.filter(l => hav(c[0], c[1], l.properties.lon, l.properties.lat) <= 50).length;
-        const u = safeUrl(p.url, ['*.usgs.gov']);
+        const u = safeUrl(p.url, SEISMIC_LINK_HOSTS);
+        const srcLabel = formatQuakeSource(p);
         return `<tr tabindex="0" data-fly="${safeFlyAttr(c[1], c[0], 9)}">
           <td class="mono">${esc(fmtNpt(p.time))}</td>
           <td class="num"><b>${fmt(p.mag, 1)}</b></td>
           <td class="num">${fmt(c[2], 1)}</td>
           <td>${esc(p.place || '')}</td>
+          <td><span class="src-chip">${esc(srcLabel)}</span></td>
           <td class="num">${fmt(nNear)}</td>
           <td>${u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">open ↗</a>` : '—'}</td>
         </tr>`;
       }).join('')}
-      </tbody></table>`
-    : '<p class="muted">No live USGS earthquakes in the selected window inside the Nepal bounding box, or the feed is offline. Also check official Nepal DMG/NEMRC bulletins at <a href="https://seismonepal.gov.np/" target="_blank" rel="noopener noreferrer">seismonepal.gov.np</a>.</p>';
+      </tbody></table></div>`
+    : '<p class="muted">No earthquakes in the selected window inside the Nepal bounding box across USGS &amp; EMSC feeds. Try switching to the 30-day window or check official Nepal DMG/NEMRC bulletins at <a href="https://seismonepal.gov.np/" target="_blank" rel="noopener noreferrer">seismonepal.gov.np</a>.</p>';
+
+  const eqWinBtns = [
+    ['day', '24h (M≥2.0)'],
+    ['week', '7d (M≥2.5)'],
+    ['month', '30d (M≥2.5)'],
+  ].map(([val, lbl]) => (
+    `<button type="button" class="btn sm${S.eqWindow === val ? ' pri' : ''}" data-eq-win="${esc(val)}">${esc(lbl)}</button>`
+  )).join('');
+  const eqMetaLine = S.liveStatus === 'live'
+    ? `Live (${S.liveSources.join(' + ') || 'USGS + EMSC'})${S.liveFetchedAt ? ` · ${fmtNpt(S.liveFetchedAt)}` : ''}${S.liveSourceNote ? ` — ${S.liveSourceNote}` : ''}`
+    : (S.liveSourceNote || (S.liveStatus === 'loading' ? 'Querying USGS & EMSC live feeds…' : 'Live feeds temporarily unavailable'));
 
   const faultNote = (S.faultsMeta && S.faultsMeta.coverage_note)
     || (S.summary && S.summary.active_faults && S.summary.active_faults.coverage_note)
@@ -5082,7 +5400,7 @@ function tabLive() {
       <b>${esc(t('openDataSeismicHead'))}</b>
       <div class="badge-row">
         <span class="badge-screening">${esc(t('screeningBadge'))}</span>
-        ${badgeDataClass(S.liveStatus === 'live' ? 'live_observation' : 'cached')}
+        ${badgeDataClass(S.liveStatus === 'live' ? 'live_observation' : S.liveStatus === 'cached' ? 'cached' : 'unavailable')}
       </div>
     </div>
     ${gfHead}
@@ -5098,7 +5416,14 @@ function tabLive() {
         </tbody></table>
       </div>
       <div>
-        <h4>Live USGS Earthquakes — Nepal Region (${fmt(S.live.length)} · ${esc(S.eqWindow)})</h4>
+        <div class="eq-live-bar">
+          <h4>Live Multi-Agency Earthquakes — Nepal Region (${fmt(S.live.length)} · ${esc(S.eqWindow)})</h4>
+          <div class="btn-row">
+            ${eqWinBtns}
+            <button type="button" class="btn sm" id="btnRefreshEqInline">↻ Refresh</button>
+          </div>
+        </div>
+        <div class="band">${esc(eqMetaLine)}</div>
         ${eqTbl}
         <h4 class="field-gap">Historical M≥6 Earthquakes in Nepal Region (${fmt(m6.length)} events)</h4>
         <table><thead><tr><th scope="col">Year</th><th scope="col">M</th><th scope="col">Depth km</th><th scope="col">Place</th></tr></thead><tbody>
@@ -6510,8 +6835,29 @@ function wireEvents() {
     });
   }
 
-  // Online / Offline PWA network status listeners
-  window.addEventListener('online', updateNetworkPill);
+  // Clickable live earthquake pill jumps straight to Official Alerts & Quakes tab
+  const pillEqEl = document.getElementById('pill-eq');
+  if (pillEqEl) {
+    const openLiveQuakes = () => {
+      switchTab('live');
+      if (S.liveStatus !== 'live' || !S.liveFetchedAt || ageHours(S.liveFetchedAt) > (3 / 60)) {
+        loadEq(true);
+      }
+    };
+    pillEqEl.addEventListener('click', openLiveQuakes);
+    pillEqEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openLiveQuakes();
+      }
+    });
+  }
+
+  // Online / Offline PWA network status listeners (auto-refresh quakes on reconnect)
+  window.addEventListener('online', () => {
+    updateNetworkPill();
+    loadEq(true);
+  });
   window.addEventListener('offline', updateNetworkPill);
 
   // Live refresh & alert buttons
@@ -6560,9 +6906,9 @@ function wireEvents() {
     }
   });
 
-  // Pause live polling while tab hidden; refresh on resume if stale > 5 min
+  // Pause live polling while tab hidden; refresh on resume if stale > 3 min
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && S.liveFetchedAt && ageHours(S.liveFetchedAt) > (5 / 60)) {
+    if (!document.hidden && (!S.liveFetchedAt || S.liveStatus !== 'live' || ageHours(S.liveFetchedAt) > (3 / 60))) {
       loadEq(false);
     }
   });
@@ -6659,9 +7005,9 @@ async function init() {
     drawRiversLayer();
     renderTab();
 
-    // Start live USGS Nepal-region feed & periodic 5-min poll (paused when hidden)
+    // Start live multi-agency (USGS + EMSC) Nepal-region seismic feed & periodic 3-min poll
     loadEq(true);
-    setInterval(() => loadEq(false), 5 * 60 * 1000);
+    setInterval(() => loadEq(false), 3 * 60 * 1000);
 
     // Restore deep-linked lake, district, or tab from URL hash
     const h = location.hash.slice(1);

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://server.arcgisonline.com https://tiles.maps.eox.at https://*.tile.opentopomap.org https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://gibs.earthdata.nasa.gov https://sentinel-cogs.s3.us-west-2.amazonaws.com https://*.amazonaws.com https://earth-search.aws.element84.com https://earthquake.usgs.gov https://*.usgs.gov; connect-src 'self' https://earthquake.usgs.gov https://*.usgs.gov https://api.open-meteo.com https://flood-api.open-meteo.com https://earth-search.aws.element84.com https://www.gdacs.org; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://server.arcgisonline.com https://tiles.maps.eox.at https://*.tile.opentopomap.org https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://gibs.earthdata.nasa.gov https://sentinel-cogs.s3.us-west-2.amazonaws.com https://*.amazonaws.com https://earth-search.aws.element84.com https://earthquake.usgs.gov https://*.usgs.gov; connect-src 'self' https://earthquake.usgs.gov https://*.usgs.gov https://www.seismicportal.eu https://api.open-meteo.com https://flood-api.open-meteo.com https://earth-search.aws.element84.com https://www.gdacs.org; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#0a0f16">
@@ -58,7 +58,7 @@
     <div class="topbar-right">
       <div class="pills" aria-live="polite">
         <span class="pill" id="pill-build" title="Weekly automated snapshot build time (NPT)"><span class="dot"></span>build …</span>
-        <span class="pill" id="pill-eq" title="Live USGS FDSN Nepal-region earthquake feed"><span class="dot"></span>quakes …</span>
+        <span class="pill is-clickable" id="pill-eq" role="button" tabindex="0" title="Live multi-agency Nepal earthquakes (USGS + EMSC) — click to open Alerts &amp; Quakes"><span class="dot"></span>quakes …</span>
         <span class="pill" id="pill-flood" title="Copernicus GloFAS 10-basin river flood watch"><span class="dot"></span>rivers …</span>
         <span class="pill" id="pill-ls" title="Dahal &amp; Hasegawa (2008) liquid-rain landslide threshold watch"><span class="dot"></span>landslides …</span>
         <span class="pill" id="pill-base" title="Active map basemap status"><span class="dot"></span>basemap</span>
@@ -254,10 +254,10 @@
 
       <section class="blk">
         <h3 data-i18n="secEqWin">Live earthquake window</h3>
-        <select id="eqWindow" aria-label="Live USGS earthquake time window">
+        <select id="eqWindow" aria-label="Live multi-agency earthquake time window">
           <option value="day" data-i18n="eqWinDay">Past 24 hours (M≥2.0)</option>
           <option value="week" selected data-i18n="eqWinWeek">Past 7 days (M≥2.5)</option>
-          <option value="month" data-i18n="eqWinMonth">Past 30 days (M≥3.5)</option>
+          <option value="month" data-i18n="eqWinMonth">Past 30 days (M≥2.5)</option>
         </select>
       </section>
 

@@ -2008,6 +2008,98 @@ def test_numpy_terrain_parity():
           and np.allclose(s_np, np.asarray(s_py), atol=1e-12))
 
 
+def test_multi_agency_seismic_fusion_and_cache():
+    """Verify EMSC positive-depth normalization, USGS+EMSC cross-agency dedup, and alerts offline cache retention."""
+    import alerts as AL
+
+    emsc_raw = {
+        "type": "Feature",
+        "id": "20261124_0000019",
+        "geometry": {"type": "Point", "coordinates": [88.0209, 27.9065, -25.2]},
+        "properties": {
+            "source_id": "2094176",
+            "time": "2026-11-24T01:32:44.63Z",
+            "flynn_region": "SIKKIM, INDIA",
+            "lat": 27.9065,
+            "lon": 88.0209,
+            "depth": 25.2,
+            "auth": "EMSC",
+            "mag": 5.3,
+        },
+    }
+    emsc_neg_only = {
+        "type": "Feature",
+        "id": "20261123_0000099",
+        "geometry": {"type": "Point", "coordinates": [81.05, 29.45, -14.5]},
+        "properties": {
+            "source_id": "2094100",
+            "time": "2026-11-23T12:00:00Z",
+            "flynn_region": "NEPAL-INDIA BORDER REG.",
+            "auth": "NDI",
+            "mag": 3.1,
+        },
+    }
+    n1 = AL.normalize_emsc_feature(emsc_raw)
+    n2 = AL.normalize_emsc_feature(emsc_neg_only)
+    check(
+        "alerts.normalize_emsc_feature converts negative z to positive depth_km & builds EMSC link",
+        n1 is not None and n2 is not None
+        and n1["depth_km"] == 25.2 and n2["depth_km"] == 14.5
+        and n1["url"].startswith("https://www.emsc-csem.org/")
+        and n2["place"] == "Nepal-India Border Region"
+        and n2["agency"] == "NDI",
+        f"n1_depth={n1 and n1['depth_km']}, n2_depth={n2 and n2['depth_km']}, n2_place={n2 and n2['place']}",
+    )
+
+    usgs_dup = {
+        "id": "us7000sikkim",
+        "time": n1["time"] + 18000,  # 18 s offset
+        "mag": 5.3,
+        "place": "67 km WNW of Mangan, India",
+        "depth_km": 10.0,
+        "lon": 88.05,
+        "lat": 27.89,
+        "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000sikkim",
+        "source": "USGS",
+        "sources": ["USGS"],
+        "agency": "US",
+        "in_nepal": False,
+    }
+    merged = AL.merge_seismic_events([usgs_dup], [n1, n2])
+    check(
+        "alerts.merge_seismic_events deduplicates USGS+EMSC within 90s/65km & retains regional EMSC",
+        len(merged) == 2
+        and merged[0]["id"] == "us7000sikkim"
+        and merged[0]["sources"] == ["USGS", "EMSC"]
+        and merged[1]["id"].startswith("emsc_")
+        and merged[1]["sources"] == ["EMSC"],
+        f"merged_ids={[m['id'] for m in merged]}, srcs={[m['sources'] for m in merged]}",
+    )
+
+    # Verify build_alerts(offline=True) preserves usgs_recent.events from cache instead of wiping to []
+    with tempfile.TemporaryDirectory() as tmpd:
+        fake_cache = os.path.join(tmpd, "cache_gdacs.json")
+        fake_out = os.path.join(tmpd, "out_gdacs.json")
+        with open(fake_cache, "w", encoding="utf-8") as fh:
+            json.dump({
+                "updated_utc": "2026-11-24T02:00:00Z",
+                "events": [],
+                "usgs_recent": {"updated_utc": "2026-11-24T02:00:00Z", "events": merged},
+            }, fh)
+        orig_cache = AL.CACHE_GDACS
+        try:
+            AL.CACHE_GDACS = fake_cache
+            res = AL.build_alerts(offline=True, out_path=fake_out)
+        finally:
+            AL.CACHE_GDACS = orig_cache
+    check(
+        "alerts.build_alerts(offline=True) retains cached usgs_recent.events (no wipe to [])",
+        res["usgs_recent"]["n_events"] == 2
+        and res["usgs_recent"]["updated_utc"] == "2026-11-24T02:00:00Z",
+        f"n_events={res['usgs_recent']['n_events']}, updated={res['usgs_recent']['updated_utc']}",
+    )
+
+
 # ---------------------------------------------------------------------------
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
@@ -2051,6 +2143,7 @@ def main(argv=None) -> int:
         test_bates_2d_shallow_water_solver,
         test_community_moderation_engine,
         test_cap_v12_multilingual_relay,
+        test_multi_agency_seismic_fusion_and_cache,
     )
 
     print(f"unit tests ({'stdlib --unit-only' if args.unit_only else 'full mode'})")
