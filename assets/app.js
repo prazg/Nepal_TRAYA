@@ -835,13 +835,15 @@ const BASEMAPS = {
     referrerPolicy: TILE_REFERRER_POLICY,
     attribution: `Esri, HERE, Garmin, &copy; OpenStreetMap | ${DATA_CREDIT}`,
   }),
-  'CARTO Voyager': L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19,
-    maxNativeZoom: 19,
-    subdomains: 'abcd',
-    referrerPolicy: TILE_REFERRER_POLICY,
-    attribution: `&copy; OpenStreetMap contributors &copy; CARTO | ${DATA_CREDIT}`,
-  }),
+  'CARTO Voyager': L.tileLayer(
+    'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_5f3l_1_c31d40cdeb2723aade9ac21c',
+    {
+      maxZoom: 19,
+      maxNativeZoom: 19,
+      referrerPolicy: TILE_REFERRER_POLICY,
+      attribution: `&copy; OpenStreetMap contributors &copy; CARTO | ${DATA_CREDIT}`,
+    }
+  ),
   'Esri World Topo': L.tileLayer(`${ESRI}/World_Topo_Map/MapServer/tile/{z}/{y}/{x}`, {
     maxZoom: 17,
     maxNativeZoom: 17,

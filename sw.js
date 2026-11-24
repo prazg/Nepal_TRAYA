@@ -10,8 +10,8 @@
  * - Cleans up obsolete cache versions atomically on activate.
  */
 
-const CACHE_NAME = 'traya-v2-shell-1';
-const DATA_CACHE = 'traya-v2-data-1';
+const CACHE_NAME = 'traya-v2-shell-2';
+const DATA_CACHE = 'traya-v2-data-2';
 const ACTIVE_CACHES = new Set([CACHE_NAME, DATA_CACHE]);
 
 const SHELL_ASSETS = [
